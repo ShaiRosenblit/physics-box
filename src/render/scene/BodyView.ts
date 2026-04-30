@@ -7,6 +7,7 @@ interface BodyEntry {
   readonly kind: BodyView["kind"];
   readonly material: BodyView["material"];
   readonly chargeSign: -1 | 0 | 1;
+  readonly dipoleSign: -1 | 0 | 1;
 }
 
 /**
@@ -28,12 +29,14 @@ export class BodyLayer {
     for (const body of snapshot.bodies) {
       seen.add(body.id);
       const sign = signOf(body.charge);
+      const dSign = body.kind === "magnet" ? signOf(body.dipole) : 0;
       let entry = this.entries.get(body.id);
       if (
         !entry ||
         entry.kind !== body.kind ||
         entry.material !== body.material ||
-        entry.chargeSign !== sign
+        entry.chargeSign !== sign ||
+        entry.dipoleSign !== dSign
       ) {
         if (entry) {
           this.node.removeChild(entry.node);
@@ -41,7 +44,13 @@ export class BodyLayer {
         }
         const node = drawBody(body, this.cameraZoomGetter());
         this.node.addChild(node);
-        entry = { node, kind: body.kind, material: body.material, chargeSign: sign };
+        entry = {
+          node,
+          kind: body.kind,
+          material: body.material,
+          chargeSign: sign,
+          dipoleSign: dSign,
+        };
         this.entries.set(body.id, entry);
       }
       entry.node.position.set(body.position.x, body.position.y);
@@ -91,6 +100,8 @@ function drawBody(body: BodyView, cameraZoom: number): Graphics {
     g.lineTo(tickLen, 0);
     g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
     drawChargeMark(g, body.charge, body.radius, lineWidth);
+  } else if (body.kind === "magnet") {
+    drawMagnet(g, body.radius, body.dipole, lineWidth, style);
   } else {
     const hw = body.width / 2;
     const hh = body.height / 2;
@@ -106,6 +117,35 @@ function signOf(q: number): -1 | 0 | 1 {
   if (q > 0) return 1;
   if (q < 0) return -1;
   return 0;
+}
+
+function drawMagnet(
+  g: Graphics,
+  radius: number,
+  dipole: number,
+  lineWidth: number,
+  style: { fill: number; edge: number },
+): void {
+  const top = dipole >= 0 ? palette.magnetN : palette.magnetS;
+  const bot = dipole >= 0 ? palette.magnetS : palette.magnetN;
+  // Body disc background
+  g.circle(0, 0, radius);
+  g.fill({ color: style.fill, alpha: 1 });
+  g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+  // Top half (north)
+  g.beginPath();
+  g.arc(0, 0, radius * 0.78, 0, Math.PI, false);
+  g.lineTo(-radius * 0.78, 0);
+  g.fill({ color: top, alpha: 0.9 });
+  // Bottom half (south)
+  g.beginPath();
+  g.arc(0, 0, radius * 0.78, Math.PI, Math.PI * 2, false);
+  g.lineTo(radius * 0.78, 0);
+  g.fill({ color: bot, alpha: 0.9 });
+  // Equator stroke
+  g.moveTo(-radius * 0.78, 0);
+  g.lineTo(radius * 0.78, 0);
+  g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.6 });
 }
 
 function drawChargeMark(

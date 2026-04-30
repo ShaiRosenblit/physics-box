@@ -21,6 +21,9 @@ export type {
   ConstraintView,
   HingeSpec,
   Id,
+  MagnetSpec,
+  MagnetView,
+  MagneticSourceView,
   MaterialName,
   RopeSpec,
   RopeView,
@@ -34,6 +37,7 @@ export type {
 export {
   ball,
   box,
+  magnet,
   rope,
   hinge,
   spring,
@@ -49,6 +53,7 @@ export { emConstants, type EmConstants } from "./electromagnetism/constants";
 export type {
   BallInput,
   BoxInput,
+  MagnetInput,
   RopeInput,
   HingeInput,
   SpringInput,

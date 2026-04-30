@@ -5,7 +5,7 @@ export interface Vec2 {
   readonly y: number;
 }
 
-export type BodyKind = "ball" | "box";
+export type BodyKind = "ball" | "box" | "magnet";
 
 export type MaterialName = "wood" | "metal" | "cork";
 
@@ -30,7 +30,14 @@ export interface BoxSpec extends BaseBodySpec {
   readonly height: number;
 }
 
-export type BodySpec = BallSpec | BoxSpec;
+export interface MagnetSpec extends BaseBodySpec {
+  readonly kind: "magnet";
+  readonly radius: number;
+  /** Signed scalar dipole moment. + is "north" by convention. */
+  readonly dipole: number;
+}
+
+export type BodySpec = BallSpec | BoxSpec | MagnetSpec;
 
 export interface BaseBodyView {
   readonly id: Id;
@@ -54,7 +61,13 @@ export interface BoxView extends BaseBodyView {
   readonly height: number;
 }
 
-export type BodyView = BallView | BoxView;
+export interface MagnetView extends BaseBodyView {
+  readonly kind: "magnet";
+  readonly radius: number;
+  readonly dipole: number;
+}
+
+export type BodyView = BallView | BoxView | MagnetView;
 
 export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }
@@ -119,10 +132,17 @@ export interface ChargedSourceView {
   readonly charge: number;
 }
 
+export interface MagneticSourceView {
+  readonly id: Id;
+  readonly position: Vec2;
+  readonly dipole: number;
+}
+
 export interface Snapshot {
   readonly tick: number;
   readonly time: number;
   readonly bodies: readonly BodyView[];
   readonly constraints: readonly ConstraintView[];
   readonly charges: readonly ChargedSourceView[];
+  readonly magnets: readonly MagneticSourceView[];
 }

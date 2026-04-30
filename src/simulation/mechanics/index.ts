@@ -1,5 +1,6 @@
 export { ball, type BallInput } from "./ball";
 export { box, type BoxInput } from "./box";
+export { magnet, type MagnetInput } from "./magnet";
 export { rope, type RopeInput } from "./rope";
 export { hinge, type HingeInput } from "./hinge";
 export { spring, type SpringInput } from "./spring";

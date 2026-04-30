@@ -9,6 +9,7 @@ import type {
   ConstraintView,
   HingeSpec,
   Id,
+  MagneticSourceView,
   RopeSpec,
   Snapshot,
   SpringSpec,
@@ -167,6 +168,29 @@ export class PlanckAdapter {
   }
 
   /**
+   * Live state of all magnets. Used by EM solvers to compute B fields
+   * and dipole-on-dipole forces.
+   */
+  collectMagnets(): Array<{
+    id: Id;
+    position: Vec2;
+    dipole: number;
+  }> {
+    const out: Array<{ id: Id; position: Vec2; dipole: number }> = [];
+    for (const [id, record] of this.bodies) {
+      if (record.spec.kind !== "magnet") continue;
+      if (record.spec.dipole === 0) continue;
+      const p = record.body.getPosition();
+      out.push({
+        id,
+        position: { x: p.x, y: p.y },
+        dipole: record.spec.dipole,
+      });
+    }
+    return out;
+  }
+
+  /**
    * Snapshot of all charged bodies' current state. Cheap pass over the
    * bodies map; intended for the EM solvers that run once per substep.
    */
@@ -259,18 +283,30 @@ export class PlanckAdapter {
     });
 
     const charges: ChargedSourceView[] = [];
+    const magnets: MagneticSourceView[] = [];
     for (const id of ids) {
       const record = this.bodies.get(id)!;
       const q = record.spec.charge ?? 0;
-      if (q === 0) continue;
-      const p = record.body.getPosition();
-      charges.push(
-        Object.freeze({
-          id,
-          position: Object.freeze({ x: p.x, y: p.y }),
-          charge: q,
-        }),
-      );
+      if (q !== 0) {
+        const p = record.body.getPosition();
+        charges.push(
+          Object.freeze({
+            id,
+            position: Object.freeze({ x: p.x, y: p.y }),
+            charge: q,
+          }),
+        );
+      }
+      if (record.spec.kind === "magnet" && record.spec.dipole !== 0) {
+        const p = record.body.getPosition();
+        magnets.push(
+          Object.freeze({
+            id,
+            position: Object.freeze({ x: p.x, y: p.y }),
+            dipole: record.spec.dipole,
+          }),
+        );
+      }
     }
 
     return Object.freeze({
@@ -279,6 +315,7 @@ export class PlanckAdapter {
       bodies: Object.freeze(bodies),
       constraints: Object.freeze(constraints),
       charges: Object.freeze(charges),
+      magnets: Object.freeze(magnets),
     });
   }
 
@@ -419,6 +456,9 @@ function makeShape(spec: BodySpec): planck.Shape {
   if (spec.kind === "ball") {
     return new planck.CircleShape(spec.radius);
   }
+  if (spec.kind === "magnet") {
+    return new planck.CircleShape(spec.radius);
+  }
   return new planck.BoxShape(spec.width / 2, spec.height / 2);
 }
 
@@ -500,6 +540,14 @@ function buildView(record: BodyRecord): BodyView {
 
   if (spec.kind === "ball") {
     return Object.freeze({ ...base, kind: "ball" as const, radius: spec.radius });
+  }
+  if (spec.kind === "magnet") {
+    return Object.freeze({
+      ...base,
+      kind: "magnet" as const,
+      radius: spec.radius,
+      dipole: spec.dipole,
+    });
   }
   return Object.freeze({
     ...base,
