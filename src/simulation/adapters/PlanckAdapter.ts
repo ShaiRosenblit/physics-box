@@ -23,6 +23,7 @@ import {
   ropeRebuildNeeded,
   springAnchorsMatch,
 } from "../core/constraintPatch";
+import { shiftCenterToKeepBottomEdgeFixed } from "../core/bodyPatch";
 import { lookupMaterial } from "../mechanics/materials";
 import type { BuoyantBodyState } from "../mechanics/buoyancy";
 import {
@@ -312,8 +313,29 @@ export class PlanckAdapter {
   /**
    * Apply a full next spec to an existing body (pose and velocities unchanged).
    * Kind must match the existing body.
+   *
+   * Box/engine height edits anchor the bottom face using the **live** body
+   * transform so edits during Planck's step (world locked) can be deferred
+   * without applying a stale center offset.
    */
-  applyBodySpec(id: Id, nextSpec: BodySpec): void {
+  applyBodySpec(
+    id: Id,
+    nextSpec: BodySpec,
+    opts?: { readonly skipBottomAnchor?: boolean },
+  ): void {
+    const run = () => this.applyBodySpecNow(id, nextSpec, opts);
+    if (this.world.isLocked()) {
+      this.world.queueUpdate(run);
+    } else {
+      run();
+    }
+  }
+
+  private applyBodySpecNow(
+    id: Id,
+    nextSpec: BodySpec,
+    opts?: { readonly skipBottomAnchor?: boolean },
+  ): void {
     const record = this.bodies.get(id);
     if (!record) return;
     if (record.spec.kind === "engine_rotor") return;
@@ -325,15 +347,35 @@ export class PlanckAdapter {
     if (this.dragState?.id === id && (nextSpec.fixed ?? false)) this.endDrag();
 
     const body = record.body;
-    const rebuild = fixturesNeedRebuild(oldSpec, nextSpec);
-    const fixedChanged = (oldSpec.fixed ?? false) !== (nextSpec.fixed ?? false);
+
+    let resolvedSpec = nextSpec;
+    if (
+      !opts?.skipBottomAnchor &&
+      (oldSpec.kind === "box" || oldSpec.kind === "engine") &&
+      (nextSpec.kind === "box" || nextSpec.kind === "engine")
+    ) {
+      const dh = nextSpec.height - oldSpec.height;
+      if (Math.abs(dh) > 1e-12) {
+        const bp = body.getPosition();
+        const angle = nextSpec.angle ?? body.getAngle();
+        const p = shiftCenterToKeepBottomEdgeFixed(
+          { x: bp.x, y: bp.y },
+          angle,
+          dh,
+        );
+        resolvedSpec = { ...nextSpec, position: p };
+      }
+    }
+
+    const rebuild = fixturesNeedRebuild(oldSpec, resolvedSpec);
+    const fixedChanged = (oldSpec.fixed ?? false) !== (resolvedSpec.fixed ?? false);
 
     if (rebuild) {
-      rebuildBodyFixtures(body, nextSpec);
+      rebuildBodyFixtures(body, resolvedSpec);
     }
 
     if (fixedChanged) {
-      if (nextSpec.fixed) {
+      if (resolvedSpec.fixed) {
         body.setStatic();
         body.setLinearVelocity(planck.Vec2(0, 0));
         body.setAngularVelocity(0);
@@ -342,28 +384,28 @@ export class PlanckAdapter {
       }
     }
 
-    body.setLinearDamping(nextSpec.linearDamping ?? 0);
-    body.setAngularDamping(nextSpec.angularDamping ?? 0);
+    body.setLinearDamping(resolvedSpec.linearDamping ?? 0);
+    body.setAngularDamping(resolvedSpec.angularDamping ?? 0);
 
     const curP = body.getPosition();
     const curA = body.getAngle();
-    const wantA = nextSpec.angle ?? 0;
+    const wantA = resolvedSpec.angle ?? 0;
     const poseEps = 1e-5;
     const poseMoved =
-      Math.abs(nextSpec.position.x - curP.x) > poseEps ||
-      Math.abs(nextSpec.position.y - curP.y) > poseEps ||
+      Math.abs(resolvedSpec.position.x - curP.x) > poseEps ||
+      Math.abs(resolvedSpec.position.y - curP.y) > poseEps ||
       Math.abs(wantA - curA) > poseEps;
 
-    let outSpec = nextSpec;
+    let outSpec = resolvedSpec;
     if (poseMoved) {
       body.setTransform(
-        planck.Vec2(nextSpec.position.x, nextSpec.position.y),
+        planck.Vec2(resolvedSpec.position.x, resolvedSpec.position.y),
         wantA,
       );
       body.setLinearVelocity(planck.Vec2(0, 0));
       body.setAngularVelocity(0);
       outSpec = {
-        ...nextSpec,
+        ...resolvedSpec,
         velocity: { x: 0, y: 0 },
         angularVelocity: 0,
       };
@@ -372,7 +414,7 @@ export class PlanckAdapter {
         if (asm) {
           const rBody = this.bodies.get(asm.rotorId)!.body;
           rBody.setTransform(
-            planck.Vec2(nextSpec.position.x, nextSpec.position.y),
+            planck.Vec2(resolvedSpec.position.x, resolvedSpec.position.y),
             wantA,
           );
           rBody.setLinearVelocity(planck.Vec2(0, 0));

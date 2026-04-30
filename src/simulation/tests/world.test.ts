@@ -252,6 +252,35 @@ describe("World", () => {
     expect(v.position.x).toBeCloseTo(0, 5);
   });
 
+  it("patchBody height on workshop floor keeps bottom on floor top (y = 0)", () => {
+    const world = new World();
+    world.add(
+      box({
+        position: { x: 0, y: -0.25 },
+        width: 40,
+        height: 0.5,
+        fixed: true,
+        material: "wood",
+      }),
+    );
+    const id = world.add(
+      box({
+        position: { x: 0, y: 0.45 },
+        width: 0.9,
+        height: 0.9,
+        material: "wood",
+      }),
+    );
+    stepFor(world, 400);
+    const settled = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
+    const bottomBefore = settled.position.y - settled.height / 2;
+    expect(Math.abs(bottomBefore)).toBeLessThan(0.02);
+    world.patchBody(id, { height: 1.5 });
+    const after = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
+    const bottomAfter = after.position.y - after.height / 2;
+    expect(bottomAfter).toBeCloseTo(bottomBefore, 2);
+  });
+
   it("patchBody skips bottom anchor when position is set in the same patch", () => {
     const world = new World();
     const id = world.add(

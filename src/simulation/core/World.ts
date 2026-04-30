@@ -17,7 +17,6 @@ import type {
   Vec2,
 } from "./types";
 import {
-  anchorBottomEdgeOnHeightChange,
   clampBodySpecToConfig,
   mergeBodyPatch,
 } from "./bodyPatch";
@@ -281,9 +280,10 @@ export class World {
     const prev = this._adapter.getBodySpec(housingId);
     if (!prev) return;
     const merged = mergeBodyPatch(prev, patch);
-    const clamped = clampBodySpecToConfig(merged, this._config);
-    const next = anchorBottomEdgeOnHeightChange(prev, clamped, patch);
-    this._adapter.applyBodySpec(housingId, next);
+    const next = clampBodySpecToConfig(merged, this._config);
+    this._adapter.applyBodySpec(housingId, next, {
+      skipBottomAnchor: patch.position !== undefined,
+    });
     this._charges.register(housingId, next.charge ?? 0);
   }
 
