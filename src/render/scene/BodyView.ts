@@ -142,6 +142,30 @@ export class BodyLayer {
   }
 }
 
+/**
+ * When this string changes, drawn body geometry must be rebuilt — `BodyLayer`
+ * only recreates nodes on style key mismatch, not on every snapshot.
+ */
+function bodyGeometryKey(body: BodyView): string {
+  switch (body.kind) {
+    case "ball":
+    case "balloon":
+    case "magnet":
+    case "engine_rotor":
+      return `r${body.radius}`;
+    case "box":
+      return `${body.width}x${body.height}`;
+    case "engine":
+      return `${body.width}x${body.height}r${body.rotorRadius}`;
+    case "crank":
+      return `r${body.radius}@${body.pinLocal.x},${body.pinLocal.y}`;
+    default: {
+      const _exhaustive: never = body;
+      return _exhaustive;
+    }
+  }
+}
+
 function woodBoxUseNineSlice(
   body: Extract<BodyView, { kind: "box" }>,
   raster: RasterBodyTextures,
@@ -174,7 +198,7 @@ function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
     body.material === "wood" &&
     raster.woodBall !== undefined;
   const crank = body.kind === "crank" ? "C" : "-";
-  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}:${crank}`;
+  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}:${crank}:${bodyGeometryKey(body)}`;
 }
 
 function createBodyNode(
