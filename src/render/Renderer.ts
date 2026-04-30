@@ -7,7 +7,6 @@ import {
 } from "../simulation";
 import { Camera } from "./camera/Camera";
 import { CameraController } from "./camera/CameraController";
-import { BenchBackdrop } from "./scene/BenchBackdrop";
 import { BodyLayer, SelectionView } from "./scene/BodyView";
 import { loadRenderTextures } from "./loadRenderTextures";
 import {
@@ -32,7 +31,7 @@ export interface RendererOptions {
  *
  * Consumes immutable Snapshot objects and never reaches back into the
  * simulation kernel. Layers, back to front:
- *   - workbench backdrop (tiled PNG)
+ *   - clear canvas (`palette.paper`)
  *   - adaptive grid (optional)
  *   - electric / magnetic fields
  *   - connectors (ropes, springs, hinges)
@@ -42,7 +41,6 @@ export interface RendererOptions {
 export class Renderer {
   private app: Application | null = null;
   private worldRoot = new Container();
-  private benchBackdrop: BenchBackdrop | null = null;
   private grid = new Grid();
   private bodyLayer: BodyLayer;
   private constraintLayer: ConstraintLayer;
@@ -102,7 +100,6 @@ export class Renderer {
     if (this.app) {
       this._camera.apply(this.worldRoot);
       this.grid.update(this._camera);
-      this.benchBackdrop?.update(this._camera);
     }
   }
 
@@ -174,8 +171,6 @@ export class Renderer {
           this.destroyApp(app);
           return;
         }
-        this.benchBackdrop = new BenchBackdrop(loaded.benchTile);
-        this.worldRoot.addChildAt(this.benchBackdrop.node, 0);
         this.bodyLayer.setRasterTextures({
           woodBox: loaded.woodBox,
           woodBall: loaded.ballWood,
@@ -191,7 +186,6 @@ export class Renderer {
         this._camera.setCanvas(app.renderer.width, app.renderer.height);
         this._camera.apply(this.worldRoot);
         this.grid.update(this._camera);
-        if (this.benchBackdrop) this.benchBackdrop.update(this._camera);
         this._lastGeomZoom = this._camera.zoom;
 
         this.resizeObserver = new ResizeObserver(() => this.handleResize());
@@ -226,7 +220,6 @@ export class Renderer {
 
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
-    this.benchBackdrop?.update(this._camera);
 
     if (
       this._geomDirty &&
@@ -278,8 +271,6 @@ export class Renderer {
     this.bodyLayer.clear();
     this.constraintLayer.clear();
     this.connectorPreview.clear();
-    this.benchBackdrop?.destroy();
-    this.benchBackdrop = null;
 
     if (this._ready && this.app) {
       this.destroyApp(this.app);
@@ -304,7 +295,6 @@ export class Renderer {
     this._camera.setCanvas(this.app.renderer.width, this.app.renderer.height);
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
-    this.benchBackdrop?.update(this._camera);
   }
 }
 
