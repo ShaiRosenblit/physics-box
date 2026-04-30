@@ -52,10 +52,13 @@ src/
 npm install        # install deps
 npm run dev        # start dev server (Vite)
 npm run typecheck  # TypeScript project references typecheck
-npm run test       # run Vitest suites once
+npm run test       # run Vitest kernel suites once
 npm run test:watch # watch mode
+npm run test:e2e   # run Playwright UI smoke (chromium)
 npm run build      # typecheck + production build
 ```
+
+The Playwright smoke spec doubles as the workflow rule's "Playwright MCP smoke pass" — it asserts presence/labels of the toolbar, inspector, playback bar, and canvas, plus playback semantics (advance, pause, step, reset). It also captures a reference screenshot at `tests/smoke/screenshots/welcome.png`.
 
 ## Development workflow
 

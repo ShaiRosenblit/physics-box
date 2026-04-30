@@ -33,6 +33,8 @@ export class Renderer {
   private _controller = new CameraController();
   private resizeObserver: ResizeObserver | null = null;
   private _initPromise: Promise<void> | null = null;
+  private _ready = false;
+  private _disposed = false;
   private _lastGeomZoom = 0;
   private _geomDirty = false;
 
@@ -58,7 +60,7 @@ export class Renderer {
   }
 
   get isReady(): boolean {
-    return this.app !== null;
+    return this._ready;
   }
 
   /**
@@ -81,6 +83,10 @@ export class Renderer {
         autoStart: false,
       })
       .then(() => {
+        if (this._disposed) {
+          this.destroyApp(app);
+          return;
+        }
         host.appendChild(app.canvas);
         app.stage.addChild(this.worldRoot);
         this.worldRoot.addChild(this.grid.node);
@@ -97,6 +103,8 @@ export class Renderer {
         this._controller.attach(host, this._camera, () => {
           this._geomDirty = true;
         });
+
+        this._ready = true;
       });
 
     return this._initPromise;
@@ -123,15 +131,29 @@ export class Renderer {
   }
 
   dispose(): void {
+    if (this._disposed) return;
+    this._disposed = true;
     this._controller.detach();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.bodyLayer.clear();
-    if (this.app) {
-      this.app.destroy(true, { children: true });
-      this.app = null;
+
+    if (this._ready && this.app) {
+      this.destroyApp(this.app);
     }
     this._initPromise = null;
+  }
+
+  private destroyApp(app: Application): void {
+    try {
+      app.destroy(true, { children: true });
+    } catch {
+      // Init may have been cancelled mid-flight; safe to ignore.
+    }
+    if (this.app === app) {
+      this.app = null;
+    }
+    this._ready = false;
   }
 
   private handleResize(): void {
