@@ -463,6 +463,29 @@ export class PlanckAdapter {
     }
   }
 
+  /**
+   * Motor bodies eligible for per-substep drive torque. `active` is false for
+   * static/kinematic bodies and when `fixed` is true.
+   */
+  engineTorqueInputs(): ReadonlyArray<{
+    readonly id: Id;
+    readonly torque: number;
+    readonly active: boolean;
+  }> {
+    const out: Array<{ readonly id: Id; readonly torque: number; readonly active: boolean }> =
+      [];
+    for (const [id, record] of this.bodies) {
+      if (record.spec.kind !== "engine") continue;
+      const spec = record.spec;
+      out.push({
+        id,
+        torque: spec.torque,
+        active: record.body.isDynamic() && !(spec.fixed ?? false),
+      });
+    }
+    return out;
+  }
+
   private disposeConstraintRecord(record: ConstraintRecord): void {
     for (const joint of record.joints) this.world.destroyJoint(joint);
     for (const body of record.internalBodies) this.world.destroyBody(body);
@@ -833,6 +856,9 @@ function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
     if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
   }
   if (oldS.kind === "box" && newS.kind === "box") {
+    if (oldS.width !== newS.width || oldS.height !== oldS.height) return true;
+  }
+  if (oldS.kind === "engine" && newS.kind === "engine") {
     if (oldS.width !== newS.width || oldS.height !== newS.height) return true;
   }
   if (oldS.kind === "magnet" && newS.kind === "magnet") {
@@ -1016,6 +1042,15 @@ function buildView(record: BodyRecord): BodyView {
       kind: "magnet" as const,
       radius: spec.radius,
       dipole: spec.dipole,
+    });
+  }
+  if (spec.kind === "engine") {
+    return Object.freeze({
+      ...base,
+      kind: "engine" as const,
+      width: spec.width,
+      height: spec.height,
+      torque: spec.torque,
     });
   }
   return Object.freeze({

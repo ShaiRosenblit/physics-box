@@ -24,6 +24,12 @@ export function clampBodySpecToConfig(spec: BodySpec, cfg: SimulationConfig): Bo
     if (d !== m.dipole) next = { ...m, dipole: d };
   }
 
+  if (next.kind === "engine") {
+    const e = next as Extract<BodySpec, { kind: "engine" }>;
+    const t = clampToSymmetricCap(e.torque, cfg.maxMotorTorque);
+    if (t !== e.torque) next = { ...e, torque: t };
+  }
+
   const bs0 = next.buoyancyScale ?? 1;
   const bs = Math.max(0, Math.min(1, bs0));
   const bl0 = next.buoyancyLift ?? 0;
@@ -112,6 +118,12 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
     let b = n;
     if (p.width !== undefined) b = { ...b, width: p.width };
     if (p.height !== undefined) b = { ...b, height: p.height };
+    n = b;
+  } else if (n.kind === "engine") {
+    let b = n;
+    if (p.width !== undefined) b = { ...b, width: p.width };
+    if (p.height !== undefined) b = { ...b, height: p.height };
+    if (p.torque !== undefined) b = { ...b, torque: p.torque };
     n = b;
   } else {
     let m = n;

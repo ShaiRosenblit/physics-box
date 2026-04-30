@@ -5,6 +5,7 @@ import {
   bodyAnchor,
   box,
   defaultSceneName,
+  engine,
   hinge,
   magnet,
   playbackTimeScale,
@@ -290,6 +291,20 @@ export function App() {
           position: world,
           radius: p.radius,
           dipole: sign * p.dipoleMagnitude,
+        }),
+      );
+    } else if (kind === "engine+" || kind === "engine-") {
+      const p = kind === "engine+" ? presets.enginePlus : presets.engineMinus;
+      const sign = kind === "engine+" ? 1 : -1;
+      sim.add(
+        engine({
+          position: world,
+          width: p.width,
+          height: p.height,
+          torque: sign * p.torqueMagnitude,
+          material: p.material,
+          linearDamping: p.linearDamping,
+          angularDamping: p.angularDamping,
         }),
       );
     } else if (kind === "box") {

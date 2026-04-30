@@ -105,6 +105,32 @@ export const MagnetSIcon = (p: Props) => (
   </Svg>
 );
 
+/** Motor torque CCW (positive Planck z). */
+export const EngineCCWIcon = (p: Props) => (
+  <Svg {...p}>
+    <rect x="3.2" y="4" width="9.6" height="8" rx="1" />
+    <path
+      d="M11.2 3.2a4.2 4.2 0 1 0-7.2 2.2"
+      opacity="0.75"
+      strokeWidth="1.1"
+    />
+    <path d="M11.4 2.6 L10.6 4.2 L12.1 4.4" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+/** Motor torque CW (negative Planck z). */
+export const EngineCWIcon = (p: Props) => (
+  <Svg {...p}>
+    <rect x="3.2" y="4" width="9.6" height="8" rx="1" />
+    <path
+      d="M4.8 3.2a4.2 4.2 0 1 1 7.2 2.2"
+      opacity="0.75"
+      strokeWidth="1.1"
+    />
+    <path d="M4.6 2.6 L5.4 4.2 L3.9 4.4" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
 export const RopeIcon = (p: Props) => (
   <Svg {...p}>
     <circle cx="3" cy="4" r="1.1" fill="currentColor" stroke="none" />

@@ -2,6 +2,7 @@ import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
 import { balloon } from "../mechanics/balloon";
 import { box } from "../mechanics/box";
+import { engine } from "../mechanics/engine";
 import { magnet } from "../mechanics/magnet";
 import { rope } from "../mechanics/rope";
 import { pulley } from "../mechanics/pulley";
@@ -58,6 +59,16 @@ export function welcome(world: World): void {
       radius: 0.28,
       buoyancyLift: 0.42,
       linearDamping: 1.2,
+    }),
+  );
+
+  world.add(
+    engine({
+      position: { x: -3.8, y: 0.14 },
+      width: 0.38,
+      height: 0.24,
+      torque: 140,
+      angularDamping: 0.12,
     }),
   );
 

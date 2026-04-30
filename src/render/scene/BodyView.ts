@@ -163,13 +163,14 @@ function woodBoxUseNineSlice(
 function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
   const sign = signOf(body.charge);
   const dSign = body.kind === "magnet" ? signOf(body.dipole) : 0;
+  const tSign = body.kind === "engine" ? signOf(body.torque) : 0;
   const woodBox =
     body.kind === "box" && woodBoxUseNineSlice(body, raster);
   const woodBall =
     body.kind === "ball" &&
     body.material === "wood" &&
     raster.woodBall !== undefined;
-  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}`;
+  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}`;
 }
 
 function createBodyNode(
@@ -274,6 +275,41 @@ function wrapRasterWoodBall(
   return c;
 }
 
+function drawEngineBody(
+  g: Graphics,
+  body: Extract<BodyView, { kind: "engine" }>,
+  lineWidth: number,
+  style: { fill: number; edge: number },
+): void {
+  const hw = body.width / 2;
+  const hh = body.height / 2;
+  g.rect(-hw, -hh - 0.04, body.width, body.height);
+  g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow * 0.9 });
+  g.rect(-hw, -hh, body.width, body.height);
+  g.fill({ color: style.fill, alpha: 1 });
+  g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+
+  const tab = Math.min(hw, hh) * 0.22;
+  g.moveTo(hw, -tab);
+  g.lineTo(hw + tab * 0.85, -tab);
+  g.lineTo(hw + tab * 0.85, tab);
+  g.lineTo(hw, tab);
+  g.stroke({ width: lineWidth * 0.85, color: style.edge, alpha: 0.72 });
+
+  const rr = Math.min(hw, hh) * 0.5;
+  const ccw = body.torque >= 0;
+  const a0 = ccw ? 0.12 * Math.PI : -0.12 * Math.PI;
+  const a1 = ccw ? a0 - 1.1 * Math.PI : a0 + 1.1 * Math.PI;
+  g.arc(0, 0, rr, a0, a1, !ccw);
+  g.stroke({
+    width: lineWidth * 0.72,
+    color: palette.inkMuted,
+    alpha: 0.52,
+  });
+
+  drawChargeMark(g, body.charge, Math.min(hw, hh), lineWidth);
+}
+
 function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
   const g = new Graphics();
   const lineWidth = stroke.bodyOutline / cameraZoom;
@@ -294,6 +330,8 @@ function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
     g.lineTo(tickLen, 0);
     g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
     drawChargeMark(g, body.charge, body.radius, lineWidth);
+  } else if (body.kind === "engine") {
+    drawEngineBody(g, body, lineWidth, style);
   } else if (body.kind === "magnet") {
     g.circle(0, -0.04, body.radius);
     g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });

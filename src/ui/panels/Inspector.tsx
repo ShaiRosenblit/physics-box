@@ -380,7 +380,7 @@ function constraintKindShort(kind: ConstraintView["kind"]): string {
 
 function BodyDetails({ view }: { view: BodyView }) {
   const { patchBody, world } = useSimulationContext();
-  const { maxCharge, maxDipole, maxBuoyancyLift } = world.config;
+  const { maxCharge, maxDipole, maxBuoyancyLift, maxMotorTorque } = world.config;
   const speed = Math.hypot(view.velocity.x, view.velocity.y);
 
   const ctl = inspectorControlStyle;
@@ -466,7 +466,10 @@ function BodyDetails({ view }: { view: BodyView }) {
         </select>
       </div>
 
-      {(view.kind === "ball" || view.kind === "balloon" || view.kind === "box") && (
+      {(view.kind === "ball" ||
+        view.kind === "balloon" ||
+        view.kind === "box" ||
+        view.kind === "engine") && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Charge</span>
           <input
@@ -512,6 +515,29 @@ function BodyDetails({ view }: { view: BodyView }) {
         </div>
       )}
 
+      {view.kind === "engine" && (
+        <div style={editRowStyle}>
+          <span style={editLabelStyle}>Torque</span>
+          <input
+            aria-label="Motor torque"
+            type="number"
+            min={-maxMotorTorque}
+            max={maxMotorTorque}
+            step={1}
+            style={ctl}
+            value={view.torque}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v)) {
+                patchBody(view.id, {
+                  torque: Math.max(-maxMotorTorque, Math.min(maxMotorTorque, v)),
+                });
+              }
+            }}
+          />
+        </div>
+      )}
+
       {(view.kind === "ball" || view.kind === "balloon") && (
         <>
           <div style={editRowStyle}>
@@ -543,7 +569,7 @@ function BodyDetails({ view }: { view: BodyView }) {
         </>
       )}
 
-      {view.kind === "box" && (
+      {(view.kind === "box" || view.kind === "engine") && (
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Width</span>
@@ -723,6 +749,8 @@ function labelOf(kind: BodyView["kind"]): string {
       return "Balloon";
     case "box":
       return "Box";
+    case "engine":
+      return "Engine";
     case "magnet":
       return "Magnet";
   }

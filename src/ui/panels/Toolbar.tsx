@@ -9,6 +9,8 @@ import {
   ChargeMinusIcon,
   ChargePlusIcon,
   EFieldIcon,
+  EngineCCWIcon,
+  EngineCWIcon,
   GridIcon,
   HingeIcon,
   MagnetNIcon,
@@ -38,6 +40,8 @@ const bodyTools: readonly ToolDef[] = [
   { id: "ball-", label: "Ball (−)", icon: ChargeMinusIcon },
   { id: "magnet+", label: "Magnet N", icon: MagnetNIcon },
   { id: "magnet-", label: "Magnet S", icon: MagnetSIcon },
+  { id: "engine+", label: "Engine CCW", icon: EngineCCWIcon },
+  { id: "engine-", label: "Engine CW", icon: EngineCWIcon },
 ];
 
 const connectorTools: readonly ToolDef[] = [

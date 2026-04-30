@@ -8,6 +8,7 @@ import {
   type BalloonSpawnPreset,
   type BoxSpawnPreset,
   type ChargedBallSpawnPreset,
+  type EngineSpawnPreset,
   type MagnetSpawnPreset,
   type NeutralBallSpawnPreset,
   type SpawnPresetKey,
@@ -50,7 +51,8 @@ export function SpawnToolOptions() {
   const setSpawnPresetPartial = useUIStore((s) => s.setSpawnPresetPartial);
 
   const mode = activeSpawnModeFromTool(tool);
-  const { maxCharge, maxDipole, maxBuoyancyLift } = useSimulationContext().world.config;
+  const { maxCharge, maxDipole, maxBuoyancyLift, maxMotorTorque } =
+    useSimulationContext().world.config;
 
   if (mode === null) return null;
 
@@ -119,6 +121,17 @@ export function SpawnToolOptions() {
           polarityLabel={mode === "magnet+" ? "Strength (N)" : "Strength (S)"}
         />
       )}
+      {(mode === "engine+" || mode === "engine-") && (
+        <EngineFields
+          preset={
+            mode === "engine+" ? spawnPresets.enginePlus : spawnPresets.engineMinus
+          }
+          onPatch={(p) =>
+            bump(mode === "engine+" ? "enginePlus" : "engineMinus", p)
+          }
+          maxMotorTorque={maxMotorTorque}
+        />
+      )}
       {mode === "box" && (
         <BoxFields preset={spawnPresets.box} onPatch={(p) => bump("box", p)} />
       )}
@@ -130,6 +143,119 @@ export function SpawnToolOptions() {
         />
       )}
     </div>
+  );
+}
+
+function EngineFields(props: {
+  preset: EngineSpawnPreset;
+  onPatch: (p: Partial<EngineSpawnPreset>) => void;
+  maxMotorTorque: number;
+}) {
+  return (
+    <>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Width</span>
+        <input
+          aria-label="Engine width"
+          type="number"
+          min={0.05}
+          step={0.02}
+          style={inputStyle}
+          value={fmtInput(props.preset.width)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ width: Math.max(0.05, v) });
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Height</span>
+        <input
+          aria-label="Engine height"
+          type="number"
+          min={0.05}
+          step={0.02}
+          style={inputStyle}
+          value={fmtInput(props.preset.height)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ height: Math.max(0.05, v) });
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Torque</span>
+        <input
+          aria-label="Engine torque magnitude"
+          type="number"
+          min={0}
+          max={props.maxMotorTorque}
+          step={5}
+          style={inputStyle}
+          value={fmtInput(props.preset.torqueMagnitude)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) {
+              props.onPatch({
+                torqueMagnitude: Math.max(
+                  0,
+                  Math.min(props.maxMotorTorque, v),
+                ),
+              });
+            }
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Material</span>
+        <select
+          aria-label="Engine material"
+          style={inputStyle}
+          value={props.preset.material}
+          onChange={(e) =>
+            props.onPatch({ material: e.target.value as MaterialName })
+          }
+        >
+          {MATERIALS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Lin. damp</span>
+        <input
+          aria-label="Linear damping"
+          type="number"
+          min={0}
+          max={50}
+          step={0.05}
+          style={inputStyle}
+          value={fmtInput(props.preset.linearDamping)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ linearDamping: Math.max(0, v) });
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Ang. damp</span>
+        <input
+          aria-label="Angular damping"
+          type="number"
+          min={0}
+          max={50}
+          step={0.05}
+          style={inputStyle}
+          value={fmtInput(props.preset.angularDamping)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ angularDamping: Math.max(0, v) });
+          }}
+        />
+      </div>
+    </>
   );
 }
 

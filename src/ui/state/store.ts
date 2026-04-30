@@ -16,6 +16,8 @@ export type Tool =
   | "ball-"
   | "magnet+"
   | "magnet-"
+  | "engine+"
+  | "engine-"
   | "rope"
   | "hinge"
   | "spring"
@@ -56,12 +58,24 @@ export interface BalloonSpawnPreset {
   buoyancyLift: number;
 }
 
+export interface EngineSpawnPreset {
+  width: number;
+  height: number;
+  /** Absolute torque before tool sign; clamped to maxMotorTorque at spawn. */
+  torqueMagnitude: number;
+  material: MaterialName;
+  linearDamping: number;
+  angularDamping: number;
+}
+
 export type SpawnPresetsBundle = {
   ball: NeutralBallSpawnPreset;
   ballPlus: ChargedBallSpawnPreset;
   ballMinus: ChargedBallSpawnPreset;
   magnetPlus: MagnetSpawnPreset;
   magnetMinus: MagnetSpawnPreset;
+  enginePlus: EngineSpawnPreset;
+  engineMinus: EngineSpawnPreset;
   box: BoxSpawnPreset;
   balloon: BalloonSpawnPreset;
 };
@@ -100,6 +114,22 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
     magnetMinus: {
       radius: 0.32,
       dipoleMagnitude: 12,
+    },
+    enginePlus: {
+      width: 0.42,
+      height: 0.26,
+      torqueMagnitude: 220,
+      material: "metal",
+      linearDamping: 0,
+      angularDamping: 0.08,
+    },
+    engineMinus: {
+      width: 0.42,
+      height: 0.26,
+      torqueMagnitude: 220,
+      material: "metal",
+      linearDamping: 0,
+      angularDamping: 0.08,
     },
     box: {
       width: 0.7,

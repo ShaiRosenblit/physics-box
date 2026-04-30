@@ -9,7 +9,9 @@ export type SpawnMode =
   | "ball+"
   | "ball-"
   | "magnet+"
-  | "magnet-";
+  | "magnet-"
+  | "engine+"
+  | "engine-";
 export type ConnectorTool = "rope" | "hinge" | "spring" | "pulley";
 
 export type ConnectorPending =
@@ -147,7 +149,9 @@ function isSpawnTool(tool: string): SpawnMode | null {
     tool === "ball+" ||
     tool === "ball-" ||
     tool === "magnet+" ||
-    tool === "magnet-"
+    tool === "magnet-" ||
+    tool === "engine+" ||
+    tool === "engine-"
   ) {
     return tool;
   }

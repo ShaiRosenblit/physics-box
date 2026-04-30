@@ -5,7 +5,7 @@ export interface Vec2 {
   readonly y: number;
 }
 
-export type BodyKind = "ball" | "balloon" | "box" | "magnet";
+export type BodyKind = "ball" | "balloon" | "box" | "engine" | "magnet";
 
 export type MaterialName = "wood" | "metal" | "cork" | "felt" | "latex";
 
@@ -50,6 +50,15 @@ export interface BoxSpec extends BaseBodySpec {
   readonly height: number;
 }
 
+/** Rectangular motor: applies a constant torque to itself each substep while dynamic. */
+export interface EngineSpec extends BaseBodySpec {
+  readonly kind: "engine";
+  readonly width: number;
+  readonly height: number;
+  /** Drive torque (N·m, Planck z); CCW positive. */
+  readonly torque: number;
+}
+
 export interface MagnetSpec extends BaseBodySpec {
   readonly kind: "magnet";
   readonly radius: number;
@@ -61,7 +70,7 @@ export interface MagnetSpec extends BaseBodySpec {
   readonly dipole: number;
 }
 
-export type BodySpec = BallSpec | BalloonSpec | BoxSpec | MagnetSpec;
+export type BodySpec = BallSpec | BalloonSpec | BoxSpec | EngineSpec | MagnetSpec;
 
 /** Sparse mutation payload for patchBody — ignored keys stay unchanged. */
 export interface BodyPatch {
@@ -82,6 +91,7 @@ export interface BodyPatch {
   readonly width?: number;
   readonly height?: number;
   readonly dipole?: number;
+  readonly torque?: number;
 }
 
 export interface BaseBodyView {
@@ -118,13 +128,20 @@ export interface BoxView extends BaseBodyView {
   readonly height: number;
 }
 
+export interface EngineView extends BaseBodyView {
+  readonly kind: "engine";
+  readonly width: number;
+  readonly height: number;
+  readonly torque: number;
+}
+
 export interface MagnetView extends BaseBodyView {
   readonly kind: "magnet";
   readonly radius: number;
   readonly dipole: number;
 }
 
-export type BodyView = BallView | BalloonView | BoxView | MagnetView;
+export type BodyView = BallView | BalloonView | BoxView | EngineView | MagnetView;
 
 export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }
