@@ -1,0 +1,22 @@
+:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background: #f5efe6;
+  color: #2a2520;
+}
+
+* {
+  box-sizing: border-box;
+}
