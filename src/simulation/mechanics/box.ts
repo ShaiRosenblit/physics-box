@@ -10,6 +10,9 @@ export interface BoxInput {
   angularVelocity?: number;
   angle?: number;
   fixed?: boolean;
+  fixtureRestitution?: number;
+  linearDamping?: number;
+  angularDamping?: number;
 }
 
 export function box(input: BoxInput): BoxSpec {
@@ -29,5 +32,10 @@ export function box(input: BoxInput): BoxSpec {
     fixed: input.fixed ?? false,
     material: input.material ?? "wood",
     charge: input.charge,
+    ...(input.fixtureRestitution !== undefined
+      ? { fixtureRestitution: input.fixtureRestitution }
+      : {}),
+    ...(input.linearDamping !== undefined ? { linearDamping: input.linearDamping } : {}),
+    ...(input.angularDamping !== undefined ? { angularDamping: input.angularDamping } : {}),
   };
 }

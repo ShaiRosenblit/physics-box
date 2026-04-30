@@ -17,6 +17,12 @@ export interface BaseBodySpec {
   readonly fixed?: boolean;
   readonly material?: MaterialName;
   readonly charge?: number;
+  /** Overrides `material.restitution` for this body's fixtures when set. */
+  readonly fixtureRestitution?: number;
+  /** Planck body linear damping (default 0). */
+  readonly linearDamping?: number;
+  /** Planck body angular damping (default 0). */
+  readonly angularDamping?: number;
 }
 
 export interface BallSpec extends BaseBodySpec {

@@ -66,6 +66,7 @@ export class PlanckAdapter {
   }
 
   add(id: Id, spec: BodySpec): void {
+    const material = lookupMaterial(spec.material);
     const body = this.world.createBody({
       type: spec.fixed ? "static" : "dynamic",
       position: planck.Vec2(spec.position.x, spec.position.y),
@@ -75,11 +76,10 @@ export class PlanckAdapter {
         : planck.Vec2(0, 0),
       angularVelocity: spec.angularVelocity ?? 0,
       userData: id,
-      linearDamping: 0,
-      angularDamping: 0,
+      linearDamping: spec.linearDamping ?? 0,
+      angularDamping: spec.angularDamping ?? 0,
     });
 
-    const material = lookupMaterial(spec.material);
     const shape = makeShape(spec);
 
     const filter = collisionFilter(spec);
@@ -87,7 +87,7 @@ export class PlanckAdapter {
       shape,
       density: material.density,
       friction: material.friction,
-      restitution: material.restitution,
+      restitution: spec.fixtureRestitution ?? material.restitution,
       ...(filter ?? {}),
     });
 

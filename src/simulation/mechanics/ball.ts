@@ -10,6 +10,9 @@ export interface BallInput {
   angle?: number;
   fixed?: boolean;
   collideWithBalls?: boolean;
+  fixtureRestitution?: number;
+  linearDamping?: number;
+  angularDamping?: number;
 }
 
 export function ball(input: BallInput): BallSpec {
@@ -27,8 +30,13 @@ export function ball(input: BallInput): BallSpec {
     material: input.material ?? "wood",
     charge: input.charge,
   };
-  if (input.collideWithBalls === false) {
-    return { ...spec, collideWithBalls: false };
-  }
-  return spec;
+  return {
+    ...spec,
+    ...(input.collideWithBalls === false ? { collideWithBalls: false as const } : {}),
+    ...(input.fixtureRestitution !== undefined
+      ? { fixtureRestitution: input.fixtureRestitution }
+      : {}),
+    ...(input.linearDamping !== undefined ? { linearDamping: input.linearDamping } : {}),
+    ...(input.angularDamping !== undefined ? { angularDamping: input.angularDamping } : {}),
+  };
 }

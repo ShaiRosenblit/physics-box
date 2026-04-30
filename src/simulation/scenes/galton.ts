@@ -22,6 +22,9 @@ function halton1d(index: number, base: 2 | 3): number {
  */
 export function galton(world: World): void {
   const groundHeight = 0.5;
+  /** Top surface of the floor plate (see empty / welcome scenes). */
+  const groundTopY = 0;
+
   world.add(
     box({
       position: { x: 0, y: -groundHeight / 2 },
@@ -37,6 +40,8 @@ export function galton(world: World): void {
   const pegDy = 0.31;
   const numRows = 10;
   const pegArenaTop = 6.85;
+  /** Pegs: very low restitution so marbles deflect sideways with little kick. */
+  const pegRestitution = 0.02;
 
   for (let row = 0; row < numRows; row++) {
     const count = row + 1;
@@ -49,6 +54,7 @@ export function galton(world: World): void {
           radius: pegRadius,
           fixed: true,
           material: "metal",
+          fixtureRestitution: pegRestitution,
         }),
       );
     }
@@ -57,8 +63,22 @@ export function galton(world: World): void {
   const outerHalf =
     ((numRows - 1) / 2) * pegDx + pegRadius + 0.12;
   const wallThickness = 0.22;
-  const wallHeight = 10.8;
-  const wallCenterY = pegArenaTop - ((numRows - 1) * pegDy) / 2 + 0.35;
+  /** Softer wall hits so beads do not rebound out of the board. */
+  const wallRestitution = 0.06;
+
+  const dropBallRadius = 0.042;
+  const numDropBalls = 42;
+  /** Bottom of hopper strip — clear of top peg row. */
+  const hopperY0 = pegArenaTop + pegRadius + dropBallRadius + 0.42;
+  /** Tall vertical span; X stays in a slit around x = 0. */
+  const hopperYSpan = 3.25;
+  /** Narrow band around x = 0 (half-width ~ few cm). */
+  const hopperHalfX = 0.052;
+
+  const hopperTopY = hopperY0 + hopperYSpan;
+  const wallTopY = hopperTopY + 0.35;
+  const wallHeight = wallTopY - groundTopY;
+  const wallCenterY = wallHeight / 2;
 
   world.add(
     box({
@@ -67,6 +87,7 @@ export function galton(world: World): void {
       height: wallHeight,
       fixed: true,
       material: "metal",
+      fixtureRestitution: wallRestitution,
     }),
   );
   world.add(
@@ -76,6 +97,7 @@ export function galton(world: World): void {
       height: wallHeight,
       fixed: true,
       material: "metal",
+      fixtureRestitution: wallRestitution,
     }),
   );
 
@@ -95,18 +117,14 @@ export function galton(world: World): void {
         height: binDividerHalfHeight * 2,
         fixed: true,
         material: "metal",
+        fixtureRestitution: wallRestitution,
       }),
     );
   }
 
-  const dropBallRadius = 0.042;
-  const numDropBalls = 42;
-  /** Bottom of hopper strip — clear of top peg row. */
-  const hopperY0 = pegArenaTop + pegRadius + dropBallRadius + 0.42;
-  /** Tall vertical span; X stays in a slit around x = 0. */
-  const hopperYSpan = 3.25;
-  /** Narrow band around x = 0 (half-width ~ few cm). */
-  const hopperHalfX = 0.052;
+  /** Bleed off speed between peg hits so paths stay inside the lattice. */
+  const marbleLinearDamping = 0.22;
+  const marbleRestitution = 0.06;
 
   for (let i = 0; i < numDropBalls; i++) {
     const u = halton1d(i, 2);
@@ -119,6 +137,8 @@ export function galton(world: World): void {
         radius: dropBallRadius,
         material: "wood",
         collideWithBalls: false,
+        fixtureRestitution: marbleRestitution,
+        linearDamping: marbleLinearDamping,
       }),
     );
   }
