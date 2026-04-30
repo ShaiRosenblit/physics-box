@@ -36,7 +36,7 @@ export function balloon(input: BalloonInput): BalloonSpec {
     material: input.material ?? "latex",
     charge: input.charge,
     buoyancyScale: input.buoyancyScale ?? 1,
-    buoyancyLift: input.buoyancyLift ?? 14,
+    buoyancyLift: input.buoyancyLift ?? 1,
     linearDamping: input.linearDamping ?? 0.35,
     angularDamping: input.angularDamping ?? 0.25,
   };

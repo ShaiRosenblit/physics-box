@@ -114,7 +114,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       linearDamping: 0.35,
       angularDamping: 0.25,
       collideDynamicBalls: true,
-      buoyancyLift: 14,
+      buoyancyLift: 1,
     },
   };
 }
