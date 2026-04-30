@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Id, SceneName } from "../../simulation";
+import { defaultSceneName, type Id, type SceneName } from "../../simulation";
 
 export type Tool =
   | "select"
@@ -11,16 +11,18 @@ export type Tool =
   | "magnet-"
   | "rope"
   | "hinge"
-  | "spring";
+  | "spring"
+  | "pulley";
 
 /** Connector tools place a constraint over two clicks rather than spawning a body. */
 export const CONNECTOR_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
   "rope",
   "hinge",
   "spring",
+  "pulley",
 ]);
 
-export function isConnectorTool(tool: Tool): tool is "rope" | "hinge" | "spring" {
+export function isConnectorTool(tool: Tool): tool is "rope" | "hinge" | "spring" | "pulley" {
   return CONNECTOR_TOOLS.has(tool);
 }
 
@@ -56,6 +58,7 @@ export interface UIState {
   setInspectorOpen: (open: boolean) => void;
   setDragging: (dragging: boolean) => void;
   setRunning: (running: boolean) => void;
+  setScene: (scene: SceneName) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -74,7 +77,7 @@ export const useUIStore = create<UIState>((set) => ({
   dragging: false,
 
   running: true,
-  scene: "welcome",
+  scene: defaultSceneName,
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -90,4 +93,5 @@ export const useUIStore = create<UIState>((set) => ({
   setDragging: (dragging) =>
     set((s) => (s.dragging === dragging ? s : { dragging })),
   setRunning: (running) => set({ running }),
+  setScene: (scene) => set({ scene }),
 }));

@@ -104,10 +104,11 @@ for (const vp of VIEWPORTS) {
 test("phone: selection shows peek, drag suppresses it, drawer never auto-opens", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.getByTestId("scene-select").selectOption("welcome");
 
-  // Wait until the dev probe is mounted (first effect runs after Pixi attach).
+    // Wait until the dev probe is mounted (first effect runs after Pixi attach).
   await page.waitForFunction(() => Boolean(window.__pb));
 
   // Pick the first body in the welcome scene to act as our selection.
@@ -166,6 +167,7 @@ for (const vp of VIEWPORTS) {
   }) => {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto("/");
+    await page.getByTestId("scene-select").selectOption("welcome");
     await page.waitForFunction(() => Boolean(window.__pb));
 
     // Allow one RAF for the fit-to-content path to apply.

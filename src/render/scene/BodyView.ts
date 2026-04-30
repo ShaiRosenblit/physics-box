@@ -17,6 +17,19 @@ export interface RasterBodyTextures {
 /** 128² nine-slice PNG: keep outer ~25% as fixed corners/bracing. */
 const WOOD_BOX_SLICE = 32;
 
+/**
+ * Below this size (world units), nine-slice wood boxes collapse visually —
+ * the fixed top/bottom caps consume almost all height, so the plank
+ * disappears while outlines and overlays (e.g. hinge markers) remain.
+ */
+const MIN_WOOD_BOX_NINESLICE_DIM = 0.22;
+
+/**
+ * Long thin strips (low min / max side ratio) also break nine-slice; use
+ * procedural wood so seesaw planks and similar stay visible.
+ */
+const MIN_WOOD_BOX_NINESLICE_ASPECT = 0.26;
+
 interface BodyEntry {
   readonly node: Container;
   readonly styleKey: string;
@@ -95,14 +108,29 @@ export class BodyLayer {
   }
 }
 
+function woodBoxUseNineSlice(
+  body: Extract<BodyView, { kind: "box" }>,
+  raster: RasterBodyTextures,
+): boolean {
+  if (
+    body.material !== "wood" ||
+    body.fixed ||
+    raster.woodBox === undefined
+  ) {
+    return false;
+  }
+  const minD = Math.min(body.width, body.height);
+  const maxD = Math.max(body.width, body.height);
+  if (minD < MIN_WOOD_BOX_NINESLICE_DIM) return false;
+  if (minD < MIN_WOOD_BOX_NINESLICE_ASPECT * maxD) return false;
+  return true;
+}
+
 function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
   const sign = signOf(body.charge);
   const dSign = body.kind === "magnet" ? signOf(body.dipole) : 0;
   const woodBox =
-    body.kind === "box" &&
-    body.material === "wood" &&
-    !body.fixed &&
-    raster.woodBox !== undefined;
+    body.kind === "box" && woodBoxUseNineSlice(body, raster);
   const woodBall =
     body.kind === "ball" &&
     body.material === "wood" &&
@@ -115,13 +143,8 @@ function createBodyNode(
   cameraZoom: number,
   raster: RasterBodyTextures,
 ): Container {
-  if (
-    body.kind === "box" &&
-    body.material === "wood" &&
-    !body.fixed &&
-    raster.woodBox
-  ) {
-    return wrapRasterWoodBox(body, cameraZoom, raster.woodBox);
+  if (body.kind === "box" && woodBoxUseNineSlice(body, raster)) {
+    return wrapRasterWoodBox(body, cameraZoom, raster.woodBox!);
   }
   if (body.kind === "ball" && body.material === "wood" && raster.woodBall) {
     return wrapRasterWoodBall(body, cameraZoom, raster.woodBall);

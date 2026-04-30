@@ -12,6 +12,7 @@ import {
   HingeIcon,
   MagnetNIcon,
   MagnetSIcon,
+  PulleyIcon,
   RopeIcon,
   SelectIcon,
   SpringIcon,
@@ -41,6 +42,7 @@ const connectorTools: readonly ToolDef[] = [
   { id: "rope", label: "Rope", icon: RopeIcon },
   { id: "hinge", label: "Hinge", icon: HingeIcon },
   { id: "spring", label: "Spring", icon: SpringIcon },
+  { id: "pulley", label: "Pulley", icon: PulleyIcon },
 ];
 
 const selectTool: ToolDef = { id: "select", label: "Select", icon: SelectIcon };

@@ -12,4 +12,8 @@ export const scenes: Readonly<Record<SceneName, SceneFn>> = {
 
 export { empty, welcome };
 
-export const defaultSceneName: SceneName = "welcome";
+/** Default sandbox load-out: blank canvas until the user builds or picks a preset. */
+export const defaultSceneName: SceneName = "empty";
+
+/** Stable order for scene menus (avoid relying on object key enumeration). */
+export const sceneIds: readonly SceneName[] = ["empty", "welcome"];

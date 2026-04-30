@@ -6,14 +6,19 @@ import {
   defaultSceneName,
   hinge,
   magnet,
+  type SceneName,
+  pulley,
   rope,
   spring,
   worldAnchor,
   type Anchor,
+  type BodyView,
   type Snapshot,
   type Vec2,
+  type World,
 } from "../simulation";
 import { Renderer } from "../render";
+import type { ConnectorPreviewState } from "../render/scene/ConnectorPreviewView";
 import { Toolbar } from "./panels/Toolbar";
 import { Inspector } from "./panels/Inspector";
 import { InspectorPeek } from "./panels/InspectorPeek";
@@ -30,7 +35,6 @@ import { SimulationProvider } from "./hooks/SimulationContext";
 import {
   usePointerGestures,
   type ConnectorPending,
-  type ConnectorTool,
   type ResolvedAnchor,
   type SpawnMode,
 } from "./canvas/usePointerGestures";
@@ -65,6 +69,8 @@ export function App() {
   const setToolsOpen = useUIStore((s) => s.setToolsOpen);
   const setInspectorOpen = useUIStore((s) => s.setInspectorOpen);
   const setDragging = useUIStore((s) => s.setDragging);
+  const scene = useUIStore((s) => s.scene);
+  const setScene = useUIStore((s) => s.setScene);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -88,6 +94,7 @@ export function App() {
           snap,
           pendingConnectorRef.current,
           previewWorldPointRef.current,
+          sim.world,
         ),
       );
       renderer.render(snap);
@@ -99,8 +106,7 @@ export function App() {
     renderer.attach(host).then(() => {
       if (cancelled) return;
       renderer.setShowGrid(useUIStore.getState().showGrid);
-      // Frame the welcome scene so all elements are visible at any
-      // viewport size on first paint.
+      // Fit camera when bodies exist (empty scenes keep the default framing).
       renderer.fitToContent(sim.world.snapshot());
       last = performance.now();
       raf = requestAnimationFrame(loop);
@@ -173,9 +179,17 @@ export function App() {
   };
   const onReset = () => {
     rendererRef.current?.reset();
-    sim.loadScene(defaultSceneName);
+    sim.loadScene(useUIStore.getState().scene);
     setSelectedId(null);
     setRunning(true);
+    rendererRef.current?.fitToContent(sim.world.snapshot());
+  };
+
+  const onSceneChange = (name: SceneName) => {
+    setScene(name);
+    rendererRef.current?.reset();
+    sim.loadScene(name);
+    setSelectedId(null);
     rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
@@ -206,7 +220,7 @@ export function App() {
   };
 
   const handleConnectorCommit = (
-    tool: ConnectorTool,
+    tool: "rope" | "hinge" | "spring",
     a: ResolvedAnchor,
     b: ResolvedAnchor,
   ) => {
@@ -250,6 +264,28 @@ export function App() {
     }
   };
 
+  const handlePulleyCommit = (
+    center: Vec2,
+    bodyA: ResolvedAnchor,
+    bodyB: ResolvedAnchor,
+  ) => {
+    if (bodyA.kind !== "body" || bodyB.kind !== "body") return;
+    if (bodyA.id === bodyB.id) return;
+    const snap = sim.world.snapshot();
+    const ba = snap.bodies.find((b) => b.id === bodyA.id);
+    const bb = snap.bodies.find((b) => b.id === bodyB.id);
+    if (!ba || !bb || ba.fixed || bb.fixed) return;
+    sim.world.addConstraint(
+      pulley({
+        wheelCenter: center,
+        bodyA: bodyA.id,
+        bodyB: bodyB.id,
+        localAnchorA: hitWorldToBodyLocal(ba, bodyA.hitPoint),
+        localAnchorB: hitWorldToBodyLocal(bb, bodyB.hitPoint),
+      }),
+    );
+  };
+
   const handleConnectorPendingChange = (pending: ConnectorPending | null) => {
     pendingConnectorRef.current = pending;
     if (pending === null) previewWorldPointRef.current = null;
@@ -267,6 +303,7 @@ export function App() {
     onSelect: setSelectedId,
     onDragStateChange: setDragging,
     onConnectorCommit: handleConnectorCommit,
+    onPulleyCommit: handlePulleyCommit,
     onConnectorPendingChange: handleConnectorPendingChange,
     onConnectorPreviewMove: handleConnectorPreviewMove,
   });
@@ -374,6 +411,8 @@ export function App() {
         <PlaybackBar
           tick={sim.tick}
           compact={isPhone}
+          scene={scene}
+          onSceneChange={onSceneChange}
           onPlay={onPlay}
           onPause={onPause}
           onStep={onStep}
@@ -387,6 +426,17 @@ export function App() {
 function toAnchor(a: ResolvedAnchor): Anchor {
   if (a.kind === "body") return bodyAnchor(a.id);
   return worldAnchor(a.point);
+}
+
+function hitWorldToBodyLocal(body: BodyView, hitWorld: Vec2): Vec2 {
+  const dx = hitWorld.x - body.position.x;
+  const dy = hitWorld.y - body.position.y;
+  const c = Math.cos(body.angle);
+  const s = Math.sin(body.angle);
+  return {
+    x: dx * c + dy * s,
+    y: -dx * s + dy * c,
+  };
 }
 
 function resolveAnchorPosition(
@@ -414,18 +464,37 @@ function computePreviewState(
   snap: Snapshot,
   pending: ConnectorPending | null,
   cursor: Vec2 | null,
-):
-  | { kind: ConnectorTool; a: Vec2; b: Vec2; snapping?: boolean }
-  | null {
+  world: World,
+): ConnectorPreviewState | null {
   if (!pending) return null;
+
+  if (pending.tool === "pulley") {
+    const snapping = cursor !== null && world.bodyAt(cursor) !== null;
+    if (pending.stage === "center") {
+      const c = pending.center;
+      const cur = cursor ?? c;
+      return {
+        kind: "pulley-center",
+        center: c,
+        cursor: cur,
+        snapping,
+      };
+    }
+    const pa = resolveAnchorPosition(snap, pending.bodyA);
+    if (!pa) return null;
+    const cur = cursor ?? pa;
+    return {
+      kind: "pulley-body-a",
+      center: pending.center,
+      anchorA: pa,
+      cursor: cur,
+      snapping,
+    };
+  }
+
   const pa = resolveAnchorPosition(snap, pending.a);
   if (!pa) return null;
   const pb = cursor ?? pa;
-  // Snapping indicator: cursor over a body would resolve to a body
-  // anchor on commit; we mirror that with a slightly stronger endpoint.
-  // The hit-test happens at gesture-tap time; here we only know the
-  // pointer position, so we conservatively show "snapping" only when
-  // the pending tool would treat such a hit as valid.
   return { kind: pending.tool, a: pa, b: pb };
 }
 

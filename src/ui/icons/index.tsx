@@ -123,6 +123,15 @@ export const SpringIcon = (p: Props) => (
   </Svg>
 );
 
+export const PulleyIcon = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="8" cy="8" r="4.8" />
+    <circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none" />
+    <path d="M3.5 5.5 L8 8 L12.5 5.5" opacity="0.65" strokeWidth="1.1" />
+    <path d="M3.5 10.5 L8 8 L12.5 10.5" opacity="0.65" strokeWidth="1.1" />
+  </Svg>
+);
+
 export const GridIcon = (p: Props) => (
   <Svg {...p}>
     <rect x="2.5" y="2.5" width="11" height="11" />

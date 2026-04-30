@@ -23,6 +23,7 @@ test.describe("UI smoke", () => {
       "Inspector",
     );
     await expect(page.getByTestId("playback-bar")).toBeVisible();
+    await expect(page.getByTestId("scene-select")).toBeVisible();
     await expect(page.getByTestId("playback-bar")).toHaveAttribute(
       "aria-label",
       "Playback",
@@ -47,6 +48,17 @@ test.describe("UI smoke", () => {
     for (const id of ["toggle-grid", "toggle-e-field", "toggle-b-field"]) {
       await expect(page.getByTestId(id)).toBeVisible();
     }
+
+    await expect(page.getByTestId("toggle-e-field")).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await expect(page.getByTestId("toggle-b-field")).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await page.getByTestId("scene-select").selectOption("welcome");
 
     // Welcome scene seeds charged balls and magnets, so both toggles are live.
     await expect(page.getByTestId("toggle-e-field")).not.toHaveAttribute(
@@ -141,6 +153,7 @@ test.describe("UI smoke", () => {
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
+    await page.getByTestId("scene-select").selectOption("welcome");
     await page.waitForTimeout(4000);
     await page.getByTestId("button-pause").click();
     await page.screenshot({

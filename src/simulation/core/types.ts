@@ -73,7 +73,7 @@ export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }
   | { readonly kind: "body"; readonly id: Id; readonly localPoint?: Vec2 };
 
-export type ConstraintKind = "rope" | "hinge" | "spring";
+export type ConstraintKind = "rope" | "hinge" | "spring" | "pulley";
 
 export interface RopeSpec {
   readonly kind: "rope";
@@ -100,7 +100,19 @@ export interface SpringSpec {
   readonly dampingRatio?: number;
 }
 
-export type ConstraintSpec = RopeSpec | HingeSpec | SpringSpec;
+/** Ideal pulley via Planck `PulleyJoint`: two dynamic bodies, fixed wheel axis in world space. */
+export interface PulleySpec {
+  readonly kind: "pulley";
+  readonly wheelCenter: Vec2;
+  readonly bodyA: Id;
+  readonly bodyB: Id;
+  readonly localAnchorA: Vec2;
+  readonly localAnchorB: Vec2;
+  readonly halfSpread?: number;
+  readonly ratio?: number;
+}
+
+export type ConstraintSpec = RopeSpec | HingeSpec | SpringSpec | PulleySpec;
 
 export interface RopeView {
   readonly id: Id;
@@ -113,6 +125,10 @@ export interface HingeView {
   readonly id: Id;
   readonly kind: "hinge";
   readonly anchor: Vec2;
+  /** First body in the revolute (always present). */
+  readonly bodyA: Id;
+  /** Second body when body-to-body; omitted when hinged to world/ground. */
+  readonly bodyB?: Id;
 }
 
 export interface SpringView {
@@ -124,7 +140,19 @@ export interface SpringView {
   readonly currentLength: number;
 }
 
-export type ConstraintView = RopeView | HingeView | SpringView;
+export interface PulleyView {
+  readonly id: Id;
+  readonly kind: "pulley";
+  readonly wheelCenter: Vec2;
+  readonly halfSpread: number;
+  readonly groundA: Vec2;
+  readonly groundB: Vec2;
+  readonly anchorA: Vec2;
+  readonly anchorB: Vec2;
+  readonly ratio: number;
+}
+
+export type ConstraintView = RopeView | HingeView | SpringView | PulleyView;
 
 export interface ChargedSourceView {
   readonly id: Id;

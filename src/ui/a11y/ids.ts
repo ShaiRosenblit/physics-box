@@ -19,6 +19,7 @@ export const testIds = {
   buttonPause: "button-pause",
   buttonStep: "button-step",
   buttonReset: "button-reset",
+  sceneSelect: "scene-select",
 
   fabTools: "fab-tools",
   fabInspector: "fab-inspector",

@@ -34,8 +34,9 @@ export interface RendererOptions {
  *   - clear canvas (`palette.paper`)
  *   - adaptive grid (optional)
  *   - electric / magnetic fields
- *   - connectors (ropes, springs, hinges)
+ *   - connectors behind bodies (ropes, springs)
  *   - bodies (procedural + optional raster wood)
+ *   - hinge pivot markers (on top of hulls)
  *   - selection ring, connector preview
  */
 export class Renderer {
@@ -178,8 +179,9 @@ export class Renderer {
 
         this.worldRoot.addChild(this.grid.node);
         this.worldRoot.addChild(this.fieldView.container);
-        this.worldRoot.addChild(this.constraintLayer.node);
+        this.worldRoot.addChild(this.constraintLayer.behindBodies);
         this.worldRoot.addChild(this.bodyLayer.node);
+        this.worldRoot.addChild(this.constraintLayer.inFrontOfBodies);
         this.worldRoot.addChild(this.selectionView.node);
         this.worldRoot.addChild(this.connectorPreview.node);
 

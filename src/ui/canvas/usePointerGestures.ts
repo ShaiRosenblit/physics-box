@@ -3,7 +3,24 @@ import type { Camera } from "../../render";
 import type { Id, Vec2, World } from "../../simulation";
 
 export type SpawnMode = "ball" | "box" | "ball+" | "ball-" | "magnet+" | "magnet-";
-export type ConnectorTool = "rope" | "hinge" | "spring";
+export type ConnectorTool = "rope" | "hinge" | "spring" | "pulley";
+
+export type ConnectorPending =
+  | {
+      readonly tool: "rope" | "spring" | "hinge";
+      readonly a: ResolvedAnchor;
+    }
+  | {
+      readonly tool: "pulley";
+      readonly stage: "center";
+      readonly center: Vec2;
+    }
+  | {
+      readonly tool: "pulley";
+      readonly stage: "bodyA";
+      readonly center: Vec2;
+      readonly bodyA: Extract<ResolvedAnchor, { kind: "body" }>;
+    };
 
 /**
  * A click resolved against the world: either a hit on a dynamic body
@@ -13,11 +30,6 @@ export type ConnectorTool = "rope" | "hinge" | "spring";
 export type ResolvedAnchor =
   | { readonly kind: "world"; readonly point: Vec2 }
   | { readonly kind: "body"; readonly id: Id; readonly hitPoint: Vec2 };
-
-export interface ConnectorPending {
-  readonly tool: ConnectorTool;
-  readonly a: ResolvedAnchor;
-}
 
 export interface PointerGestureCallbacks {
   /** Active world reference; required for drag and field sampling. */
@@ -33,9 +45,15 @@ export interface PointerGestureCallbacks {
    * the pair is invalid; the hook still clears the pending state.
    */
   readonly onConnectorCommit?: (
-    tool: ConnectorTool,
+    tool: Exclude<ConnectorTool, "pulley">,
     a: ResolvedAnchor,
     b: ResolvedAnchor,
+  ) => void;
+  /** Pulley: tap wheel center (empty space), then body A, then body B. */
+  readonly onPulleyCommit?: (
+    center: Vec2,
+    bodyA: ResolvedAnchor,
+    bodyB: ResolvedAnchor,
   ) => void;
   /** Notified whenever the connector's pending anchor A changes. */
   readonly onConnectorPendingChange?: (pending: ConnectorPending | null) => void;
@@ -55,7 +73,14 @@ export interface PointerGestureCallbacks {
 }
 
 function isConnectorTool(tool: string): ConnectorTool | null {
-  if (tool === "rope" || tool === "hinge" || tool === "spring") return tool;
+  if (
+    tool === "rope" ||
+    tool === "hinge" ||
+    tool === "spring" ||
+    tool === "pulley"
+  ) {
+    return tool;
+  }
   return null;
 }
 
@@ -67,6 +92,12 @@ function anchorValidForRole(
 ): boolean {
   if (tool === "hinge" && role === "a" && anchor.kind !== "body") return false;
   return true;
+}
+
+function isBodyAnchor(
+  anchor: ResolvedAnchor,
+): anchor is Extract<ResolvedAnchor, { kind: "body" }> {
+  return anchor.kind === "body";
 }
 
 const TAP_MOVEMENT_THRESHOLD = 6; // px
@@ -382,7 +413,49 @@ export function usePointerGestures(
       return { kind: "world", point: worldPt };
     };
 
+    const handlePulleyTap = (worldPt: Vec2) => {
+      if (pendingConnector && pendingConnector.tool !== "pulley") {
+        setPending(null);
+      }
+      const anchor = resolveAnchor(worldPt);
+
+      if (!pendingConnector || pendingConnector.tool !== "pulley") {
+        if (anchor.kind !== "world") return;
+        setPending({
+          tool: "pulley",
+          stage: "center",
+          center: anchor.point,
+        });
+        return;
+      }
+
+      if (pendingConnector.stage === "center") {
+        if (!isBodyAnchor(anchor)) return;
+        setPending({
+          tool: "pulley",
+          stage: "bodyA",
+          center: pendingConnector.center,
+          bodyA: anchor,
+        });
+        return;
+      }
+
+      const pulleyPending = pendingConnector;
+      if (pulleyPending.stage !== "bodyA") return;
+      if (!isBodyAnchor(anchor)) return;
+      if (anchor.id === pulleyPending.bodyA.id) return;
+      const center = pulleyPending.center;
+      const bodyA = pulleyPending.bodyA;
+      setPending(null);
+      cbRef.current.onPulleyCommit?.(center, bodyA, anchor);
+    };
+
     const handleConnectorTap = (tool: ConnectorTool, worldPt: Vec2) => {
+      if (tool === "pulley") {
+        handlePulleyTap(worldPt);
+        return;
+      }
+
       // Switching connector tools mid-pending starts fresh.
       if (pendingConnector && pendingConnector.tool !== tool) {
         setPending(null);
@@ -394,6 +467,8 @@ export function usePointerGestures(
         setPending({ tool, a: anchor });
         return;
       }
+
+      if (pendingConnector.tool === "pulley") return;
 
       if (!anchorValidForRole(tool, "b", anchor)) return;
       const a = pendingConnector.a;

@@ -20,4 +20,4 @@ The single source of truth is [`VISUAL_GUIDELINES.md`](../../VISUAL_GUIDELINES.m
 
 - Any new visual element must reference `VISUAL_GUIDELINES.md` and use existing tokens, or extend the token set in a dedicated commit (`feat(render): extend palette with …`).
 - Visual changes that aren't trivial get a screenshot pass via Playwright MCP (from M3 onward).
-- Procedural visuals first. Only generate assets when clearly necessary.
+- Procedural visuals first; raster sprites or thumbnails follow `VISUAL_GUIDELINES.md` (Asset pipeline) when craft or recognition needs it.

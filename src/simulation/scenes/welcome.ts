@@ -3,6 +3,7 @@ import { ball } from "../mechanics/ball";
 import { box } from "../mechanics/box";
 import { magnet } from "../mechanics/magnet";
 import { rope } from "../mechanics/rope";
+import { pulley } from "../mechanics/pulley";
 import { hinge } from "../mechanics/hinge";
 import { spring } from "../mechanics/spring";
 import { bodyAnchor, worldAnchor } from "../mechanics/anchors";
@@ -76,6 +77,30 @@ export function welcome(world: World): void {
     }),
   );
 
+  const pulleyA = world.add(
+    ball({
+      position: { x: -10.8, y: 3.9 },
+      radius: 0.26,
+      material: "metal",
+    }),
+  );
+  const pulleyB = world.add(
+    ball({
+      position: { x: -9.6, y: 3.9 },
+      radius: 0.26,
+      material: "wood",
+    }),
+  );
+  world.addConstraint(
+    pulley({
+      wheelCenter: { x: -10.2, y: 5.65 },
+      bodyA: pulleyA,
+      bodyB: pulleyB,
+      localAnchorA: { x: 0, y: 0.26 },
+      localAnchorB: { x: 0, y: 0.26 },
+    }),
+  );
+
   const springBob = world.add(
     ball({
       position: { x: 0.5, y: 5.5 },
@@ -106,7 +131,8 @@ export function welcome(world: World): void {
     box({
       position: { x: 5.0, y: 1.15 },
       width: 2.6,
-      height: 0.15,
+      // Thick enough to survive "fit whole workshop" zoom (~few px if 0.15 m).
+      height: 0.4,
       material: "wood",
     }),
   );

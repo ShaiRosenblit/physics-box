@@ -4,6 +4,7 @@ import {
   ball,
   box,
   hinge,
+  pulley,
   rope,
   spring,
   worldAnchor,
@@ -130,6 +131,67 @@ describe("Spring", () => {
       (zeros[zeros.length - 1] - zeros[0]) / (zeros.length - 1);
     expect(avgPeriod).toBeGreaterThan(0.7 / freq);
     expect(avgPeriod).toBeLessThan(1.3 / freq);
+  });
+});
+
+describe("Pulley", () => {
+  it("couples two dynamic bodies without blowing up over fixed substeps", () => {
+    const world = new World();
+    const a = world.add(
+      ball({
+        position: { x: -1.0, y: 2.4 },
+        radius: 0.25,
+        material: "metal",
+      }),
+    );
+    const b = world.add(
+      ball({
+        position: { x: 1.0, y: 2.4 },
+        radius: 0.25,
+        material: "wood",
+      }),
+    );
+    const id = world.addConstraint(
+      pulley({
+        wheelCenter: { x: 0, y: 4.5 },
+        bodyA: a,
+        bodyB: b,
+        localAnchorA: { x: 0, y: 0.25 },
+        localAnchorB: { x: 0, y: 0.25 },
+      }),
+    );
+
+    for (let i = 0; i < 480; i++) world.stepOnce();
+
+    const view = world.snapshot().constraints.find((c) => c.id === id);
+    expect(view?.kind).toBe("pulley");
+    if (view?.kind !== "pulley") return;
+
+    const ba = world.snapshot().bodies.find((x) => x.id === a)!;
+    const bb = world.snapshot().bodies.find((x) => x.id === b)!;
+    expect(Number.isFinite(ba.position.x)).toBe(true);
+    expect(Number.isFinite(bb.position.y)).toBe(true);
+    expect(Math.abs(ba.position.y)).toBeLessThan(20);
+    expect(Math.abs(bb.position.y)).toBeLessThan(20);
+    expect(view.ratio).toBe(1);
+  });
+
+  it("is removed cleanly like other constraints", () => {
+    const world = new World();
+    const a = world.add(ball({ position: { x: -0.5, y: 2 }, radius: 0.2 }));
+    const b = world.add(ball({ position: { x: 0.5, y: 2 }, radius: 0.2 }));
+    const id = world.addConstraint(
+      pulley({
+        wheelCenter: { x: 0, y: 4 },
+        bodyA: a,
+        bodyB: b,
+        localAnchorA: { x: 0, y: 0 },
+        localAnchorB: { x: 0, y: 0 },
+      }),
+    );
+    expect(world.snapshot().constraints.length).toBe(1);
+    world.remove(id);
+    expect(world.snapshot().constraints.length).toBe(0);
   });
 });
 

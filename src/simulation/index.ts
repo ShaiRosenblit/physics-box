@@ -30,6 +30,8 @@ export type {
   HingeView,
   SpringSpec,
   SpringView,
+  PulleySpec,
+  PulleyView,
   Snapshot,
   Vec2,
 } from "./core/types";
@@ -41,6 +43,8 @@ export {
   rope,
   hinge,
   spring,
+  pulley,
+  PULLEY_DEFAULT_HALF_SPREAD,
   materials,
   worldAnchor,
   bodyAnchor,
@@ -66,8 +70,9 @@ export type {
   RopeInput,
   HingeInput,
   SpringInput,
+  PulleyInput,
   MaterialProps,
 } from "./mechanics";
 
-export { scenes, defaultSceneName, empty, welcome } from "./scenes";
+export { scenes, defaultSceneName, sceneIds, empty, welcome } from "./scenes";
 export type { SceneFn, SceneName } from "./scenes";

@@ -10,12 +10,16 @@ import type {
   HingeSpec,
   Id,
   MagneticSourceView,
+  PulleySpec,
   RopeSpec,
   Snapshot,
   SpringSpec,
   Vec2,
 } from "../core/types";
 import { lookupMaterial } from "../mechanics/materials";
+import { PULLEY_DEFAULT_HALF_SPREAD } from "../mechanics/pulley";
+
+const PULLEY_MIN_HALF_SPREAD = 0.05;
 
 interface BodyRecord {
   readonly id: Id;
@@ -249,6 +253,10 @@ export class PlanckAdapter {
       this.constraints.set(id, this.buildSpring(id, spec));
       return;
     }
+    if (spec.kind === "pulley") {
+      this.constraints.set(id, this.buildPulley(id, spec));
+      return;
+    }
     const exhaustive: never = spec;
     throw new Error(
       `PlanckAdapter.addConstraint: unknown kind ${(exhaustive as { kind: string }).kind}`,
@@ -450,6 +458,54 @@ export class PlanckAdapter {
     this.world.createJoint(joint);
     return { id, spec, internalBodies: [], joints: [joint] };
   }
+
+  private buildPulley(id: Id, spec: PulleySpec): ConstraintRecord {
+    const recA = this.bodies.get(spec.bodyA);
+    const recB = this.bodies.get(spec.bodyB);
+    if (!recA) {
+      throw new Error(`pulley: bodyA id ${spec.bodyA} not found`);
+    }
+    if (!recB) {
+      throw new Error(`pulley: bodyB id ${spec.bodyB} not found`);
+    }
+    if (!recA.body.isDynamic() || !recB.body.isDynamic()) {
+      throw new Error(
+        "pulley: Planck PulleyJoint requires two dynamic bodies",
+      );
+    }
+
+    const spread = Math.max(
+      PULLEY_MIN_HALF_SPREAD,
+      spec.halfSpread ?? PULLEY_DEFAULT_HALF_SPREAD,
+    );
+    const cx = spec.wheelCenter.x;
+    const cy = spec.wheelCenter.y;
+    const groundA = planck.Vec2(cx - spread, cy);
+    const groundB = planck.Vec2(cx + spread, cy);
+
+    const wa = recA.body.getWorldPoint(
+      planck.Vec2(spec.localAnchorA.x, spec.localAnchorA.y),
+    );
+    const wb = recB.body.getWorldPoint(
+      planck.Vec2(spec.localAnchorB.x, spec.localAnchorB.y),
+    );
+    const worldA = planck.Vec2(wa.x, wa.y);
+    const worldB = planck.Vec2(wb.x, wb.y);
+
+    const ratio = spec.ratio ?? 1;
+    const joint = new planck.PulleyJoint(
+      { collideConnected: false },
+      recA.body,
+      recB.body,
+      groundA,
+      groundB,
+      worldA,
+      worldB,
+      ratio,
+    );
+    this.world.createJoint(joint);
+    return { id, spec, internalBodies: [], joints: [joint] };
+  }
 }
 
 function makeShape(spec: BodySpec): planck.Shape {
@@ -495,6 +551,8 @@ function buildConstraintView(record: ConstraintRecord): ConstraintView {
       id,
       kind: "hinge" as const,
       anchor: Object.freeze({ x: anchorVec.x, y: anchorVec.y }),
+      bodyA: spec.bodyA,
+      bodyB: spec.bodyB,
     });
   }
 
@@ -514,6 +572,32 @@ function buildConstraintView(record: ConstraintRecord): ConstraintView {
       b: Object.freeze({ x: b.x, y: b.y }),
       restLength,
       currentLength: Math.hypot(dx, dy),
+    });
+  }
+
+  if (spec.kind === "pulley") {
+    const joint = record.joints[0] as planck.PulleyJoint;
+    const ga = joint.getGroundAnchorA();
+    const gb = joint.getGroundAnchorB();
+    const aa = joint.getAnchorA();
+    const ab = joint.getAnchorB();
+    const spread = Math.max(
+      PULLEY_MIN_HALF_SPREAD,
+      spec.halfSpread ?? PULLEY_DEFAULT_HALF_SPREAD,
+    );
+    return Object.freeze({
+      id,
+      kind: "pulley" as const,
+      wheelCenter: Object.freeze({
+        x: spec.wheelCenter.x,
+        y: spec.wheelCenter.y,
+      }),
+      halfSpread: spread,
+      groundA: Object.freeze({ x: ga.x, y: ga.y }),
+      groundB: Object.freeze({ x: gb.x, y: gb.y }),
+      anchorA: Object.freeze({ x: aa.x, y: aa.y }),
+      anchorB: Object.freeze({ x: ab.x, y: ab.y }),
+      ratio: spec.ratio ?? 1,
     });
   }
 

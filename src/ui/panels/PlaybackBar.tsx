@@ -1,3 +1,4 @@
+import { sceneIds, type SceneName } from "../../simulation";
 import { testIds } from "../a11y/ids";
 import {
   PauseIcon,
@@ -7,9 +8,16 @@ import {
 } from "../icons";
 import { useUIStore } from "../state/store";
 
+const SCENE_LABEL: Record<SceneName, string> = {
+  empty: "Empty",
+  welcome: "Welcome",
+};
+
 export interface PlaybackBarProps {
   readonly tick: number;
   readonly compact: boolean;
+  readonly scene: SceneName;
+  readonly onSceneChange: (scene: SceneName) => void;
   readonly onPlay: () => void;
   readonly onPause: () => void;
   readonly onStep: () => void;
@@ -26,6 +34,23 @@ export function PlaybackBar(props: PlaybackBarProps) {
       style={{ ...barStyle, ...(props.compact ? compactBarStyle : {}) }}
     >
       <div style={{ ...controlsStyle, ...(props.compact ? compactControlsStyle : {}) }}>
+        <select
+          data-testid={testIds.sceneSelect}
+          aria-label="Scene"
+          title="Scene"
+          value={props.scene}
+          onChange={(e) => props.onSceneChange(e.target.value as SceneName)}
+          style={{
+            ...sceneSelectStyle,
+            ...(props.compact ? sceneSelectCompactStyle : {}),
+          }}
+        >
+          {sceneIds.map((id) => (
+            <option key={id} value={id}>
+              {SCENE_LABEL[id]}
+            </option>
+          ))}
+        </select>
         {running ? (
           <PlaybackButton
             label="Pause"
@@ -131,6 +156,26 @@ const controlsStyle: React.CSSProperties = {
 
 const compactControlsStyle: React.CSSProperties = {
   gap: 8,
+};
+
+const sceneSelectStyle: React.CSSProperties = {
+  appearance: "none",
+  border: "1px solid #d8cfbe",
+  background: "#f5efe6",
+  color: "#2a2520",
+  padding: "3px 8px",
+  borderRadius: 3,
+  font: "inherit",
+  fontSize: 12,
+  cursor: "pointer",
+  minWidth: 108,
+  transition: "background 160ms ease-out, border-color 160ms ease-out",
+};
+
+const sceneSelectCompactStyle: React.CSSProperties = {
+  minWidth: 92,
+  padding: "6px 8px",
+  borderRadius: 4,
 };
 
 const buttonStyle: React.CSSProperties = {
