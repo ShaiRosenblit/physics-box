@@ -5,6 +5,7 @@ import { Toolbar } from "./panels/Toolbar";
 import { Inspector } from "./panels/Inspector";
 import { PlaybackBar } from "./panels/PlaybackBar";
 import { useSimulation } from "./hooks/useSimulation";
+import { SimulationProvider } from "./hooks/SimulationContext";
 import { useUIStore } from "./state/store";
 import { testIds } from "./a11y/ids";
 
@@ -164,31 +165,33 @@ export function App() {
   };
 
   return (
-    <div data-testid={testIds.app} style={appShell}>
-      <div style={mainRow}>
-        <Toolbar />
-        <main style={canvasArea}>
-          <div
-            ref={hostRef}
-            data-testid={testIds.canvasHost}
-            aria-label="Physics Box simulation canvas"
-            onPointerDown={onCanvasPointerDown}
-            onPointerMove={onCanvasPointerMove}
-            onPointerUp={endCanvasDrag}
-            onPointerCancel={endCanvasDrag}
-            style={{ position: "absolute", inset: 0 }}
-          />
-        </main>
-        <Inspector />
+    <SimulationProvider value={sim}>
+      <div data-testid={testIds.app} style={appShell}>
+        <div style={mainRow}>
+          <Toolbar />
+          <main style={canvasArea}>
+            <div
+              ref={hostRef}
+              data-testid={testIds.canvasHost}
+              aria-label="Physics Box simulation canvas"
+              onPointerDown={onCanvasPointerDown}
+              onPointerMove={onCanvasPointerMove}
+              onPointerUp={endCanvasDrag}
+              onPointerCancel={endCanvasDrag}
+              style={{ position: "absolute", inset: 0 }}
+            />
+          </main>
+          <Inspector />
+        </div>
+        <PlaybackBar
+          tick={sim.tick}
+          onPlay={onPlay}
+          onPause={onPause}
+          onStep={onStep}
+          onReset={onReset}
+        />
       </div>
-      <PlaybackBar
-        tick={sim.tick}
-        onPlay={onPlay}
-        onPause={onPause}
-        onStep={onStep}
-        onReset={onReset}
-      />
-    </div>
+    </SimulationProvider>
   );
 }
 

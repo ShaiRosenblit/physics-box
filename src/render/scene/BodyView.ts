@@ -92,25 +92,62 @@ function drawBody(body: BodyView, cameraZoom: number): Graphics {
     : materialStyles[body.material];
 
   if (body.kind === "ball") {
+    g.circle(0, -0.04, body.radius);
+    g.fill({ color: 0x2a2520, alpha: 0.1 });
     g.circle(0, 0, body.radius);
     g.fill({ color: style.fill, alpha: 1 });
     g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+    drawHighlight(g, body.material, body.radius);
     const tickLen = body.radius * 0.55;
     g.moveTo(0, 0);
     g.lineTo(tickLen, 0);
     g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
     drawChargeMark(g, body.charge, body.radius, lineWidth);
   } else if (body.kind === "magnet") {
+    g.circle(0, -0.04, body.radius);
+    g.fill({ color: 0x2a2520, alpha: 0.1 });
     drawMagnet(g, body.radius, body.dipole, lineWidth, style);
   } else {
     const hw = body.width / 2;
     const hh = body.height / 2;
+    g.rect(-hw, -hh - 0.04, body.width, body.height);
+    g.fill({ color: 0x2a2520, alpha: 0.08 });
     g.rect(-hw, -hh, body.width, body.height);
     g.fill({ color: style.fill, alpha: 1 });
     g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+    drawBoxGrain(g, body.material, hw, hh);
   }
 
   return g;
+}
+
+function drawHighlight(
+  g: Graphics,
+  material: BodyView["material"],
+  radius: number,
+): void {
+  const offset = radius * 0.32;
+  const r = radius * 0.55;
+  const alpha = material === "metal" ? 0.32 : material === "cork" ? 0.14 : 0.18;
+  g.circle(-offset, offset, r);
+  g.fill({ color: 0xfff4e3, alpha });
+}
+
+function drawBoxGrain(
+  g: Graphics,
+  material: BodyView["material"],
+  hw: number,
+  hh: number,
+): void {
+  if (material !== "wood") return;
+  const grainColor = palette.woodGrain;
+  const lines = 3;
+  for (let i = 1; i <= lines; i++) {
+    const y = -hh + (i / (lines + 1)) * (hh * 2);
+    g.moveTo(-hw * 0.85, y);
+    g.lineTo(hw * 0.85, y);
+    g.stroke({ width: 0.01, color: grainColor, alpha: 0.18 });
+  }
 }
 
 function signOf(q: number): -1 | 0 | 1 {

@@ -45,6 +45,7 @@ export class Renderer {
   private _lastFieldZoom = 0;
   private _lastFieldCenterX = Number.NaN;
   private _lastFieldCenterY = Number.NaN;
+  private _lastFieldTimestamp = 0;
 
   constructor(config: SimulationConfig = defaultConfig) {
     this.bodyLayer = new BodyLayer(() => this._camera.zoom);
@@ -165,6 +166,13 @@ export class Renderer {
       center.y !== this._lastFieldCenterY ||
       Math.abs(Math.log(zoom / Math.max(this._lastFieldZoom, 1e-9))) >= 0.05;
     if (!tickChanged && !cameraChanged) return;
+
+    // Throttle to ~30 Hz max to keep streamline tracing off the hot path.
+    const now = performance.now();
+    if (tickChanged && !cameraChanged && now - this._lastFieldTimestamp < 33) {
+      return;
+    }
+    this._lastFieldTimestamp = now;
     this._lastFieldTick = snapshot.tick;
     this._lastFieldZoom = zoom;
     this._lastFieldCenterX = center.x;
