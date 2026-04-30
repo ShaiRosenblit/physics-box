@@ -22,3 +22,6 @@ export type {
 
 export { ball, box, materials } from "./mechanics";
 export type { BallInput, BoxInput, MaterialProps } from "./mechanics";
+
+export { scenes, defaultSceneName, empty, welcome } from "./scenes";
+export type { SceneFn, SceneName } from "./scenes";

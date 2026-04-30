@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { World, ball, box } from "../simulation";
+import { World, defaultSceneName, scenes } from "../simulation";
 import { Renderer } from "../render";
 
 export function App() {
@@ -11,21 +11,9 @@ export function App() {
     if (!host) return;
 
     const world = new World();
-    const renderer = new Renderer();
+    scenes[defaultSceneName](world);
 
-    world.add(
-      box({
-        position: { x: 0, y: -0.25 },
-        width: 24,
-        height: 0.5,
-        fixed: true,
-        material: "wood",
-      }),
-    );
-    world.add(ball({ position: { x: -1.4, y: 4 }, radius: 0.4, material: "metal" }));
-    world.add(ball({ position: { x: 0.5, y: 5.5 }, radius: 0.5, material: "wood" }));
-    world.add(ball({ position: { x: 1.6, y: 6.2 }, radius: 0.3, material: "cork" }));
-    world.add(box({ position: { x: -2.4, y: 6.0 }, width: 0.8, height: 0.8 }));
+    const renderer = new Renderer();
 
     let raf = 0;
     let cancelled = false;
