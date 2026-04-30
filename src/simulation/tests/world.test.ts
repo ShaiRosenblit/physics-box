@@ -124,4 +124,56 @@ describe("World", () => {
     expect(view.position.y).toBeLessThan(groundTopY + radius * 1.5);
     expect(Math.abs(view.velocity.y)).toBeLessThan(0.05);
   });
+
+  it("dynamic balls may opt out of ball–ball collisions", () => {
+    const world = new World();
+    world.add(
+      box({
+        position: { x: 0, y: -0.25 },
+        width: 20,
+        height: 0.5,
+        fixed: true,
+      }),
+    );
+    world.add(
+      ball({
+        position: { x: 0, y: 2 },
+        radius: 0.2,
+        collideWithBalls: false,
+      }),
+    );
+    world.add(
+      ball({
+        position: { x: 0.15, y: 2 },
+        radius: 0.2,
+        collideWithBalls: false,
+      }),
+    );
+    stepFor(world, 360);
+    const marbles = world.snapshot().bodies.filter((b) => b.kind === "ball");
+    const sepMarble = Math.hypot(
+      marbles[0].position.x - marbles[1].position.x,
+      marbles[0].position.y - marbles[1].position.y,
+    );
+    expect(sepMarble).toBeLessThan(0.32);
+
+    const world2 = new World();
+    world2.add(
+      box({
+        position: { x: 0, y: -0.25 },
+        width: 20,
+        height: 0.5,
+        fixed: true,
+      }),
+    );
+    world2.add(ball({ position: { x: 0, y: 2 }, radius: 0.2 }));
+    world2.add(ball({ position: { x: 0.15, y: 2 }, radius: 0.2 }));
+    stepFor(world2, 360);
+    const pair = world2.snapshot().bodies.filter((b) => b.kind === "ball");
+    const sepDefault = Math.hypot(
+      pair[0].position.x - pair[1].position.x,
+      pair[0].position.y - pair[1].position.y,
+    );
+    expect(sepDefault).toBeGreaterThan(0.38);
+  });
 });

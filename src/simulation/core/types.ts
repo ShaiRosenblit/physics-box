@@ -22,6 +22,8 @@ export interface BaseBodySpec {
 export interface BallSpec extends BaseBodySpec {
   readonly kind: "ball";
   readonly radius: number;
+  /** When false, dynamic balls ignore collisions with other dynamic balls using this flag (still hit pegs, boxes, rope links). */
+  readonly collideWithBalls?: boolean;
 }
 
 export interface BoxSpec extends BaseBodySpec {

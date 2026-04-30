@@ -18,6 +18,7 @@ function halton1d(index: number, base: 2 | 3): number {
 /**
  * Galton board (bean machine): staggered fixed pegs and a hopper of neutral balls
  * on a tall narrow strip above the apex so drops read as a thin vertical curtain.
+ * Hopper balls use `collideWithBalls: false` so they stream without jamming each other.
  */
 export function galton(world: World): void {
   const groundHeight = 0.5;
@@ -117,6 +118,7 @@ export function galton(world: World): void {
         position: { x, y },
         radius: dropBallRadius,
         material: "wood",
+        collideWithBalls: false,
       }),
     );
   }

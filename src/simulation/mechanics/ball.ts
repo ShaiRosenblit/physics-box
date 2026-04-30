@@ -9,13 +9,14 @@ export interface BallInput {
   angularVelocity?: number;
   angle?: number;
   fixed?: boolean;
+  collideWithBalls?: boolean;
 }
 
 export function ball(input: BallInput): BallSpec {
   if (input.radius <= 0) {
     throw new Error(`ball: radius must be > 0 (got ${input.radius})`);
   }
-  return {
+  const spec: BallSpec = {
     kind: "ball",
     position: input.position,
     radius: input.radius,
@@ -26,4 +27,8 @@ export function ball(input: BallInput): BallSpec {
     material: input.material ?? "wood",
     charge: input.charge,
   };
+  if (input.collideWithBalls === false) {
+    return { ...spec, collideWithBalls: false };
+  }
+  return spec;
 }

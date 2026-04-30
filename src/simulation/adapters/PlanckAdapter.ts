@@ -21,6 +21,9 @@ import { PULLEY_DEFAULT_HALF_SPREAD } from "../mechanics/pulley";
 
 const PULLEY_MIN_HALF_SPREAD = 0.05;
 
+/** Dynamic balls that ghost through each other (Galton marbles); still collide with default fixtures & rope links. */
+const CAT_NO_DYNAMIC_BALL_COLLISION = 0x0010;
+
 interface BodyRecord {
   readonly id: Id;
   readonly spec: BodySpec;
@@ -79,11 +82,13 @@ export class PlanckAdapter {
     const material = lookupMaterial(spec.material);
     const shape = makeShape(spec);
 
+    const filter = collisionFilter(spec);
     body.createFixture({
       shape,
       density: material.density,
       friction: material.friction,
       restitution: material.restitution,
+      ...(filter ?? {}),
     });
 
     this.bodies.set(id, { id, spec, body });
@@ -506,6 +511,20 @@ export class PlanckAdapter {
     this.world.createJoint(joint);
     return { id, spec, internalBodies: [], joints: [joint] };
   }
+}
+
+/** Collision filter for body fixtures (rope links use their own bits). */
+function collisionFilter(
+  spec: BodySpec,
+): { filterCategoryBits: number; filterMaskBits: number } | undefined {
+  if (spec.kind !== "ball") return undefined;
+  if (spec.fixed) return undefined;
+  if (spec.collideWithBalls !== false) return undefined;
+  const cat = CAT_NO_DYNAMIC_BALL_COLLISION;
+  return {
+    filterCategoryBits: cat,
+    filterMaskBits: 0xffff ^ cat,
+  };
 }
 
 function makeShape(spec: BodySpec): planck.Shape {
