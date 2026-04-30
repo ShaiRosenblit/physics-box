@@ -8,6 +8,7 @@ import {
   playbackTimeScaleMax,
   playbackTimeScaleMin,
   type BallView,
+  type BoxView,
 } from "..";
 
 const TICK = defaultConfig.dt;
@@ -232,6 +233,37 @@ describe("World", () => {
     expect(v.radius).toBe(0.6);
     expect(v.position.x).toBeCloseTo(1, 5);
     expect(v.position.y).toBeCloseTo(2, 5);
+  });
+
+  it("patchBody lengthens a box upward: bottom face stays fixed", () => {
+    const world = new World();
+    const id = world.add(
+      box({
+        position: { x: 0, y: 1 },
+        width: 0.4,
+        height: 1,
+        material: "wood",
+      }),
+    );
+    world.patchBody(id, { height: 2 });
+    const v = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
+    expect(v.height).toBe(2);
+    expect(v.position.y).toBeCloseTo(1.5, 5);
+    expect(v.position.x).toBeCloseTo(0, 5);
+  });
+
+  it("patchBody skips bottom anchor when position is set in the same patch", () => {
+    const world = new World();
+    const id = world.add(
+      box({
+        position: { x: 0, y: 1 },
+        width: 0.4,
+        height: 1,
+      }),
+    );
+    world.patchBody(id, { height: 2, position: { x: 0, y: 1 } });
+    const v = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
+    expect(v.position.y).toBeCloseTo(1, 5);
   });
 
   it("patchBody fixes body and ends mouse drag session", () => {

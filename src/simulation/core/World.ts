@@ -16,7 +16,11 @@ import type {
   Snapshot,
   Vec2,
 } from "./types";
-import { clampBodySpecToConfig, mergeBodyPatch } from "./bodyPatch";
+import {
+  anchorBottomEdgeOnHeightChange,
+  clampBodySpecToConfig,
+  mergeBodyPatch,
+} from "./bodyPatch";
 import {
   mergeConstraintPatch,
   sanitizeConstraintSpec,
@@ -276,7 +280,9 @@ export class World {
     if (!this._adapter.has(housingId)) return;
     const prev = this._adapter.getBodySpec(housingId);
     if (!prev) return;
-    const next = clampBodySpecToConfig(mergeBodyPatch(prev, patch), this._config);
+    const merged = mergeBodyPatch(prev, patch);
+    const clamped = clampBodySpecToConfig(merged, this._config);
+    const next = anchorBottomEdgeOnHeightChange(prev, clamped, patch);
     this._adapter.applyBodySpec(housingId, next);
     this._charges.register(housingId, next.charge ?? 0);
   }

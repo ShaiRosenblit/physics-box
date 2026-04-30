@@ -199,3 +199,32 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
 
   return n;
 }
+
+/**
+ * When height changes without an explicit position patch, shift the body center
+ * along local +Y by half the height delta so the world-space bottom edge (local
+ * midpoint of the bottom face) stays fixed — e.g. a box on a floor grows upward
+ * instead of sinking through the support.
+ */
+export function anchorBottomEdgeOnHeightChange(
+  prev: BodySpec,
+  next: BodySpec,
+  patch: BodyPatch,
+): BodySpec {
+  if (patch.position !== undefined) return next;
+  if (prev.kind !== "box" && prev.kind !== "engine") return next;
+  if (next.kind !== "box" && next.kind !== "engine") return next;
+  const dh = next.height - prev.height;
+  if (Math.abs(dh) < 1e-12) return next;
+  const a = next.angle ?? 0;
+  const half = dh / 2;
+  const ox = -Math.sin(a) * half;
+  const oy = Math.cos(a) * half;
+  return {
+    ...next,
+    position: {
+      x: next.position.x + ox,
+      y: next.position.y + oy,
+    },
+  };
+}
