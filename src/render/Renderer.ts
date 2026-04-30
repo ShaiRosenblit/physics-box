@@ -8,6 +8,10 @@ import {
 import { Camera } from "./camera/Camera";
 import { CameraController } from "./camera/CameraController";
 import { BodyLayer, SelectionView } from "./scene/BodyView";
+import {
+  ConnectorPreviewView,
+  type ConnectorPreviewState,
+} from "./scene/ConnectorPreviewView";
 import { ConstraintLayer } from "./scene/ConstraintView";
 import { FieldView } from "./scene/FieldView";
 import { Grid } from "./scene/Grid";
@@ -39,6 +43,7 @@ export class Renderer {
   private constraintLayer: ConstraintLayer;
   private fieldView: FieldView;
   private selectionView: SelectionView;
+  private connectorPreview: ConnectorPreviewView;
   private _camera = new Camera();
   private _controller = new CameraController();
   private _lastSnapshot: Snapshot | null = null;
@@ -60,6 +65,11 @@ export class Renderer {
     this.constraintLayer = new ConstraintLayer(() => this._camera.zoom);
     this.fieldView = new FieldView(config);
     this.selectionView = new SelectionView(() => this._camera.zoom);
+    this.connectorPreview = new ConnectorPreviewView(() => this._camera.zoom);
+  }
+
+  setConnectorPreview(state: ConnectorPreviewState | null): void {
+    this.connectorPreview.set(state);
   }
 
   setSelectedId(id: Id | null): void {
@@ -113,6 +123,7 @@ export class Renderer {
     this.bodyLayer.clear();
     this.constraintLayer.clear();
     this.selectionView.clear();
+    this.connectorPreview.clear();
     this._lastFieldTick = -1;
     this._lastSnapshot = null;
   }
@@ -156,6 +167,7 @@ export class Renderer {
         this.worldRoot.addChild(this.constraintLayer.node);
         this.worldRoot.addChild(this.bodyLayer.node);
         this.worldRoot.addChild(this.selectionView.node);
+        this.worldRoot.addChild(this.connectorPreview.node);
 
         this._camera.setCanvas(app.renderer.width, app.renderer.height);
         this._camera.apply(this.worldRoot);
@@ -209,6 +221,7 @@ export class Renderer {
     this.constraintLayer.reconcile(snapshot);
     this.selectionView.update(snapshot);
     this.updateFieldView(snapshot);
+    this.connectorPreview.redraw();
     this.app.render();
   }
 
@@ -243,6 +256,7 @@ export class Renderer {
     this.resizeObserver = null;
     this.bodyLayer.clear();
     this.constraintLayer.clear();
+    this.connectorPreview.clear();
 
     if (this._ready && this.app) {
       this.destroyApp(this.app);

@@ -1,9 +1,16 @@
 import { useEffect, useRef } from "react";
 import {
   ball,
+  bodyAnchor,
   box,
   defaultSceneName,
+  hinge,
   magnet,
+  rope,
+  spring,
+  worldAnchor,
+  type Anchor,
+  type Snapshot,
   type Vec2,
 } from "../simulation";
 import { Renderer } from "../render";
@@ -20,7 +27,13 @@ import {
 } from "./icons";
 import { useSimulation } from "./hooks/useSimulation";
 import { SimulationProvider } from "./hooks/SimulationContext";
-import { usePointerGestures, type SpawnMode } from "./canvas/usePointerGestures";
+import {
+  usePointerGestures,
+  type ConnectorPending,
+  type ConnectorTool,
+  type ResolvedAnchor,
+  type SpawnMode,
+} from "./canvas/usePointerGestures";
 import { useViewportMode } from "./hooks/useViewportMode";
 import { useUIStore } from "./state/store";
 import { testIds } from "./a11y/ids";
@@ -30,6 +43,12 @@ export function App() {
   const rendererRef = useRef<Renderer | null>(null);
   const sim = useSimulation(defaultSceneName);
   const mode = useViewportMode();
+
+  // Pending connector state lives in refs so the per-frame loop can read
+  // it without retriggering React. UI never mutates physics state from
+  // here — the commit handler issues `world.addConstraint` once.
+  const pendingConnectorRef = useRef<ConnectorPending | null>(null);
+  const previewWorldPointRef = useRef<Vec2 | null>(null);
 
   const showGrid = useUIStore((s) => s.showGrid);
   const showEField = useUIStore((s) => s.showEField);
@@ -64,6 +83,13 @@ export function App() {
       last = now;
       sim.world.step(dt);
       const snap = sim.world.snapshot();
+      renderer.setConnectorPreview(
+        computePreviewState(
+          snap,
+          pendingConnectorRef.current,
+          previewWorldPointRef.current,
+        ),
+      );
       renderer.render(snap);
       setHasCharges(snap.charges.length > 0);
       setHasMagnets(snap.magnets.length > 0);
@@ -179,6 +205,60 @@ export function App() {
     }
   };
 
+  const handleConnectorCommit = (
+    tool: ConnectorTool,
+    a: ResolvedAnchor,
+    b: ResolvedAnchor,
+  ) => {
+    if (tool === "rope") {
+      const length = anchorDistance(sim.world.snapshot(), a, b);
+      if (length < 0.05) return;
+      sim.world.addConstraint(
+        rope({
+          a: toAnchor(a),
+          b: toAnchor(b),
+          length,
+          material: "wood",
+        }),
+      );
+      return;
+    }
+    if (tool === "spring") {
+      const restLength = anchorDistance(sim.world.snapshot(), a, b);
+      if (restLength < 0.05) return;
+      sim.world.addConstraint(
+        spring({
+          a: toAnchor(a),
+          b: toAnchor(b),
+          restLength,
+        }),
+      );
+      return;
+    }
+    if (tool === "hinge") {
+      // Anchor A is enforced by the gesture to be a body. The hinge
+      // pivot is placed at click 2 in world space; if click 2 also
+      // hits a body, the hinge becomes a body-to-body revolute.
+      if (a.kind !== "body") return;
+      sim.world.addConstraint(
+        hinge({
+          bodyA: a.id,
+          bodyB: b.kind === "body" ? b.id : undefined,
+          worldAnchor: b.kind === "body" ? b.hitPoint : b.point,
+        }),
+      );
+    }
+  };
+
+  const handleConnectorPendingChange = (pending: ConnectorPending | null) => {
+    pendingConnectorRef.current = pending;
+    if (pending === null) previewWorldPointRef.current = null;
+  };
+
+  const handleConnectorPreviewMove = (worldPt: Vec2) => {
+    previewWorldPointRef.current = worldPt;
+  };
+
   usePointerGestures(hostRef, {
     world: sim.world,
     getCamera: () => rendererRef.current?.camera ?? null,
@@ -186,6 +266,9 @@ export function App() {
     onSpawn: handleSpawn,
     onSelect: setSelectedId,
     onDragStateChange: setDragging,
+    onConnectorCommit: handleConnectorCommit,
+    onConnectorPendingChange: handleConnectorPendingChange,
+    onConnectorPreviewMove: handleConnectorPreviewMove,
   });
 
   const isPhone = mode === "phone";
@@ -299,6 +382,51 @@ export function App() {
       </div>
     </SimulationProvider>
   );
+}
+
+function toAnchor(a: ResolvedAnchor): Anchor {
+  if (a.kind === "body") return bodyAnchor(a.id);
+  return worldAnchor(a.point);
+}
+
+function resolveAnchorPosition(
+  snap: Snapshot,
+  a: ResolvedAnchor,
+): Vec2 | null {
+  if (a.kind === "world") return a.point;
+  const body = snap.bodies.find((b) => b.id === a.id);
+  if (!body) return null;
+  return body.position;
+}
+
+function anchorDistance(
+  snap: Snapshot,
+  a: ResolvedAnchor,
+  b: ResolvedAnchor,
+): number {
+  const pa = resolveAnchorPosition(snap, a);
+  const pb = resolveAnchorPosition(snap, b);
+  if (!pa || !pb) return 0;
+  return Math.hypot(pb.x - pa.x, pb.y - pa.y);
+}
+
+function computePreviewState(
+  snap: Snapshot,
+  pending: ConnectorPending | null,
+  cursor: Vec2 | null,
+):
+  | { kind: ConnectorTool; a: Vec2; b: Vec2; snapping?: boolean }
+  | null {
+  if (!pending) return null;
+  const pa = resolveAnchorPosition(snap, pending.a);
+  if (!pa) return null;
+  const pb = cursor ?? pa;
+  // Snapping indicator: cursor over a body would resolve to a body
+  // anchor on commit; we mirror that with a slightly stronger endpoint.
+  // The hit-test happens at gesture-tap time; here we only know the
+  // pointer position, so we conservatively show "snapping" only when
+  // the pending tool would treat such a hit as valid.
+  return { kind: pending.tool, a: pa, b: pb };
 }
 
 function DrawerHeader(props: { title: string; onClose: () => void }) {

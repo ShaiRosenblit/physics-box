@@ -8,7 +8,21 @@ export type Tool =
   | "ball+"
   | "ball-"
   | "magnet+"
-  | "magnet-";
+  | "magnet-"
+  | "rope"
+  | "hinge"
+  | "spring";
+
+/** Connector tools place a constraint over two clicks rather than spawning a body. */
+export const CONNECTOR_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
+  "rope",
+  "hinge",
+  "spring",
+]);
+
+export function isConnectorTool(tool: Tool): tool is "rope" | "hinge" | "spring" {
+  return CONNECTOR_TOOLS.has(tool);
+}
 
 export interface UIState {
   tool: Tool;

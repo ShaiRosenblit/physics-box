@@ -3,6 +3,21 @@ import type { Camera } from "../../render";
 import type { Id, Vec2, World } from "../../simulation";
 
 export type SpawnMode = "ball" | "box" | "ball+" | "ball-" | "magnet+" | "magnet-";
+export type ConnectorTool = "rope" | "hinge" | "spring";
+
+/**
+ * A click resolved against the world: either a hit on a dynamic body
+ * (with the world-space hit point so the constraint anchors at the
+ * exact place the user clicked) or an empty-space world point.
+ */
+export type ResolvedAnchor =
+  | { readonly kind: "world"; readonly point: Vec2 }
+  | { readonly kind: "body"; readonly id: Id; readonly hitPoint: Vec2 };
+
+export interface ConnectorPending {
+  readonly tool: ConnectorTool;
+  readonly a: ResolvedAnchor;
+}
 
 export interface PointerGestureCallbacks {
   /** Active world reference; required for drag and field sampling. */
@@ -11,6 +26,21 @@ export interface PointerGestureCallbacks {
   readonly getCamera: () => Camera | null;
   /** Spawn callback invoked on tap when a spawn tool is active. */
   readonly onSpawn: (mode: SpawnMode, worldPoint: Vec2) => void;
+  /**
+   * Connector commit fired when the second tap of a connector tool
+   * resolves. The App composes a `ConstraintSpec` and calls
+   * `world.addConstraint`. Implementations may reject (return false) if
+   * the pair is invalid; the hook still clears the pending state.
+   */
+  readonly onConnectorCommit?: (
+    tool: ConnectorTool,
+    a: ResolvedAnchor,
+    b: ResolvedAnchor,
+  ) => void;
+  /** Notified whenever the connector's pending anchor A changes. */
+  readonly onConnectorPendingChange?: (pending: ConnectorPending | null) => void;
+  /** Notified on pointer move while a connector is pending, for live preview. */
+  readonly onConnectorPreviewMove?: (worldPoint: Vec2) => void;
   /** Returns the active tool id from the UI store. */
   readonly getTool: () => string;
   /** Body-selection callback fired whenever a drag begins or a tap misses. */
@@ -22,6 +52,21 @@ export interface PointerGestureCallbacks {
   /** Optional zoom clamps. */
   readonly minZoom?: number;
   readonly maxZoom?: number;
+}
+
+function isConnectorTool(tool: string): ConnectorTool | null {
+  if (tool === "rope" || tool === "hinge" || tool === "spring") return tool;
+  return null;
+}
+
+/** Hinge requires anchor A to be a body; everything else accepts both. */
+function anchorValidForRole(
+  tool: ConnectorTool,
+  role: "a" | "b",
+  anchor: ResolvedAnchor,
+): boolean {
+  if (tool === "hinge" && role === "a" && anchor.kind !== "body") return false;
+  return true;
 }
 
 const TAP_MOVEMENT_THRESHOLD = 6; // px
@@ -94,6 +139,20 @@ export function usePointerGestures(
 
     const pointers = new Map<number, PointerSample>();
     let state: GestureState = null;
+    let pendingConnector: ConnectorPending | null = null;
+    let pendingConnectorTool: ConnectorTool | null = null;
+
+    const setPending = (next: ConnectorPending | null) => {
+      pendingConnector = next;
+      pendingConnectorTool = next?.tool ?? null;
+      cbRef.current.onConnectorPendingChange?.(next);
+    };
+
+    const clearPendingIfToolChanged = () => {
+      if (!pendingConnector) return;
+      const t = isConnectorTool(cbRef.current.getTool());
+      if (t !== pendingConnectorTool) setPending(null);
+    };
 
     const localXY = (e: PointerEvent): PointerSample => {
       const rect = host.getBoundingClientRect();
@@ -156,7 +215,13 @@ export function usePointerGestures(
         const world = screenToWorld(xy);
         if (!world) return;
         const tool = cbRef.current.getTool();
-        const draggedId = cbRef.current.world.startDragAt(world);
+        clearPendingIfToolChanged();
+
+        // Connector tools never drag bodies — a press on a body still
+        // resolves to a tap that captures it as anchor A or B.
+        const connector = isConnectorTool(tool);
+        const draggedId =
+          connector === null ? cbRef.current.world.startDragAt(world) : null;
         if (draggedId !== null) {
           cbRef.current.onSelect(draggedId);
           cbRef.current.onDragStateChange?.(true);
@@ -182,7 +247,7 @@ export function usePointerGestures(
             lastX: xy.x,
             lastY: xy.y,
             totalMovement: 0,
-            mode: isSpawnTool(tool) ? "pending" : "pending",
+            mode: "pending",
             draggedId: null,
             panStartCenter: cam ? { ...cam.center } : { x: 0, y: 0 },
           };
@@ -242,6 +307,13 @@ export function usePointerGestures(
         }
 
         if (state.mode === "pending") {
+          // Live preview for the connector being placed: emit the
+          // current world point so the renderer can redraw the ghost
+          // line from anchor A to the cursor.
+          if (pendingConnector) {
+            const w = screenToWorld(xy);
+            if (w) cbRef.current.onConnectorPreviewMove?.(w);
+          }
           if (state.totalMovement > TAP_MOVEMENT_THRESHOLD) {
             // Upgrade to camera pan.
             state.mode = "pan-camera";
@@ -285,17 +357,63 @@ export function usePointerGestures(
           cbRef.current.world.endDrag();
           cbRef.current.onDragStateChange?.(false);
         } else if (state.mode === "pending") {
-          // Tap. Spawn or deselect depending on tool.
+          // Tap. Spawn, place a connector anchor, or deselect.
           const tool = cbRef.current.getTool();
-          const spawn = isSpawnTool(tool);
           const w = screenToWorld(xy);
-          if (spawn && w) {
-            cbRef.current.onSpawn(spawn, w);
+          const connector = isConnectorTool(tool);
+          if (connector && w) {
+            handleConnectorTap(connector, w);
           } else {
-            cbRef.current.onSelect(null);
+            const spawn = isSpawnTool(tool);
+            if (spawn && w) {
+              cbRef.current.onSpawn(spawn, w);
+            } else {
+              cbRef.current.onSelect(null);
+            }
           }
         }
         state = null;
+      }
+    };
+
+    const resolveAnchor = (worldPt: Vec2): ResolvedAnchor => {
+      const id = cbRef.current.world.bodyAt(worldPt);
+      if (id !== null) return { kind: "body", id, hitPoint: worldPt };
+      return { kind: "world", point: worldPt };
+    };
+
+    const handleConnectorTap = (tool: ConnectorTool, worldPt: Vec2) => {
+      // Switching connector tools mid-pending starts fresh.
+      if (pendingConnector && pendingConnector.tool !== tool) {
+        setPending(null);
+      }
+      const anchor = resolveAnchor(worldPt);
+
+      if (!pendingConnector) {
+        if (!anchorValidForRole(tool, "a", anchor)) return;
+        setPending({ tool, a: anchor });
+        return;
+      }
+
+      if (!anchorValidForRole(tool, "b", anchor)) return;
+      const a = pendingConnector.a;
+      setPending(null);
+      cbRef.current.onConnectorCommit?.(tool, a, anchor);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && pendingConnector) {
+        setPending(null);
+        e.preventDefault();
+      }
+    };
+    const onContextMenu = (e: MouseEvent) => {
+      // Right-click cancels a pending connector; only swallow when one
+      // is pending so the rest of the canvas keeps the default menu off
+      // via existing `touch-action: none` handling.
+      if (pendingConnector) {
+        setPending(null);
+        e.preventDefault();
       }
     };
 
@@ -309,6 +427,8 @@ export function usePointerGestures(
     host.addEventListener("pointerup", onPointerUp);
     host.addEventListener("pointercancel", onPointerCancel);
     host.addEventListener("pointerleave", onPointerCancel);
+    host.addEventListener("contextmenu", onContextMenu);
+    window.addEventListener("keydown", onKeyDown);
 
     return () => {
       host.removeEventListener("pointerdown", onPointerDown);
@@ -316,6 +436,9 @@ export function usePointerGestures(
       host.removeEventListener("pointerup", onPointerUp);
       host.removeEventListener("pointercancel", onPointerCancel);
       host.removeEventListener("pointerleave", onPointerCancel);
+      host.removeEventListener("contextmenu", onContextMenu);
+      window.removeEventListener("keydown", onKeyDown);
+      if (pendingConnector) setPending(null);
     };
   }, [hostRef]);
 }

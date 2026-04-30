@@ -8,9 +8,12 @@ import {
   ChargePlusIcon,
   EFieldIcon,
   GridIcon,
+  HingeIcon,
   MagnetNIcon,
   MagnetSIcon,
+  RopeIcon,
   SelectIcon,
+  SpringIcon,
 } from "../icons";
 import { useUIStore, type Tool } from "../state/store";
 import type { ViewportMode } from "../hooks/useViewportMode";
@@ -23,8 +26,7 @@ interface ToolDef {
   readonly icon: IconC;
 }
 
-const allTools: readonly ToolDef[] = [
-  { id: "select", label: "Select", icon: SelectIcon },
+const bodyTools: readonly ToolDef[] = [
   { id: "ball", label: "Ball", icon: BallIcon },
   { id: "box", label: "Box", icon: BoxIcon },
   { id: "ball+", label: "Ball (+)", icon: ChargePlusIcon },
@@ -32,6 +34,14 @@ const allTools: readonly ToolDef[] = [
   { id: "magnet+", label: "Magnet N", icon: MagnetNIcon },
   { id: "magnet-", label: "Magnet S", icon: MagnetSIcon },
 ];
+
+const connectorTools: readonly ToolDef[] = [
+  { id: "rope", label: "Rope", icon: RopeIcon },
+  { id: "hinge", label: "Hinge", icon: HingeIcon },
+  { id: "spring", label: "Spring", icon: SpringIcon },
+];
+
+const selectTool: ToolDef = { id: "select", label: "Select", icon: SelectIcon };
 
 export interface ToolbarProps {
   /** Layout variant; "panel" = full sidebar, "rail" = icon column, "sheet" = phone drawer body. */
@@ -57,24 +67,31 @@ export function Toolbar({ variant }: ToolbarProps) {
   };
 
   if (variant === "rail") {
+    const renderRailGroup = (items: readonly ToolDef[]) => (
+      <div style={railGroupStyle}>
+        {items.map((t) => (
+          <RailButton
+            key={t.id}
+            label={t.label}
+            testId={`${testIds.toolButtonPrefix}${t.id}`}
+            active={tool === t.id}
+            icon={t.icon}
+            onClick={() => choose(t.id)}
+          />
+        ))}
+      </div>
+    );
     return (
       <aside
         data-testid={testIds.toolbar}
         aria-label="Tools"
         style={railStyle}
       >
-        <div style={railGroupStyle}>
-          {allTools.map((t) => (
-            <RailButton
-              key={t.id}
-              label={t.label}
-              testId={`${testIds.toolButtonPrefix}${t.id}`}
-              active={tool === t.id}
-              icon={t.icon}
-              onClick={() => choose(t.id)}
-            />
-          ))}
-        </div>
+        {renderRailGroup([selectTool])}
+        <div style={railSeparatorStyle} />
+        {renderRailGroup(bodyTools)}
+        <div style={railSeparatorStyle} />
+        {renderRailGroup(connectorTools)}
         <div style={railSeparatorStyle} />
         <div style={railGroupStyle}>
           <RailToggle
@@ -121,9 +138,25 @@ export function Toolbar({ variant }: ToolbarProps) {
           active={tool === "select"}
           onClick={() => choose("select")}
         />
+      </Section>
+
+      <Section label="Bodies">
         {/* Single-column list keeps full labels readable at panel widths
             and on narrow phone sheets without truncating to "Bal" / "Mag". */}
-        {allTools.slice(1).map((t) => (
+        {bodyTools.map((t) => (
+          <FullToolButton
+            key={t.id}
+            label={t.label}
+            testId={`${testIds.toolButtonPrefix}${t.id}`}
+            active={tool === t.id}
+            icon={t.icon}
+            onClick={() => choose(t.id)}
+          />
+        ))}
+      </Section>
+
+      <Section label="Connectors">
+        {connectorTools.map((t) => (
           <FullToolButton
             key={t.id}
             label={t.label}

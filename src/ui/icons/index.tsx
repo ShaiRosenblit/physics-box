@@ -98,6 +98,31 @@ export const MagnetSIcon = (p: Props) => (
   </Svg>
 );
 
+export const RopeIcon = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="3" cy="4" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="13" cy="12" r="1.1" fill="currentColor" stroke="none" />
+    <path d="M3.6 4.6c1.5 1 2 3 1 4.6-0.9 1.6 0.4 3 2.2 3.2 1.7 0.2 5-0.6 5.6-1.8" />
+  </Svg>
+);
+
+export const HingeIcon = (p: Props) => (
+  <Svg {...p}>
+    <path d="M2.5 13l4.5-4.5" />
+    <path d="M13.5 13l-4.5-4.5" />
+    <circle cx="8" cy="7" r="2" />
+    <circle cx="8" cy="7" r="0.6" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const SpringIcon = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="2.5" cy="8" r="1" fill="currentColor" stroke="none" />
+    <circle cx="13.5" cy="8" r="1" fill="currentColor" stroke="none" />
+    <path d="M3.5 8 L5 5.5 L6.5 10.5 L8 5.5 L9.5 10.5 L11 5.5 L12.5 8" />
+  </Svg>
+);
+
 export const GridIcon = (p: Props) => (
   <Svg {...p}>
     <rect x="2.5" y="2.5" width="11" height="11" />

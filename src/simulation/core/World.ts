@@ -173,6 +173,15 @@ export class World {
   }
 
   /**
+   * Read-only hit-test: returns the id of the dynamic body whose fixtures
+   * contain `p`, or null. Used by UI gestures (selection, connector
+   * anchor placement) where mutating drag state would be wrong.
+   */
+  bodyAt(p: Vec2): Id | null {
+    return this._adapter.findDynamicBodyAt(p);
+  }
+
+  /**
    * Begin dragging the dynamic body under the given world point. Returns
    * the dragged body id, or null if no dynamic body is at that point.
    * UI translates pointer events to this command — never mutating bodies
