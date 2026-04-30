@@ -6,9 +6,11 @@ import type {
   BodyView,
   ConstraintSpec,
   ConstraintView,
+  HingeSpec,
   Id,
   RopeSpec,
   Snapshot,
+  SpringSpec,
   Vec2,
 } from "../core/types";
 import { lookupMaterial } from "../mechanics/materials";
@@ -171,8 +173,17 @@ export class PlanckAdapter {
       this.constraints.set(id, this.buildRope(id, spec));
       return;
     }
+    if (spec.kind === "hinge") {
+      this.constraints.set(id, this.buildHinge(id, spec));
+      return;
+    }
+    if (spec.kind === "spring") {
+      this.constraints.set(id, this.buildSpring(id, spec));
+      return;
+    }
+    const exhaustive: never = spec;
     throw new Error(
-      `PlanckAdapter.addConstraint: kind '${spec.kind}' not implemented yet`,
+      `PlanckAdapter.addConstraint: unknown kind ${(exhaustive as { kind: string }).kind}`,
     );
   }
 
@@ -299,6 +310,49 @@ export class PlanckAdapter {
 
     return { id, spec, internalBodies, joints };
   }
+
+  private buildHinge(id: Id, spec: HingeSpec): ConstraintRecord {
+    const recordA = this.bodies.get(spec.bodyA);
+    if (!recordA) {
+      throw new Error(`hinge: bodyA id ${spec.bodyA} not found`);
+    }
+    const bodyB = spec.bodyB === undefined
+      ? this.groundBody
+      : this.bodies.get(spec.bodyB)?.body;
+    if (!bodyB) {
+      throw new Error(`hinge: bodyB id ${spec.bodyB} not found`);
+    }
+    const anchor = planck.Vec2(spec.worldAnchor.x, spec.worldAnchor.y);
+    const joint = new planck.RevoluteJoint(
+      {},
+      recordA.body,
+      bodyB,
+      anchor,
+    );
+    this.world.createJoint(joint);
+    return { id, spec, internalBodies: [], joints: [joint] };
+  }
+
+  private buildSpring(id: Id, spec: SpringSpec): ConstraintRecord {
+    const a = this.resolveAnchor(spec.a);
+    const b = this.resolveAnchor(spec.b);
+    const span = planck.Vec2.sub(b.worldPoint, a.worldPoint);
+    const distance = span.length();
+    const restLength = Math.max(0.05, spec.restLength ?? distance);
+    const joint = new planck.DistanceJoint(
+      {
+        frequencyHz: spec.frequencyHz ?? 4,
+        dampingRatio: spec.dampingRatio ?? 0.5,
+        length: restLength,
+      },
+      a.body,
+      b.body,
+      a.worldPoint,
+      b.worldPoint,
+    );
+    this.world.createJoint(joint);
+    return { id, spec, internalBodies: [], joints: [joint] };
+  }
 }
 
 function makeShape(spec: BodySpec): planck.Shape {
@@ -333,7 +387,40 @@ function buildConstraintView(record: ConstraintRecord): ConstraintView {
       material: spec.material ?? "wood",
     });
   }
-  throw new Error(`buildConstraintView: kind '${spec.kind}' not implemented yet`);
+
+  if (spec.kind === "hinge") {
+    const joint = record.joints[0];
+    const anchorVec = joint.getAnchorA();
+    return Object.freeze({
+      id,
+      kind: "hinge" as const,
+      anchor: Object.freeze({ x: anchorVec.x, y: anchorVec.y }),
+    });
+  }
+
+  if (spec.kind === "spring") {
+    const joint = record.joints[0] as planck.DistanceJoint;
+    const a = joint.getAnchorA();
+    const b = joint.getAnchorB();
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const restLength = (joint as { getLength?: () => number }).getLength?.() ??
+      spec.restLength ??
+      Math.hypot(dx, dy);
+    return Object.freeze({
+      id,
+      kind: "spring" as const,
+      a: Object.freeze({ x: a.x, y: a.y }),
+      b: Object.freeze({ x: b.x, y: b.y }),
+      restLength,
+      currentLength: Math.hypot(dx, dy),
+    });
+  }
+
+  const exhaustive: never = spec;
+  throw new Error(
+    `buildConstraintView: unknown kind ${(exhaustive as { kind: string }).kind}`,
+  );
 }
 
 function buildView(record: BodyRecord): BodyView {

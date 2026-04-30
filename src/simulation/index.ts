@@ -30,8 +30,24 @@ export type {
   Vec2,
 } from "./core/types";
 
-export { ball, box, rope, materials, worldAnchor, bodyAnchor } from "./mechanics";
-export type { BallInput, BoxInput, RopeInput, MaterialProps } from "./mechanics";
+export {
+  ball,
+  box,
+  rope,
+  hinge,
+  spring,
+  materials,
+  worldAnchor,
+  bodyAnchor,
+} from "./mechanics";
+export type {
+  BallInput,
+  BoxInput,
+  RopeInput,
+  HingeInput,
+  SpringInput,
+  MaterialProps,
+} from "./mechanics";
 
 export { scenes, defaultSceneName, empty, welcome } from "./scenes";
 export type { SceneFn, SceneName } from "./scenes";
