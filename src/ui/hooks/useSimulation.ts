@@ -28,6 +28,8 @@ export interface SimulationApi {
   /** Reset the kernel and apply the named scene. Returns the loaded scene. */
   loadScene(name: SceneName): SceneName;
   setGravityEnabled(enabled: boolean): void;
+  /** Clamp to `playbackTimeScaleMin`…`playbackTimeScaleMax`; persists across scene load. */
+  setTimeScale(multiplier: number): void;
   /** Update body parameters without changing pose or velocities. */
   patchBody(id: Id, patch: BodyPatch): void;
   /** Sparse constraint update (rope length / spring stiffness / hinge pivot …). */
@@ -99,6 +101,13 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
     [world],
   );
 
+  const setTimeScale = useCallback(
+    (multiplier: number) => {
+      world.setTimeScale(multiplier);
+    },
+    [world],
+  );
+
   return {
     world,
     tick,
@@ -110,6 +119,7 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
     stepOnce,
     loadScene,
     setGravityEnabled,
+    setTimeScale,
     patchBody,
     patchConstraint,
   };

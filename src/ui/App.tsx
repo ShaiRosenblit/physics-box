@@ -7,6 +7,9 @@ import {
   defaultSceneName,
   hinge,
   magnet,
+  playbackTimeScale,
+  playbackTimeScaleMax,
+  playbackTimeScaleMin,
   type SceneName,
   pulley,
   rope,
@@ -75,6 +78,7 @@ export function App() {
   const scene = useUIStore((s) => s.scene);
   const setScene = useUIStore((s) => s.setScene);
   const [airDensity, setAirDensity] = useState(() => sim.world.config.fluidDensity);
+  const [timeScale, setTimeScaleState] = useState(playbackTimeScale);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -512,11 +516,18 @@ export function App() {
           gravityEnabled={sim.gravityEnabled}
           airDensity={airDensity}
           maxAirDensity={sim.world.config.maxFluidDensity}
+          timeScale={timeScale}
+          timeScaleMin={playbackTimeScaleMin}
+          timeScaleMax={playbackTimeScaleMax}
           onSceneChange={onSceneChange}
           onGravityChange={sim.setGravityEnabled}
           onAirDensityChange={(v) => {
             sim.world.setFluidDensity(v);
             setAirDensity(v);
+          }}
+          onTimeScaleChange={(v) => {
+            sim.setTimeScale(v);
+            setTimeScaleState(sim.world.config.timeScale);
           }}
           onPlay={onPlay}
           onPause={onPause}

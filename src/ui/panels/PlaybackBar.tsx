@@ -15,6 +15,13 @@ const SCENE_LABEL: Record<SceneName, string> = {
   random: "Random",
 };
 
+const SPEED_SLIDER_STEP = 1 / 64;
+
+function speedLabel(multiplier: number): string {
+  const s = multiplier.toFixed(3);
+  return String(parseFloat(s));
+}
+
 export interface PlaybackBarProps {
   readonly tick: number;
   readonly compact: boolean;
@@ -22,9 +29,14 @@ export interface PlaybackBarProps {
   readonly gravityEnabled: boolean;
   readonly airDensity: number;
   readonly maxAirDensity: number;
+  /** Simulation integration rate multiplier (same units as `SimulationConfig.timeScale`). */
+  readonly timeScale: number;
+  readonly timeScaleMin: number;
+  readonly timeScaleMax: number;
   readonly onSceneChange: (scene: SceneName) => void;
   readonly onGravityChange: (enabled: boolean) => void;
   readonly onAirDensityChange: (density: number) => void;
+  readonly onTimeScaleChange: (multiplier: number) => void;
   readonly onPlay: () => void;
   readonly onPause: () => void;
   readonly onStep: () => void;
@@ -92,6 +104,38 @@ export function PlaybackBar(props: PlaybackBarProps) {
             onChange={(e) => {
               const v = parseFloat(e.target.value);
               if (Number.isFinite(v)) props.onAirDensityChange(v);
+            }}
+            style={{
+              width: props.compact ? 72 : 100,
+              accentColor: "#2a2520",
+            }}
+          />
+        </label>
+        <label
+          style={{
+            ...gravityToggleStyle,
+            ...(props.compact ? gravityToggleCompactStyle : {}),
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
+            {!props.compact ? `Speed ×${speedLabel(props.timeScale)}` : "×"}
+          </span>
+          <input
+            type="range"
+            data-testid={testIds.playbackSpeed}
+            aria-label="Simulation speed"
+            title="Simulation speed (integration time scale)"
+            min={props.timeScaleMin}
+            max={props.timeScaleMax}
+            step={SPEED_SLIDER_STEP}
+            value={Math.min(
+              props.timeScaleMax,
+              Math.max(props.timeScaleMin, props.timeScale),
+            )}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v)) props.onTimeScaleChange(v);
             }}
             style={{
               width: props.compact ? 72 : 100,

@@ -26,6 +26,7 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("scene-select")).toBeVisible();
     await expect(page.getByTestId("toggle-gravity")).toBeVisible();
     await expect(page.getByTestId("air-density")).toBeVisible();
+    await expect(page.getByTestId("playback-speed")).toBeVisible();
     await expect(page.getByTestId("playback-bar")).toHaveAttribute(
       "aria-label",
       "Playback",
