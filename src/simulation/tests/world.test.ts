@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { World, ball, box, defaultConfig } from "..";
+import { World, ball, box, defaultConfig, type BallView } from "..";
 
 const TICK = defaultConfig.dt;
 
@@ -198,5 +198,40 @@ describe("World", () => {
       pair[0].position.y - pair[1].position.y,
     );
     expect(sepDefault).toBeGreaterThan(0.38);
+  });
+
+  it("patchBody updates scalars and clamps charge", () => {
+    const world = new World();
+    const id = world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    expect(world.charges.has(id)).toBe(false);
+    world.patchBody(id, { charge: 10 });
+    let v = world.snapshot().bodies.find((b) => b.id === id)! as BallView;
+    expect(v.charge).toBe(10);
+    expect(world.charges.has(id)).toBe(true);
+    world.patchBody(id, { charge: defaultConfig.maxCharge + 10 });
+    v = world.snapshot().bodies.find((b) => b.id === id)! as BallView;
+    expect(v.charge).toBe(defaultConfig.maxCharge);
+    world.patchBody(id, { charge: 0 });
+    expect(world.charges.has(id)).toBe(false);
+  });
+
+  it("patchBody rebuilds geometry while preserving pose", () => {
+    const world = new World();
+    const id = world.add(ball({ position: { x: 1, y: 2 }, radius: 0.3 }));
+    world.patchBody(id, { radius: 0.6 });
+    const v = world.snapshot().bodies.find((b) => b.id === id)! as BallView;
+    expect(v.radius).toBe(0.6);
+    expect(v.position.x).toBeCloseTo(1, 5);
+    expect(v.position.y).toBeCloseTo(2, 5);
+  });
+
+  it("patchBody fixes body and ends mouse drag session", () => {
+    const world = new World();
+    const id = world.add(ball({ position: { x: 0, y: 5 }, radius: 0.4 }));
+    world.startDragAt({ x: 0, y: 5 });
+    expect(world.dragging).toBe(true);
+    world.patchBody(id, { fixed: true });
+    expect(world.dragging).toBe(false);
+    expect(world.snapshot().bodies.find((b) => b.id === id)!.fixed).toBe(true);
   });
 });

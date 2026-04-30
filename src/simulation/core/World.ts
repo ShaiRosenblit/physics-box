@@ -2,7 +2,8 @@ import { defaultConfig, type SimulationConfig } from "./config";
 import { EventBus, type EventName, type Listener, type Unsubscribe } from "./events";
 import { createIdFactory } from "./ids";
 import { Stepper } from "./Stepper";
-import type { BodySpec, ConstraintSpec, Id, Snapshot, Vec2 } from "./types";
+import type { BodyPatch, BodySpec, ConstraintSpec, Id, Snapshot, Vec2 } from "./types";
+import { clampBodySpecToConfig, mergeBodyPatch } from "./bodyPatch";
 import { PlanckAdapter } from "../adapters/PlanckAdapter";
 import { ChargeRegistry } from "../electromagnetism/ChargeRegistry";
 import { computeCoulombForces } from "../electromagnetism/coulomb";
@@ -161,21 +162,25 @@ export class World {
   }
 
   add(spec: BodySpec): Id {
-    let finalSpec = spec;
-    const charge = spec.charge ?? 0;
-    const clampedQ = clampToCap(charge, this._config.maxCharge);
-    if (clampedQ !== charge) finalSpec = { ...finalSpec, charge: clampedQ };
-    if (finalSpec.kind === "magnet") {
-      const clampedM = clampToCap(finalSpec.dipole, this._config.maxDipole);
-      if (clampedM !== finalSpec.dipole) {
-        finalSpec = { ...finalSpec, dipole: clampedM };
-      }
-    }
+    const finalSpec = clampBodySpecToConfig(spec, this._config);
     const id = this._nextId();
     this._adapter.add(id, finalSpec);
-    if (clampedQ !== 0) this._charges.register(id, clampedQ);
+    this._charges.register(id, finalSpec.charge ?? 0);
     this._events.emit("add", { id });
     return id;
+  }
+
+  /**
+   * Sparse body update (charge, material, geometry, fixed, damping, EM, …).
+   * Clamps to the same limits as `add`. Pose and velocities stay as-is.
+   */
+  patchBody(id: Id, patch: BodyPatch): void {
+    if (!this._adapter.has(id)) return;
+    const prev = this._adapter.getBodySpec(id);
+    if (!prev) return;
+    const next = clampBodySpecToConfig(mergeBodyPatch(prev, patch), this._config);
+    this._adapter.applyBodySpec(id, next);
+    this._charges.register(id, next.charge ?? 0);
   }
 
   remove(id: Id): void {
@@ -266,10 +271,4 @@ export class World {
     this._tick += 1;
     this._events.emit("step", { tick: this._tick });
   }
-}
-
-function clampToCap(value: number, cap: number): number {
-  if (value > cap) return cap;
-  if (value < -cap) return -cap;
-  return value;
 }

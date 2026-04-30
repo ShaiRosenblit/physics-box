@@ -9,6 +9,7 @@ export type {
 export type {
   Anchor,
   BodyKind,
+  BodyPatch,
   BodySpec,
   BallSpec,
   BoxSpec,

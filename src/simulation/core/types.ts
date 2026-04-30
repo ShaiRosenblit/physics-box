@@ -53,6 +53,23 @@ export interface MagnetSpec extends BaseBodySpec {
 
 export type BodySpec = BallSpec | BoxSpec | MagnetSpec;
 
+/** Sparse mutation payload for patchBody — ignored keys stay unchanged. */
+export interface BodyPatch {
+  readonly charge?: number;
+  readonly material?: MaterialName;
+  readonly fixed?: boolean;
+  readonly linearDamping?: number;
+  readonly angularDamping?: number;
+  readonly fixtureFriction?: number;
+  readonly fixtureRestitution?: number;
+  /** When false, ball ghosts through other dynamic balls (fixture filter). */
+  readonly collideWithBalls?: boolean;
+  readonly radius?: number;
+  readonly width?: number;
+  readonly height?: number;
+  readonly dipole?: number;
+}
+
 export interface BaseBodyView {
   readonly id: Id;
   readonly position: Vec2;
@@ -62,11 +79,15 @@ export interface BaseBodyView {
   readonly material: MaterialName;
   readonly charge: number;
   readonly fixed: boolean;
+  readonly linearDamping: number;
+  readonly angularDamping: number;
 }
 
 export interface BallView extends BaseBodyView {
   readonly kind: "ball";
   readonly radius: number;
+  /** True when collisions with other dynamic balls are enabled. */
+  readonly collideDynamicBalls: boolean;
 }
 
 export interface BoxView extends BaseBodyView {

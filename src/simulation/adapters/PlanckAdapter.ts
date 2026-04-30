@@ -99,6 +99,49 @@ export class PlanckAdapter {
     this.bodies.set(id, { id, spec, body });
   }
 
+  /** @internal — consumed by World.patchBody merge path. */
+  getBodySpec(id: Id): BodySpec | undefined {
+    return this.bodies.get(id)?.spec;
+  }
+
+  /**
+   * Apply a full next spec to an existing body (pose and velocities unchanged).
+   * Kind must match the existing body.
+   */
+  applyBodySpec(id: Id, nextSpec: BodySpec): void {
+    const record = this.bodies.get(id);
+    if (!record) return;
+    const oldSpec = record.spec;
+    if (oldSpec.kind !== nextSpec.kind) {
+      throw new Error(`applyBodySpec: kind ${oldSpec.kind} cannot become ${nextSpec.kind}`);
+    }
+
+    if (this.dragState?.id === id && (nextSpec.fixed ?? false)) this.endDrag();
+
+    const body = record.body;
+    const rebuild = fixturesNeedRebuild(oldSpec, nextSpec);
+    const fixedChanged = (oldSpec.fixed ?? false) !== (nextSpec.fixed ?? false);
+
+    if (rebuild) {
+      rebuildBodyFixtures(body, nextSpec);
+    }
+
+    if (fixedChanged) {
+      if (nextSpec.fixed) {
+        body.setStatic();
+        body.setLinearVelocity(planck.Vec2(0, 0));
+        body.setAngularVelocity(0);
+      } else {
+        body.setDynamic();
+      }
+    }
+
+    body.setLinearDamping(nextSpec.linearDamping ?? 0);
+    body.setAngularDamping(nextSpec.angularDamping ?? 0);
+
+    this.bodies.set(id, { id, spec: nextSpec, body });
+  }
+
   remove(id: Id): void {
     const record = this.bodies.get(id);
     if (!record) return;
@@ -530,6 +573,45 @@ export class PlanckAdapter {
   }
 }
 
+function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
+  if (oldS.kind !== newS.kind) return true;
+  const matOld = oldS.material ?? "wood";
+  const matNew = newS.material ?? "wood";
+  if (matOld !== matNew) return true;
+  if ((oldS.fixtureFriction ?? null) !== (newS.fixtureFriction ?? null)) return true;
+  if ((oldS.fixtureRestitution ?? null) !== (newS.fixtureRestitution ?? null)) return true;
+  if (oldS.kind === "ball" && newS.kind === "ball") {
+    if (oldS.radius !== newS.radius) return true;
+    if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
+  }
+  if (oldS.kind === "box" && newS.kind === "box") {
+    if (oldS.width !== newS.width || oldS.height !== newS.height) return true;
+  }
+  if (oldS.kind === "magnet" && newS.kind === "magnet") {
+    if (oldS.radius !== newS.radius) return true;
+  }
+  return false;
+}
+
+function rebuildBodyFixtures(body: planck.Body, spec: BodySpec): void {
+  let f = body.getFixtureList();
+  while (f) {
+    const nextF = f.getNext();
+    body.destroyFixture(f);
+    f = nextF;
+  }
+  const material = lookupMaterial(spec.material);
+  const shape = makeShape(spec);
+  const filter = collisionFilter(spec);
+  body.createFixture({
+    shape,
+    density: material.density,
+    friction: spec.fixtureFriction ?? material.friction,
+    restitution: spec.fixtureRestitution ?? material.restitution,
+    ...(filter ?? {}),
+  });
+}
+
 /** Collision filter for body fixtures (rope links use their own bits). */
 function collisionFilter(
   spec: BodySpec,
@@ -656,10 +738,17 @@ function buildView(record: BodyRecord): BodyView {
     material: spec.material ?? "wood",
     charge: spec.charge ?? 0,
     fixed: spec.fixed ?? false,
+    linearDamping: spec.linearDamping ?? 0,
+    angularDamping: spec.angularDamping ?? 0,
   } as const;
 
   if (spec.kind === "ball") {
-    return Object.freeze({ ...base, kind: "ball" as const, radius: spec.radius });
+    return Object.freeze({
+      ...base,
+      kind: "ball" as const,
+      radius: spec.radius,
+      collideDynamicBalls: spec.collideWithBalls !== false,
+    });
   }
   if (spec.kind === "magnet") {
     return Object.freeze({
