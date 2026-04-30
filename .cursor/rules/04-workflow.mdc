@@ -32,7 +32,10 @@ At the end of every milestone:
 - **Body** (when needed): explains the *why* in 1–3 short lines.
 - **One commit = one meaningful step.** Aim for 2–4 commits per milestone.
 - Every commit must leave the repo in a working state (typecheck + tests pass).
-- **No remote, no pushing.** Repo stays local until explicitly requested otherwise.
+- **Commit and push every ready change.** As soon as a change is ready — typecheck green, tests green, working state — commit it and push it to the remote on the same branch. Do not let ready work sit uncommitted or unpushed.
+  - "Ready" means the step is coherent on its own, not necessarily that the milestone is done.
+  - If there is no remote configured yet, set one up before pushing; do not silently skip the push.
+  - If a push is rejected (e.g. non-fast-forward), stop and resolve it explicitly — never force-push to a shared branch without being asked.
 - **No pre-commit hooks.** Discipline + this rule is the enforcement.
 - No `wip` / `update` / `misc` subjects. No squashing past commits unless asked.
 - Never commit `node_modules`, `.env`, or secrets.
