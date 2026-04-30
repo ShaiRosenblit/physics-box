@@ -20,8 +20,11 @@ export interface PlaybackBarProps {
   readonly compact: boolean;
   readonly scene: SceneName;
   readonly gravityEnabled: boolean;
+  readonly airDensity: number;
+  readonly maxAirDensity: number;
   readonly onSceneChange: (scene: SceneName) => void;
   readonly onGravityChange: (enabled: boolean) => void;
+  readonly onAirDensityChange: (density: number) => void;
   readonly onPlay: () => void;
   readonly onPause: () => void;
   readonly onStep: () => void;
@@ -66,6 +69,35 @@ export function PlaybackBar(props: PlaybackBarProps) {
             style={gravityCheckboxStyle}
           />
           {!props.compact && <span>Gravity</span>}
+        </label>
+        <label
+          style={{
+            ...gravityToggleStyle,
+            ...(props.compact ? gravityToggleCompactStyle : {}),
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
+            {!props.compact ? "Air" : ""} ρ
+          </span>
+          <input
+            type="range"
+            data-testid={testIds.airDensity}
+            aria-label="Ambient fluid density"
+            title="Ambient fluid density (Archimedes)"
+            min={0}
+            max={props.maxAirDensity}
+            step={0.02}
+            value={Math.min(props.airDensity, props.maxAirDensity)}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v)) props.onAirDensityChange(v);
+            }}
+            style={{
+              width: props.compact ? 72 : 100,
+              accentColor: "#2a2520",
+            }}
+          />
         </label>
         {running ? (
           <PlaybackButton

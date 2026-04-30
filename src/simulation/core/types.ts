@@ -5,9 +5,9 @@ export interface Vec2 {
   readonly y: number;
 }
 
-export type BodyKind = "ball" | "box" | "magnet";
+export type BodyKind = "ball" | "balloon" | "box" | "magnet";
 
-export type MaterialName = "wood" | "metal" | "cork" | "felt";
+export type MaterialName = "wood" | "metal" | "cork" | "felt" | "latex";
 
 export interface BaseBodySpec {
   readonly position: Vec2;
@@ -25,12 +25,22 @@ export interface BaseBodySpec {
   readonly linearDamping?: number;
   /** Planck body angular damping (default 0). */
   readonly angularDamping?: number;
+  /** Scales Archimedes and prescriptive lift; 0 disables both for this body. */
+  readonly buoyancyScale?: number;
+  /** Extra lift (N) along −gravity direction (helium-style); 0 = none. */
+  readonly buoyancyLift?: number;
 }
 
 export interface BallSpec extends BaseBodySpec {
   readonly kind: "ball";
   readonly radius: number;
   /** When false, dynamic balls ignore collisions with other dynamic balls using this flag (still hit pegs, boxes, rope links). */
+  readonly collideWithBalls?: boolean;
+}
+
+export interface BalloonSpec extends BaseBodySpec {
+  readonly kind: "balloon";
+  readonly radius: number;
   readonly collideWithBalls?: boolean;
 }
 
@@ -51,7 +61,7 @@ export interface MagnetSpec extends BaseBodySpec {
   readonly dipole: number;
 }
 
-export type BodySpec = BallSpec | BoxSpec | MagnetSpec;
+export type BodySpec = BallSpec | BalloonSpec | BoxSpec | MagnetSpec;
 
 /** Sparse mutation payload for patchBody — ignored keys stay unchanged. */
 export interface BodyPatch {
@@ -66,6 +76,8 @@ export interface BodyPatch {
   readonly fixtureRestitution?: number;
   /** When false, ball ghosts through other dynamic balls (fixture filter). */
   readonly collideWithBalls?: boolean;
+  readonly buoyancyScale?: number;
+  readonly buoyancyLift?: number;
   readonly radius?: number;
   readonly width?: number;
   readonly height?: number;
@@ -83,12 +95,20 @@ export interface BaseBodyView {
   readonly fixed: boolean;
   readonly linearDamping: number;
   readonly angularDamping: number;
+  readonly buoyancyScale: number;
+  readonly buoyancyLift: number;
 }
 
 export interface BallView extends BaseBodyView {
   readonly kind: "ball";
   readonly radius: number;
   /** True when collisions with other dynamic balls are enabled. */
+  readonly collideDynamicBalls: boolean;
+}
+
+export interface BalloonView extends BaseBodyView {
+  readonly kind: "balloon";
+  readonly radius: number;
   readonly collideDynamicBalls: boolean;
 }
 
@@ -104,7 +124,7 @@ export interface MagnetView extends BaseBodyView {
   readonly dipole: number;
 }
 
-export type BodyView = BallView | BoxView | MagnetView;
+export type BodyView = BallView | BalloonView | BoxView | MagnetView;
 
 export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }

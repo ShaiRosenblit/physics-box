@@ -28,6 +28,7 @@ import {
   computeMagnetPairTorques,
 } from "../electromagnetism/lorentz";
 import { sampleB } from "../electromagnetism/magnetism";
+import { computeBuoyancyForces } from "../mechanics/buoyancy";
 
 /**
  * The simulation kernel facade.
@@ -48,12 +49,18 @@ export class World {
   private _tick = 0;
   private _running = true;
   private _gravityEnabled = true;
+  /** Runtime overrides; re-seeded from `SimulationConfig` on `reset()`. */
+  private _fluidDensity: number;
+  private _fluidLinearDrag: number;
 
   constructor(config: SimulationConfig = defaultConfig) {
     this._config = config;
+    this._fluidDensity = config.fluidDensity;
+    this._fluidLinearDrag = config.fluidLinearDrag;
     this._adapter = new PlanckAdapter(config);
     this._stepper = new Stepper(config.dt, config.maxSubsteps);
     this.registerEmSolvers();
+    this.registerBuoyancySolver();
   }
 
   private registerEmSolvers(): void {
@@ -81,6 +88,27 @@ export class World {
     });
   }
 
+  private registerBuoyancySolver(): void {
+    this._preStepHooks.push(() => {
+      const cfg = this.config;
+      const gVec = this._gravityEnabled ? this._config.gravity : { x: 0, y: 0 };
+      const raw = this._adapter.collectBuoyantBodies();
+      if (raw.length === 0) return;
+      const sorted = [...raw].sort((a, b) => a.id - b.id);
+      let anyLift = false;
+      for (const b of sorted) {
+        if (b.buoyancyLift > 0) {
+          anyLift = true;
+          break;
+        }
+      }
+      if (cfg.fluidDensity <= 0 && cfg.fluidLinearDrag <= 0 && !anyLift) return;
+
+      const f = computeBuoyancyForces(sorted, gVec, cfg);
+      if (f.size > 0) this._adapter.applyForces(f);
+    });
+  }
+
   /**
    * Sample the electric and magnetic fields at the given world point.
    * E is a 2D vector (V/m), B is a scalar (out-of-plane component).
@@ -105,6 +133,8 @@ export class World {
   reset(): void {
     this._adapter = new PlanckAdapter(this._config);
     this.applyGravityToAdapter();
+    this._fluidDensity = this._config.fluidDensity;
+    this._fluidLinearDrag = this._config.fluidLinearDrag;
     this._stepper.reset();
     this._charges.clear();
     this._nextId = createIdFactory();
@@ -123,7 +153,23 @@ export class World {
   }
 
   get config(): SimulationConfig {
-    return this._config;
+    return {
+      ...this._config,
+      fluidDensity: this._fluidDensity,
+      fluidLinearDrag: this._fluidLinearDrag,
+    };
+  }
+
+  setFluidDensity(value: number): void {
+    if (!Number.isFinite(value)) return;
+    const v = Math.max(0, Math.min(this._config.maxFluidDensity, value));
+    this._fluidDensity = v;
+  }
+
+  setFluidLinearDrag(value: number): void {
+    if (!Number.isFinite(value)) return;
+    const v = Math.max(0, Math.min(this._config.maxFluidLinearDrag, value));
+    this._fluidLinearDrag = v;
   }
 
   get tick(): number {

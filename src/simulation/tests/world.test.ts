@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { World, ball, box, defaultConfig, type BallView } from "..";
+import { World, balloon, ball, box, defaultConfig, type BallView } from "..";
 
 const TICK = defaultConfig.dt;
 
@@ -233,5 +233,72 @@ describe("World", () => {
     world.patchBody(id, { fixed: true });
     expect(world.dragging).toBe(false);
     expect(world.snapshot().bodies.find((b) => b.id === id)!.fixed).toBe(true);
+  });
+
+  it("balloon rises with prescriptive lift under gravity", () => {
+    const world = new World();
+    const id = world.add(
+      balloon({
+        position: { x: 0, y: 0.5 },
+        radius: 0.3,
+        buoyancyLift: 25,
+      }),
+    );
+    stepFor(world, 200);
+    const v = world.snapshot().bodies.find((b) => b.id === id)!;
+    expect(v.position.y).toBeGreaterThan(1.2);
+  });
+
+  it("cork ball rises when ambient fluid is denser than cork", () => {
+    const world = new World({ ...defaultConfig, fluidDensity: 0.35 });
+    world.add(
+      box({
+        position: { x: 0, y: -0.25 },
+        width: 20,
+        height: 0.5,
+        fixed: true,
+      }),
+    );
+    const id = world.add(
+      ball({
+        position: { x: 0, y: 1.2 },
+        radius: 0.35,
+        material: "cork",
+      }),
+    );
+    stepFor(world, 400);
+    const v = world.snapshot().bodies.find((b) => b.id === id)!;
+    expect(v.position.y).toBeGreaterThan(2.5);
+  });
+
+  it("buoyancyScale 0 suppresses lift on a balloon", () => {
+    const world = new World();
+    world.add(
+      box({
+        position: { x: 0, y: -0.25 },
+        width: 20,
+        height: 0.5,
+        fixed: true,
+      }),
+    );
+    const id = world.add(
+      balloon({
+        position: { x: 0, y: 2 },
+        radius: 0.3,
+        buoyancyLift: 40,
+        buoyancyScale: 0,
+      }),
+    );
+    stepFor(world, 200);
+    const v = world.snapshot().bodies.find((b) => b.id === id)!;
+    expect(v.position.y).toBeLessThan(1.5);
+  });
+
+  it("setFluidDensity is re-seeded from config on reset", () => {
+    const world = new World({ ...defaultConfig, fluidDensity: 0.2 });
+    world.setFluidDensity(0.5);
+    expect(world.config.fluidDensity).toBeCloseTo(0.5, 5);
+    world.reset();
+    expect(world.config.fluidDensity).toBeCloseTo(0.2, 5);
   });
 });

@@ -1,4 +1,5 @@
 export { ball, type BallInput } from "./ball";
+export { balloon, type BalloonInput } from "./balloon";
 export { box, type BoxInput } from "./box";
 export { magnet, type MagnetInput } from "./magnet";
 export { rope, type RopeInput } from "./rope";

@@ -15,6 +15,8 @@ export type {
   BoxSpec,
   BodyView,
   BallView,
+  BalloonSpec,
+  BalloonView,
   BoxView,
   ChargedSourceView,
   ConstraintKind,
@@ -40,6 +42,7 @@ export type {
 
 export {
   ball,
+  balloon,
   box,
   magnet,
   rope,
@@ -71,6 +74,7 @@ export {
 export { emConstants, type EmConstants } from "./electromagnetism/constants";
 export type {
   BallInput,
+  BalloonInput,
   BoxInput,
   MagnetInput,
   RopeInput,

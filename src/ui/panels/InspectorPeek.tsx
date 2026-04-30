@@ -136,6 +136,13 @@ function summarizeBody(view: BodyView): {
       tint: ui.inkMuted,
     };
   }
+  if (view.kind === "balloon") {
+    return {
+      label: `#${view.id} · Balloon`,
+      stats: `${speedStr} · lift ${fmt(view.buoyancyLift)} N`,
+      tint: ui.fieldB,
+    };
+  }
   if (view.kind === "magnet") {
     return {
       label: `#${view.id} · Magnet ${view.dipole >= 0 ? "N" : "S"}`,

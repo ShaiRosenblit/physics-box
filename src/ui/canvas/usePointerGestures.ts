@@ -2,7 +2,14 @@ import { useEffect, useRef } from "react";
 import type { Camera } from "../../render";
 import type { Id, Vec2, World } from "../../simulation";
 
-export type SpawnMode = "ball" | "box" | "ball+" | "ball-" | "magnet+" | "magnet-";
+export type SpawnMode =
+  | "ball"
+  | "balloon"
+  | "box"
+  | "ball+"
+  | "ball-"
+  | "magnet+"
+  | "magnet-";
 export type ConnectorTool = "rope" | "hinge" | "spring" | "pulley";
 
 export type ConnectorPending =
@@ -135,6 +142,7 @@ type GestureState = SingleState | PinchState | null;
 function isSpawnTool(tool: string): SpawnMode | null {
   if (
     tool === "ball" ||
+    tool === "balloon" ||
     tool === "box" ||
     tool === "ball+" ||
     tool === "ball-" ||

@@ -25,6 +25,7 @@ test.describe("UI smoke", () => {
     await expect(page.getByTestId("playback-bar")).toBeVisible();
     await expect(page.getByTestId("scene-select")).toBeVisible();
     await expect(page.getByTestId("toggle-gravity")).toBeVisible();
+    await expect(page.getByTestId("air-density")).toBeVisible();
     await expect(page.getByTestId("playback-bar")).toHaveAttribute(
       "aria-label",
       "Playback",
@@ -38,6 +39,7 @@ test.describe("UI smoke", () => {
     for (const id of [
       "tool-select",
       "tool-ball",
+      "tool-balloon",
       "tool-box",
       "tool-ball+",
       "tool-ball-",

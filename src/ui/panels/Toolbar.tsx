@@ -3,6 +3,7 @@ import { bodyToolThumbSrc } from "../assets/tools/thumbs";
 import { testIds } from "../a11y/ids";
 import {
   BallIcon,
+  BalloonIcon,
   BFieldIcon,
   BoxIcon,
   ChargeMinusIcon,
@@ -31,6 +32,7 @@ interface ToolDef {
 
 const bodyTools: readonly ToolDef[] = [
   { id: "ball", label: "Ball", icon: BallIcon },
+  { id: "balloon", label: "Balloon", icon: BalloonIcon },
   { id: "box", label: "Box", icon: BoxIcon },
   { id: "ball+", label: "Ball (+)", icon: ChargePlusIcon },
   { id: "ball-", label: "Ball (−)", icon: ChargeMinusIcon },

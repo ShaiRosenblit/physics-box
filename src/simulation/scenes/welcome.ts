@@ -1,5 +1,6 @@
 import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
+import { balloon } from "../mechanics/balloon";
 import { box } from "../mechanics/box";
 import { magnet } from "../mechanics/magnet";
 import { rope } from "../mechanics/rope";
@@ -49,6 +50,15 @@ export function welcome(world: World): void {
   );
   world.add(
     ball({ position: { x: 2.6, y: 4.2 }, radius: 0.32, material: "cork" }),
+  );
+
+  world.add(
+    balloon({
+      position: { x: 5.2, y: 5.4 },
+      radius: 0.28,
+      buoyancyLift: 0.42,
+      linearDamping: 1.2,
+    }),
   );
 
   const ropeBob = world.add(

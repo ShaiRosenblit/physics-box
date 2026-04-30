@@ -21,6 +21,7 @@ import {
   springAnchorsMatch,
 } from "../core/constraintPatch";
 import { lookupMaterial } from "../mechanics/materials";
+import type { BuoyantBodyState } from "../mechanics/buoyancy";
 import { PULLEY_DEFAULT_HALF_SPREAD } from "../mechanics/pulley";
 
 const PULLEY_MIN_HALF_SPREAD = 0.05;
@@ -418,6 +419,33 @@ export class PlanckAdapter {
     return out;
   }
 
+  /**
+   * Dynamic bodies eligible for ambient-fluid buoyancy and drag.
+   * Excludes kinematic/static; stable iteration order is imposed by callers.
+   */
+  collectBuoyantBodies(): BuoyantBodyState[] {
+    const out: BuoyantBodyState[] = [];
+    for (const [id, record] of this.bodies) {
+      if (!record.body.isDynamic()) continue;
+      const spec = record.spec;
+      let displacedArea = 0;
+      if (spec.kind === "ball" || spec.kind === "balloon" || spec.kind === "magnet") {
+        displacedArea = Math.PI * spec.radius * spec.radius;
+      } else {
+        displacedArea = spec.width * spec.height;
+      }
+      const v = record.body.getLinearVelocity();
+      out.push({
+        id,
+        velocity: { x: v.x, y: v.y },
+        displacedArea,
+        buoyancyScale: spec.buoyancyScale ?? 1,
+        buoyancyLift: spec.buoyancyLift ?? 0,
+      });
+    }
+    return out;
+  }
+
   /** Apply per-body forces (in N, world coords) to the underlying bodies. */
   applyForces(forces: Map<Id, Vec2>): void {
     for (const [id, f] of forces) {
@@ -800,6 +828,10 @@ function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
     if (oldS.radius !== newS.radius) return true;
     if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
   }
+  if (oldS.kind === "balloon" && newS.kind === "balloon") {
+    if (oldS.radius !== newS.radius) return true;
+    if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
+  }
   if (oldS.kind === "box" && newS.kind === "box") {
     if (oldS.width !== newS.width || oldS.height !== newS.height) return true;
   }
@@ -832,7 +864,7 @@ function rebuildBodyFixtures(body: planck.Body, spec: BodySpec): void {
 function collisionFilter(
   spec: BodySpec,
 ): { filterCategoryBits: number; filterMaskBits: number } | undefined {
-  if (spec.kind !== "ball") return undefined;
+  if (spec.kind !== "ball" && spec.kind !== "balloon") return undefined;
   if (spec.fixed) return undefined;
   if (spec.collideWithBalls !== false) return undefined;
   const cat = CAT_NO_DYNAMIC_BALL_COLLISION;
@@ -843,7 +875,7 @@ function collisionFilter(
 }
 
 function makeShape(spec: BodySpec): planck.Shape {
-  if (spec.kind === "ball") {
+  if (spec.kind === "ball" || spec.kind === "balloon") {
     return new planck.CircleShape(spec.radius);
   }
   if (spec.kind === "magnet") {
@@ -958,12 +990,22 @@ function buildView(record: BodyRecord): BodyView {
     fixed: spec.fixed ?? false,
     linearDamping: spec.linearDamping ?? 0,
     angularDamping: spec.angularDamping ?? 0,
+    buoyancyScale: spec.buoyancyScale ?? 1,
+    buoyancyLift: spec.buoyancyLift ?? 0,
   } as const;
 
   if (spec.kind === "ball") {
     return Object.freeze({
       ...base,
       kind: "ball" as const,
+      radius: spec.radius,
+      collideDynamicBalls: spec.collideWithBalls !== false,
+    });
+  }
+  if (spec.kind === "balloon") {
+    return Object.freeze({
+      ...base,
+      kind: "balloon" as const,
       radius: spec.radius,
       collideDynamicBalls: spec.collideWithBalls !== false,
     });

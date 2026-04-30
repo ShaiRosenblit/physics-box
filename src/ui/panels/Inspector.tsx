@@ -6,7 +6,7 @@ import type { BodyView, ConstraintView, Id, MaterialName } from "../../simulatio
 import type { ViewportMode } from "../hooks/useViewportMode";
 import { layout, ui } from "../style/tokens";
 
-const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt"];
+const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt", "latex"];
 
 const MIN_ROPE_SEG_UI = 2;
 
@@ -380,7 +380,7 @@ function constraintKindShort(kind: ConstraintView["kind"]): string {
 
 function BodyDetails({ view }: { view: BodyView }) {
   const { patchBody, world } = useSimulationContext();
-  const { maxCharge, maxDipole } = world.config;
+  const { maxCharge, maxDipole, maxBuoyancyLift } = world.config;
   const speed = Math.hypot(view.velocity.x, view.velocity.y);
 
   const ctl = inspectorControlStyle;
@@ -466,7 +466,7 @@ function BodyDetails({ view }: { view: BodyView }) {
         </select>
       </div>
 
-      {(view.kind === "ball" || view.kind === "box") && (
+      {(view.kind === "ball" || view.kind === "balloon" || view.kind === "box") && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Charge</span>
           <input
@@ -512,7 +512,7 @@ function BodyDetails({ view }: { view: BodyView }) {
         </div>
       )}
 
-      {view.kind === "ball" && (
+      {(view.kind === "ball" || view.kind === "balloon") && (
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Radius</span>
@@ -638,6 +638,46 @@ function BodyDetails({ view }: { view: BodyView }) {
           }}
         />
       </div>
+      <div style={editRowStyle}>
+        <span style={editLabelStyle}>Buoy. scale</span>
+        <input
+          aria-label="Buoyancy scale"
+          type="number"
+          min={0}
+          max={1}
+          step={0.05}
+          style={ctl}
+          value={view.buoyancyScale}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) {
+              patchBody(view.id, {
+                buoyancyScale: Math.max(0, Math.min(1, v)),
+              });
+            }
+          }}
+        />
+      </div>
+      <div style={editRowStyle}>
+        <span style={editLabelStyle}>Lift (N)</span>
+        <input
+          aria-label="Buoyancy lift"
+          type="number"
+          min={0}
+          max={maxBuoyancyLift}
+          step={0.5}
+          style={ctl}
+          value={view.buoyancyLift}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) {
+              patchBody(view.id, {
+                buoyancyLift: Math.max(0, Math.min(maxBuoyancyLift, v)),
+              });
+            }
+          }}
+        />
+      </div>
 
       <ReadRow
         label="Position"
@@ -679,6 +719,8 @@ function labelOf(kind: BodyView["kind"]): string {
   switch (kind) {
     case "ball":
       return "Ball";
+    case "balloon":
+      return "Balloon";
     case "box":
       return "Box";
     case "magnet":

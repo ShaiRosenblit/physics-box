@@ -12,6 +12,8 @@ export const materials: Readonly<Record<MaterialName, MaterialProps>> = {
   cork: { density: 0.2, friction: 0.7, restitution: 0.5 },
   /** Dead, grabby contact — workshop pin cushion / matte peg wrap (Galton nails). */
   felt: { density: 2.4, friction: 1.45, restitution: 0.01 },
+  /** Thin film — balloon envelope; low area density. */
+  latex: { density: 0.04, friction: 0.45, restitution: 0.35 },
 };
 
 export function lookupMaterial(name: MaterialName | undefined): MaterialProps {

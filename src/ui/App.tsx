@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ball,
+  balloon,
   bodyAnchor,
   box,
   defaultSceneName,
@@ -73,6 +74,7 @@ export function App() {
   const setDragging = useUIStore((s) => s.setDragging);
   const scene = useUIStore((s) => s.scene);
   const setScene = useUIStore((s) => s.setScene);
+  const [airDensity, setAirDensity] = useState(() => sim.world.config.fluidDensity);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -206,6 +208,7 @@ export function App() {
     sim.loadScene(useUIStore.getState().scene);
     setSelectedId(null);
     setRunning(true);
+    setAirDensity(sim.world.config.fluidDensity);
     rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
@@ -214,6 +217,7 @@ export function App() {
     rendererRef.current?.reset();
     sim.loadScene(name);
     setSelectedId(null);
+    setAirDensity(sim.world.config.fluidDensity);
     rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
@@ -258,6 +262,19 @@ export function App() {
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
           charge: p.charge,
+          ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+        }),
+      );
+    } else if (kind === "balloon") {
+      const p = presets.balloon;
+      sim.add(
+        balloon({
+          position: world,
+          radius: p.radius,
+          material: p.material,
+          linearDamping: p.linearDamping,
+          angularDamping: p.angularDamping,
+          buoyancyLift: p.buoyancyLift,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
       );
@@ -493,8 +510,14 @@ export function App() {
           compact={isPhone}
           scene={scene}
           gravityEnabled={sim.gravityEnabled}
+          airDensity={airDensity}
+          maxAirDensity={sim.world.config.maxFluidDensity}
           onSceneChange={onSceneChange}
           onGravityChange={sim.setGravityEnabled}
+          onAirDensityChange={(v) => {
+            sim.world.setFluidDensity(v);
+            setAirDensity(v);
+          }}
           onPlay={onPlay}
           onPause={onPause}
           onStep={onStep}

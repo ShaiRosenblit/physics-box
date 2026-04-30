@@ -1,5 +1,5 @@
 import type { SimulationConfig } from "./config";
-import type { BallSpec, BodyPatch, BodySpec } from "./types";
+import type { BallSpec, BalloonSpec, BodyPatch, BodySpec } from "./types";
 
 export const MIN_BODY_RADIUS = 0.05;
 export const MIN_BOX_EXTENT = 0.05;
@@ -23,12 +23,25 @@ export function clampBodySpecToConfig(spec: BodySpec, cfg: SimulationConfig): Bo
     const d = clampToSymmetricCap(m.dipole, cfg.maxDipole);
     if (d !== m.dipole) next = { ...m, dipole: d };
   }
+
+  const bs0 = next.buoyancyScale ?? 1;
+  const bs = Math.max(0, Math.min(1, bs0));
+  const bl0 = next.buoyancyLift ?? 0;
+  const bl = Math.max(0, Math.min(cfg.maxBuoyancyLift, bl0));
+  if (bs !== bs0 || bl !== bl0) {
+    next = { ...next, buoyancyScale: bs, buoyancyLift: bl };
+  }
+
   return sanitizeBodyGeometry(next);
 }
 
 /** Clamp geometry to positive minimums suitable for stable fixtures. */
 export function sanitizeBodyGeometry(spec: BodySpec): BodySpec {
   if (spec.kind === "ball") {
+    const r = Math.max(MIN_BODY_RADIUS, spec.radius);
+    return r === spec.radius ? spec : { ...spec, radius: r };
+  }
+  if (spec.kind === "balloon") {
     const r = Math.max(MIN_BODY_RADIUS, spec.radius);
     return r === spec.radius ? spec : { ...spec, radius: r };
   }
@@ -76,14 +89,20 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
     const base = { ...n, fixtureRestitution: p.fixtureRestitution };
     n = base as BodySpec;
   }
+  if (p.buoyancyScale !== undefined) {
+    n = { ...n, buoyancyScale: p.buoyancyScale } as BodySpec;
+  }
+  if (p.buoyancyLift !== undefined) {
+    n = { ...n, buoyancyLift: p.buoyancyLift } as BodySpec;
+  }
 
-  if (n.kind === "ball") {
-    let b: BallSpec = { ...(n as BallSpec) };
+  if (n.kind === "ball" || n.kind === "balloon") {
+    let b: BallSpec | BalloonSpec = { ...(n as BallSpec | BalloonSpec) };
     if (p.radius !== undefined) b = { ...b, radius: p.radius };
     if (p.collideWithBalls !== undefined) {
       if (p.collideWithBalls) {
         const { collideWithBalls: _omit, ...rest } = b;
-        b = rest as BallSpec;
+        b = rest as BallSpec | BalloonSpec;
       } else {
         b = { ...b, collideWithBalls: false };
       }

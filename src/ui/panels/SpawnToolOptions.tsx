@@ -5,6 +5,7 @@ import { testIds } from "../a11y/ids";
 import { useSimulationContext } from "../hooks/SimulationContext";
 import {
   useUIStore,
+  type BalloonSpawnPreset,
   type BoxSpawnPreset,
   type ChargedBallSpawnPreset,
   type MagnetSpawnPreset,
@@ -14,7 +15,7 @@ import {
 } from "../state/store";
 import { layout, ui } from "../style/tokens";
 
-const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt"];
+const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt", "latex"];
 
 const inputStyle: CSSProperties = {
   height: layout.controlHeight,
@@ -49,7 +50,7 @@ export function SpawnToolOptions() {
   const setSpawnPresetPartial = useUIStore((s) => s.setSpawnPresetPartial);
 
   const mode = activeSpawnModeFromTool(tool);
-  const { maxCharge, maxDipole } = useSimulationContext().world.config;
+  const { maxCharge, maxDipole, maxBuoyancyLift } = useSimulationContext().world.config;
 
   if (mode === null) return null;
 
@@ -120,6 +121,13 @@ export function SpawnToolOptions() {
       )}
       {mode === "box" && (
         <BoxFields preset={spawnPresets.box} onPatch={(p) => bump("box", p)} />
+      )}
+      {mode === "balloon" && (
+        <BalloonFields
+          preset={spawnPresets.balloon}
+          onPatch={(p) => bump("balloon", p)}
+          maxBuoyancyLift={maxBuoyancyLift}
+        />
       )}
     </div>
   );
@@ -246,6 +254,121 @@ function BallFields(props: {
           />
         </div>
       ) : null}
+    </>
+  );
+}
+
+function BalloonFields(props: {
+  preset: BalloonSpawnPreset;
+  onPatch: (p: Partial<BalloonSpawnPreset>) => void;
+  maxBuoyancyLift: number;
+}) {
+  return (
+    <>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Radius</span>
+        <input
+          aria-label="Balloon radius"
+          type="number"
+          min={0.05}
+          step={0.02}
+          style={inputStyle}
+          value={fmtInput(props.preset.radius)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ radius: Math.max(0.05, v) });
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Material</span>
+        <select
+          aria-label="Balloon material"
+          style={inputStyle}
+          value={props.preset.material}
+          onChange={(e) =>
+            props.onPatch({ material: e.target.value as MaterialName })
+          }
+        >
+          {MATERIALS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Lift (N)</span>
+        <input
+          aria-label="Buoyancy lift"
+          type="number"
+          min={0}
+          max={props.maxBuoyancyLift}
+          step={0.5}
+          style={inputStyle}
+          value={fmtInput(props.preset.buoyancyLift)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) {
+              props.onPatch({
+                buoyancyLift: Math.max(0, Math.min(props.maxBuoyancyLift, v)),
+              });
+            }
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Lin. damp</span>
+        <input
+          aria-label="Linear damping"
+          type="number"
+          min={0}
+          max={50}
+          step={0.05}
+          style={inputStyle}
+          value={fmtInput(props.preset.linearDamping)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ linearDamping: Math.max(0, v) });
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Ang. damp</span>
+        <input
+          aria-label="Angular damping"
+          type="number"
+          min={0}
+          max={50}
+          step={0.05}
+          style={inputStyle}
+          value={fmtInput(props.preset.angularDamping)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ angularDamping: Math.max(0, v) });
+          }}
+        />
+      </div>
+      <label
+        style={{
+          display: "flex",
+          gap: 6,
+          alignItems: "center",
+          fontSize: 11,
+          color: ui.inkPrimary,
+          cursor: "pointer",
+        }}
+      >
+        <input
+          aria-label="Collide with other dynamic balls"
+          type="checkbox"
+          checked={props.preset.collideDynamicBalls}
+          onChange={(e) =>
+            props.onPatch({ collideDynamicBalls: e.target.checked })
+          }
+        />
+        <span>Ball–ball hits</span>
+      </label>
     </>
   );
 }

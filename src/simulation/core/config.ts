@@ -21,6 +21,18 @@ export interface SimulationConfig {
   readonly maxCharge: number;
   readonly maxDipole: number;
   readonly maxChargedBodies: number;
+
+  /** Ambient fluid area density (kg/m²); 0 disables Archimedes lift. Tuned per 2D mass model. */
+  readonly fluidDensity: number;
+  /** Linear air drag coefficient (N·s/m); F_drag = −coeff × v. 0 disables. */
+  readonly fluidLinearDrag: number;
+  /** Cap on combined buoyancy + lift + drag force magnitude per body per substep (N). */
+  readonly maxBuoyancyForce: number;
+  /** Maximum prescriptive upward `buoyancyLift` on a body (N). */
+  readonly maxBuoyancyLift: number;
+  /** UI / runtime clamp for `fluidDensity` overrides. */
+  readonly maxFluidDensity: number;
+  readonly maxFluidLinearDrag: number;
 }
 
 export const defaultConfig: SimulationConfig = {
@@ -42,6 +54,13 @@ export const defaultConfig: SimulationConfig = {
   maxCharge: 50,
   maxDipole: 50,
   maxChargedBodies: 64,
+
+  fluidDensity: 0,
+  fluidLinearDrag: 0,
+  maxBuoyancyForce: 4_000,
+  maxBuoyancyLift: 200,
+  maxFluidDensity: 4,
+  maxFluidLinearDrag: 25,
 };
 
 /** Passed by the UI shell so playback feels calmer; kernel tests use `defaultConfig` (timeScale 1). */

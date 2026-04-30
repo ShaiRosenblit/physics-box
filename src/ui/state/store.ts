@@ -10,6 +10,7 @@ import {
 export type Tool =
   | "select"
   | "ball"
+  | "balloon"
   | "box"
   | "ball+"
   | "ball-"
@@ -46,6 +47,15 @@ export interface BoxSpawnPreset {
   angularDamping: number;
 }
 
+export interface BalloonSpawnPreset {
+  radius: number;
+  material: MaterialName;
+  linearDamping: number;
+  angularDamping: number;
+  collideDynamicBalls: boolean;
+  buoyancyLift: number;
+}
+
 export type SpawnPresetsBundle = {
   ball: NeutralBallSpawnPreset;
   ballPlus: ChargedBallSpawnPreset;
@@ -53,6 +63,7 @@ export type SpawnPresetsBundle = {
   magnetPlus: MagnetSpawnPreset;
   magnetMinus: MagnetSpawnPreset;
   box: BoxSpawnPreset;
+  balloon: BalloonSpawnPreset;
 };
 
 export type SpawnPresetKey = keyof SpawnPresetsBundle;
@@ -96,6 +107,14 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       material: "wood",
       linearDamping: 0,
       angularDamping: 0,
+    },
+    balloon: {
+      radius: 0.32,
+      material: "latex",
+      linearDamping: 0.35,
+      angularDamping: 0.25,
+      collideDynamicBalls: true,
+      buoyancyLift: 14,
     },
   };
 }

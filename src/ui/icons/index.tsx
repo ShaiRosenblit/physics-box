@@ -42,6 +42,13 @@ export const BallIcon = (p: Props) => (
   </Svg>
 );
 
+export const BalloonIcon = (p: Props) => (
+  <Svg {...p}>
+    <ellipse cx="8" cy="6.5" rx="4.5" ry="5.2" />
+    <path d="M8 11.7v2.8M6.5 14.5h3" strokeWidth="1.2" />
+  </Svg>
+);
+
 export const BoxIcon = (p: Props) => (
   <Svg {...p}>
     <rect x="3" y="3" width="10" height="10" rx="1.2" />
