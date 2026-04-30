@@ -1,6 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import type { BodyView, Id, Snapshot } from "../../simulation";
-import { materialStyles, palette, stroke } from "../style/palette";
+import { materialStyles, opacity, palette, stroke } from "../style/palette";
 
 interface BodyEntry {
   readonly node: Graphics;
@@ -81,6 +81,74 @@ export class BodyLayer {
       entry.node.destroy();
     }
     this.entries.clear();
+  }
+}
+
+/**
+ * Draws a soft accent ring around the currently-selected body.
+ *
+ * Lives in `worldRoot` so the ring transforms with the camera. The
+ * stroke width is divided by `cameraZoom` so it stays at the same
+ * pixel thickness regardless of zoom level.
+ */
+export class SelectionView {
+  readonly node = new Graphics();
+  private currentId: Id | null = null;
+
+  constructor(private readonly cameraZoomGetter: () => number) {}
+
+  setSelectedId(id: Id | null): void {
+    this.currentId = id;
+  }
+
+  /** Recompute the ring geometry from the latest snapshot. */
+  update(snapshot: Snapshot): void {
+    this.node.clear();
+    if (this.currentId === null) return;
+    const body = snapshot.bodies.find((b) => b.id === this.currentId);
+    if (!body) return;
+
+    const zoom = Math.max(this.cameraZoomGetter(), 1e-3);
+    const lineWidth = (stroke.selection + 0.6) / zoom;
+    const inset = 4 / zoom; // small visual gap between body and ring
+
+    this.node.position.set(body.position.x, body.position.y);
+    this.node.rotation = body.angle;
+
+    if (body.kind === "ball" || body.kind === "magnet") {
+      this.node.circle(0, 0, body.radius + inset);
+      this.node.stroke({
+        width: lineWidth,
+        color: palette.fieldB,
+        alpha: 0.95,
+      });
+      this.node.circle(0, 0, body.radius + inset);
+      this.node.stroke({
+        width: lineWidth * 2.6,
+        color: palette.fieldB,
+        alpha: opacity.selection,
+      });
+    } else {
+      const hw = body.width / 2 + inset;
+      const hh = body.height / 2 + inset;
+      this.node.rect(-hw, -hh, hw * 2, hh * 2);
+      this.node.stroke({
+        width: lineWidth,
+        color: palette.fieldB,
+        alpha: 0.95,
+      });
+      this.node.rect(-hw, -hh, hw * 2, hh * 2);
+      this.node.stroke({
+        width: lineWidth * 2.6,
+        color: palette.fieldB,
+        alpha: opacity.selection,
+      });
+    }
+  }
+
+  clear(): void {
+    this.currentId = null;
+    this.node.clear();
   }
 }
 

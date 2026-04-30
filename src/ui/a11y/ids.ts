@@ -19,4 +19,11 @@ export const testIds = {
   buttonPause: "button-pause",
   buttonStep: "button-step",
   buttonReset: "button-reset",
+
+  fabTools: "fab-tools",
+  fabInspector: "fab-inspector",
+  drawerTools: "drawer-tools",
+  drawerInspector: "drawer-inspector",
+  inspectorPeek: "inspector-peek",
+  buttonFitView: "button-fit-view",
 } as const;

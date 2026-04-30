@@ -1,11 +1,27 @@
 import { useEffect, useRef } from "react";
-import { ball, box, defaultSceneName, magnet } from "../simulation";
+import {
+  ball,
+  box,
+  defaultSceneName,
+  magnet,
+  type Vec2,
+} from "../simulation";
 import { Renderer } from "../render";
 import { Toolbar } from "./panels/Toolbar";
 import { Inspector } from "./panels/Inspector";
+import { InspectorPeek } from "./panels/InspectorPeek";
 import { PlaybackBar } from "./panels/PlaybackBar";
+import { Drawer } from "./components/Drawer";
+import {
+  CloseIcon,
+  FitViewIcon,
+  InspectorIcon,
+  ToolsIcon,
+} from "./icons";
 import { useSimulation } from "./hooks/useSimulation";
 import { SimulationProvider } from "./hooks/SimulationContext";
+import { usePointerGestures, type SpawnMode } from "./canvas/usePointerGestures";
+import { useViewportMode } from "./hooks/useViewportMode";
 import { useUIStore } from "./state/store";
 import { testIds } from "./a11y/ids";
 
@@ -13,6 +29,7 @@ export function App() {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const sim = useSimulation(defaultSceneName);
+  const mode = useViewportMode();
 
   const showGrid = useUIStore((s) => s.showGrid);
   const showEField = useUIStore((s) => s.showEField);
@@ -22,6 +39,13 @@ export function App() {
   const setHasCharges = useUIStore((s) => s.setHasCharges);
   const setHasMagnets = useUIStore((s) => s.setHasMagnets);
   const setRunning = useUIStore((s) => s.setRunning);
+  const selectedId = useUIStore((s) => s.selectedId);
+  const setSelectedId = useUIStore((s) => s.setSelectedId);
+  const toolsOpen = useUIStore((s) => s.toolsOpen);
+  const inspectorOpen = useUIStore((s) => s.inspectorOpen);
+  const setToolsOpen = useUIStore((s) => s.setToolsOpen);
+  const setInspectorOpen = useUIStore((s) => s.setInspectorOpen);
+  const setDragging = useUIStore((s) => s.setDragging);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -49,6 +73,9 @@ export function App() {
     renderer.attach(host).then(() => {
       if (cancelled) return;
       renderer.setShowGrid(useUIStore.getState().showGrid);
+      // Frame the welcome scene so all elements are visible at any
+      // viewport size on first paint.
+      renderer.fitToContent(sim.world.snapshot());
       last = performance.now();
       raf = requestAnimationFrame(loop);
     });
@@ -59,7 +86,7 @@ export function App() {
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [sim.world]);
+  }, [sim.world, setHasCharges, setHasMagnets]);
 
   useEffect(() => {
     rendererRef.current?.setShowGrid(showGrid);
@@ -72,6 +99,40 @@ export function App() {
   useEffect(() => {
     rendererRef.current?.setShowBField(showBField && hasMagnets);
   }, [showBField, hasMagnets]);
+
+  // Drive the on-canvas selection ring directly from the UI store; this
+  // is intentionally independent of any drawer/peek state so users
+  // always see what's selected.
+  useEffect(() => {
+    rendererRef.current?.setSelectedId(selectedId);
+  }, [selectedId]);
+
+  // Dev-only probe: exposes a tiny imperative surface to Playwright and
+  // ad-hoc debugging. Disabled in production builds so it never leaks
+  // simulation internals into the public bundle.
+  useEffect(() => {
+    if (import.meta.env.MODE === "production") return;
+    const probe = {
+      setSelectedId: (id: number | null) =>
+        setSelectedId(id === null ? null : (id as unknown as NonNullable<typeof selectedId>)),
+      setDragging,
+      fitView: () => rendererRef.current?.fitToContent(sim.world.snapshot()),
+      getCameraState: () => {
+        const cam = rendererRef.current?.camera;
+        return cam ? { center: cam.center, zoom: cam.zoom, canvas: cam.canvasSize } : null;
+      },
+      getBodies: () => sim.world.snapshot().bodies.map((b) => ({
+        id: b.id,
+        kind: b.kind,
+        position: b.position,
+      })),
+    };
+    (globalThis as unknown as { __pb?: unknown }).__pb = probe;
+    return () => {
+      const g = globalThis as unknown as { __pb?: unknown };
+      if (g.__pb === probe) delete g.__pb;
+    };
+  }, [setSelectedId, setDragging, sim.world]);
 
   const onPlay = () => {
     sim.resume();
@@ -87,104 +148,149 @@ export function App() {
   const onReset = () => {
     rendererRef.current?.reset();
     sim.loadScene(defaultSceneName);
+    setSelectedId(null);
     setRunning(true);
+    rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
-  const draggingRef = useRef(false);
-
-  const worldFromEvent = (e: React.PointerEvent<HTMLDivElement>) => {
-    const renderer = rendererRef.current;
-    if (!renderer || !renderer.isReady) return null;
-    const rect = e.currentTarget.getBoundingClientRect();
-    return renderer.camera.screenToWorld(
-      e.clientX - rect.left,
-      e.clientY - rect.top,
-    );
+  const onFitView = () => {
+    rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
-  const onCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    const world = worldFromEvent(e);
-    if (!world) return;
-    const tool = useUIStore.getState().tool;
-    const setSelectedId = useUIStore.getState().setSelectedId;
-    if (tool === "ball") {
+  const handleSpawn = (kind: SpawnMode, world: Vec2) => {
+    if (kind === "ball") {
       sim.add(ball({ position: world, radius: 0.4, material: "wood" }));
-      return;
-    }
-    if (tool === "ball+") {
+    } else if (kind === "ball+") {
       sim.add(
         ball({ position: world, radius: 0.32, material: "metal", charge: 4 }),
       );
-      return;
-    }
-    if (tool === "ball-") {
+    } else if (kind === "ball-") {
       sim.add(
         ball({ position: world, radius: 0.32, material: "metal", charge: -4 }),
       );
-      return;
-    }
-    if (tool === "magnet+") {
+    } else if (kind === "magnet+") {
       sim.add(magnet({ position: world, radius: 0.32, dipole: 12 }));
-      return;
-    }
-    if (tool === "magnet-") {
+    } else if (kind === "magnet-") {
       sim.add(magnet({ position: world, radius: 0.32, dipole: -12 }));
-      return;
-    }
-    if (tool === "box") {
+    } else if (kind === "box") {
       sim.add(
         box({ position: world, width: 0.7, height: 0.7, material: "wood" }),
       );
-      return;
-    }
-    const id = sim.world.startDragAt(world);
-    if (id !== null) {
-      draggingRef.current = true;
-      setSelectedId(id);
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } else {
-      setSelectedId(null);
     }
   };
 
-  const onCanvasPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    const world = worldFromEvent(e);
-    if (!world) return;
-    sim.world.updateDrag(world);
-  };
+  usePointerGestures(hostRef, {
+    world: sim.world,
+    getCamera: () => rendererRef.current?.camera ?? null,
+    getTool: () => useUIStore.getState().tool,
+    onSpawn: handleSpawn,
+    onSelect: setSelectedId,
+    onDragStateChange: setDragging,
+  });
 
-  const endCanvasDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    sim.world.endDrag();
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-  };
+  const isPhone = mode === "phone";
+  const isTablet = mode === "tablet";
+  const isDesktop = mode === "desktop";
+
+  // Tablet shares the phone-style inspector UX (floating peek, drawer
+  // accessed via a FAB). Only desktop keeps a permanent inspector
+  // panel — at iPad-landscape widths the panel was just stealing
+  // canvas width to render "No body selected".
+  const inspectorAsDrawer = !isDesktop;
 
   return (
     <SimulationProvider value={sim}>
       <div data-testid={testIds.app} style={appShell}>
         <div style={mainRow}>
-          <Toolbar />
+          {/* Toolbar: rail on tablet, full panel on desktop, drawer on phone. */}
+          {isTablet && <Toolbar variant="rail" />}
+          {isDesktop && <Toolbar variant="panel" />}
+
           <main style={canvasArea}>
             <div
               ref={hostRef}
               data-testid={testIds.canvasHost}
               aria-label="Physics Box simulation canvas"
-              onPointerDown={onCanvasPointerDown}
-              onPointerMove={onCanvasPointerMove}
-              onPointerUp={endCanvasDrag}
-              onPointerCancel={endCanvasDrag}
-              style={{ position: "absolute", inset: 0 }}
+              style={canvasHostStyle}
             />
+
+            <button
+              type="button"
+              aria-label="Fit scene to view"
+              title="Fit view"
+              data-testid={testIds.buttonFitView}
+              onClick={onFitView}
+              style={{
+                ...fitButtonStyle,
+                width: isPhone ? 44 : 36,
+                height: isPhone ? 44 : 36,
+                borderRadius: isPhone ? 22 : 18,
+              }}
+            >
+              <FitViewIcon />
+            </button>
+
+            {isPhone && (
+              <button
+                type="button"
+                aria-label="Open tools"
+                data-testid={testIds.fabTools}
+                onClick={() => setToolsOpen(true)}
+                style={{ ...fabStyle, left: 12 }}
+              >
+                <ToolsIcon />
+              </button>
+            )}
+
+            {inspectorAsDrawer && (
+              <button
+                type="button"
+                aria-label="Open inspector"
+                data-testid={testIds.fabInspector}
+                onClick={() => setInspectorOpen(true)}
+                style={{ ...fabStyle, right: 12 }}
+              >
+                <InspectorIcon />
+              </button>
+            )}
+
+            {isPhone && (
+              <Drawer
+                open={toolsOpen}
+                side="left"
+                onDismiss={() => setToolsOpen(false)}
+                ariaLabel="Tools panel"
+                testId={testIds.drawerTools}
+                size={Math.min(320, Math.round(typeof window !== "undefined" ? window.innerWidth * 0.78 : 280))}
+              >
+                <DrawerHeader title="Tools" onClose={() => setToolsOpen(false)} />
+                <Toolbar variant="sheet" />
+              </Drawer>
+            )}
+            {inspectorAsDrawer && (
+              <Drawer
+                open={inspectorOpen}
+                side="bottom"
+                onDismiss={() => setInspectorOpen(false)}
+                ariaLabel="Inspector panel"
+                testId={testIds.drawerInspector}
+                size={420}
+              >
+                <DrawerHeader
+                  title="Inspector"
+                  onClose={() => setInspectorOpen(false)}
+                />
+                <Inspector variant="sheet" />
+              </Drawer>
+            )}
           </main>
-          <Inspector />
+
+          {isDesktop && <Inspector variant="panel" />}
         </div>
+        {inspectorAsDrawer && <InspectorPeek />}
         <PlaybackBar
           tick={sim.tick}
+          compact={isPhone}
           onPlay={onPlay}
           onPause={onPause}
           onStep={onStep}
@@ -195,6 +301,22 @@ export function App() {
   );
 }
 
+function DrawerHeader(props: { title: string; onClose: () => void }) {
+  return (
+    <div style={drawerHeaderStyle}>
+      <span style={drawerTitleStyle}>{props.title}</span>
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={props.onClose}
+        style={drawerCloseStyle}
+      >
+        <CloseIcon />
+      </button>
+    </div>
+  );
+}
+
 const appShell: React.CSSProperties = {
   height: "100%",
   width: "100%",
@@ -202,12 +324,14 @@ const appShell: React.CSSProperties = {
   flexDirection: "column",
   background: "#f5efe6",
   color: "#2a2520",
+  paddingTop: "env(safe-area-inset-top)",
 };
 
 const mainRow: React.CSSProperties = {
   flex: 1,
   display: "flex",
   minHeight: 0,
+  minWidth: 0,
 };
 
 const canvasArea: React.CSSProperties = {
@@ -215,4 +339,76 @@ const canvasArea: React.CSSProperties = {
   position: "relative",
   background: "#f5efe6",
   overflow: "hidden",
+  minWidth: 0,
+  minHeight: 0,
+};
+
+const canvasHostStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  touchAction: "none",
+  userSelect: "none",
+  WebkitUserSelect: "none",
+};
+
+const fabStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(12px + env(safe-area-inset-top))",
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  border: "1px solid #d8cfbe",
+  background: "#f5efe6",
+  color: "#2a2520",
+  boxShadow: "0 2px 12px rgba(42,37,32,0.18)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  zIndex: 15,
+};
+
+const fitButtonStyle: React.CSSProperties = {
+  position: "absolute",
+  right: 12,
+  bottom: 12,
+  border: "1px solid #d8cfbe",
+  background: "#f5efe6",
+  color: "#2a2520",
+  boxShadow: "0 2px 10px rgba(42,37,32,0.14)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  zIndex: 14,
+};
+
+const drawerHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "12px 14px",
+  borderBottom: "1px solid #d8cfbe",
+};
+
+const drawerTitleStyle: React.CSSProperties = {
+  fontSize: 11,
+  letterSpacing: "0.16em",
+  textTransform: "uppercase",
+  color: "#5a4f43",
+  fontWeight: 600,
+};
+
+const drawerCloseStyle: React.CSSProperties = {
+  appearance: "none",
+  border: "none",
+  background: "transparent",
+  color: "#5a4f43",
+  cursor: "pointer",
+  width: 32,
+  height: 32,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 16,
 };

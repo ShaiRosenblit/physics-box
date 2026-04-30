@@ -15,8 +15,22 @@ body,
   width: 100%;
   background: #f5efe6;
   color: #2a2520;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  /* Prevent the browser from auto-zooming form controls and from
+     bouncing the page when the canvas swallows pointer events. */
+  -webkit-text-size-adjust: 100%;
 }
 
 * {
   box-sizing: border-box;
+}
+
+button {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }

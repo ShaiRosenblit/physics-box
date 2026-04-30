@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Physics Box">
+  <rect width="64" height="64" rx="12" fill="#eae2d5"/>
+  <g stroke="#2a2520" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <rect x="8" y="40" width="20" height="16" rx="1.5" fill="#caa97a"/>
+    <circle cx="42" cy="22" r="9" fill="#c75c45"/>
+    <path d="M14 40 L42 22" stroke-dasharray="2 3" opacity="0.55"/>
+    <path d="M52 32 q-6 6 0 14" opacity="0.6"/>
+    <path d="M56 30 q-9 8 0 18" opacity="0.35"/>
+  </g>
+</svg>

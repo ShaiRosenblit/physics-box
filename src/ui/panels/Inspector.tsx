@@ -3,9 +3,15 @@ import { testIds } from "../a11y/ids";
 import { useUIStore } from "../state/store";
 import { useSimulationContext } from "../hooks/SimulationContext";
 import type { BodyView } from "../../simulation";
+import type { ViewportMode } from "../hooks/useViewportMode";
 
-export function Inspector() {
+export interface InspectorProps {
+  variant: "panel" | "rail" | "sheet";
+}
+
+export function Inspector({ variant }: InspectorProps) {
   const selectedId = useUIStore((s) => s.selectedId);
+  const setInspectorOpen = useUIStore((s) => s.setInspectorOpen);
   const { world } = useSimulationContext();
   const [view, setView] = useState<BodyView | null>(null);
 
@@ -30,13 +36,47 @@ export function Inspector() {
     };
   }, [selectedId, world]);
 
+  if (variant === "rail") {
+    return (
+      <aside
+        data-testid={testIds.inspector}
+        aria-label="Inspector"
+        style={railStyle}
+      >
+        <div style={railEyebrowStyle}>Body</div>
+        {view ? (
+          <div style={railValueStyle} title={`Body #${view.id}`}>
+            #{view.id}
+          </div>
+        ) : (
+          <div style={{ ...railValueStyle, opacity: 0.5 }} aria-hidden="true">
+            —
+          </div>
+        )}
+      </aside>
+    );
+  }
+
+  const isSheet = variant === "sheet";
   return (
     <aside
       data-testid={testIds.inspector}
       aria-label="Inspector"
-      style={panelStyle}
+      style={isSheet ? sheetStyle : panelStyle}
     >
-      <div style={eyebrowStyle}>Inspector</div>
+      <div style={headerRowStyle}>
+        <div style={eyebrowStyle}>Inspector</div>
+        {isSheet && (
+          <button
+            type="button"
+            aria-label="Dismiss inspector"
+            onClick={() => setInspectorOpen(false)}
+            style={dismissStyle}
+          >
+            ×
+          </button>
+        )}
+      </div>
       {view === null ? (
         <div style={emptyStateStyle}>No body selected</div>
       ) : (
@@ -124,20 +164,80 @@ function titleCase(s: string): string {
 }
 
 const panelStyle: React.CSSProperties = {
-  width: 232,
-  padding: 16,
+  width: 220,
+  padding: "12px 12px",
   background: "#eae2d5",
   borderLeft: "1px solid #d8cfbe",
   display: "flex",
   flexDirection: "column",
-  gap: 12,
-  fontSize: 13,
+  gap: 8,
+  fontSize: 12,
+  lineHeight: 1.3,
   color: "#2a2520",
+  flexShrink: 0,
+  overflowY: "auto",
+};
+
+const sheetStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "16px 14px calc(16px + env(safe-area-inset-bottom))",
+  background: "#eae2d5",
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+  fontSize: 14,
+  lineHeight: 1.35,
+  color: "#2a2520",
+  height: "100%",
+  overflowY: "auto",
+};
+
+const railStyle: React.CSSProperties = {
+  width: 44,
+  padding: "10px 4px",
+  background: "#eae2d5",
+  borderLeft: "1px solid #d8cfbe",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 6,
+  color: "#2a2520",
+  flexShrink: 0,
+};
+
+const railEyebrowStyle: React.CSSProperties = {
+  fontSize: 8.5,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase",
+  color: "#5a4f43",
+};
+
+const railValueStyle: React.CSSProperties = {
+  fontFamily: '"SF Mono", ui-monospace, Menlo, monospace',
+  fontSize: 11,
+  fontVariantNumeric: "tabular-nums",
+};
+
+const headerRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const dismissStyle: React.CSSProperties = {
+  appearance: "none",
+  border: "none",
+  background: "transparent",
+  color: "#5a4f43",
+  fontSize: 22,
+  lineHeight: 1,
+  cursor: "pointer",
+  padding: 4,
 };
 
 const eyebrowStyle: React.CSSProperties = {
-  fontSize: 10,
-  letterSpacing: "0.12em",
+  fontSize: 9,
+  letterSpacing: "0.14em",
   textTransform: "uppercase",
   color: "#5a4f43",
   fontWeight: 500,
@@ -145,7 +245,6 @@ const eyebrowStyle: React.CSSProperties = {
 
 const emptyStateStyle: React.CSSProperties = {
   color: "#5a4f43",
-  fontSize: 12,
   fontStyle: "italic",
   paddingTop: 8,
 };
@@ -166,13 +265,20 @@ const rowStyle: React.CSSProperties = {
 };
 
 const rowLabelStyle: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 9.5,
   color: "#5a4f43",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
 };
 
 const rowValueStyle: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 11,
   fontFamily: '"SF Mono", ui-monospace, Menlo, monospace',
 };
+
+export function inspectorVariantFor(mode: ViewportMode): "panel" | "sheet" {
+  if (mode === "desktop") return "panel";
+  // Tablet shares the phone pattern: floating peek + drawer. The rail
+  // mostly showed "BODY —" and stole canvas width without earning it.
+  return "sheet";
+}

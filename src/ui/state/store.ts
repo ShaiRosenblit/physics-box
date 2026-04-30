@@ -21,6 +21,13 @@ export interface UIState {
   hasCharges: boolean;
   hasMagnets: boolean;
 
+  /** Toolbar drawer visibility (only consulted on tablet/phone). */
+  toolsOpen: boolean;
+  /** Inspector drawer visibility (only consulted on tablet/phone). */
+  inspectorOpen: boolean;
+  /** True while a body is actively being dragged via the canvas. */
+  dragging: boolean;
+
   running: boolean;
   scene: SceneName;
 
@@ -31,6 +38,9 @@ export interface UIState {
   toggleBField: () => void;
   setHasCharges: (hasCharges: boolean) => void;
   setHasMagnets: (hasMagnets: boolean) => void;
+  setToolsOpen: (open: boolean) => void;
+  setInspectorOpen: (open: boolean) => void;
+  setDragging: (dragging: boolean) => void;
   setRunning: (running: boolean) => void;
 }
 
@@ -45,6 +55,10 @@ export const useUIStore = create<UIState>((set) => ({
   hasCharges: false,
   hasMagnets: false,
 
+  toolsOpen: false,
+  inspectorOpen: false,
+  dragging: false,
+
   running: true,
   scene: "welcome",
 
@@ -57,5 +71,9 @@ export const useUIStore = create<UIState>((set) => ({
     set((s) => (s.hasCharges === hasCharges ? s : { hasCharges })),
   setHasMagnets: (hasMagnets) =>
     set((s) => (s.hasMagnets === hasMagnets ? s : { hasMagnets })),
+  setToolsOpen: (toolsOpen) => set({ toolsOpen }),
+  setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
+  setDragging: (dragging) =>
+    set((s) => (s.dragging === dragging ? s : { dragging })),
   setRunning: (running) => set({ running }),
 }));

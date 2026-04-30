@@ -1,8 +1,13 @@
 import { Application, Container } from "pixi.js";
-import { defaultConfig, type SimulationConfig, type Snapshot } from "../simulation";
+import {
+  defaultConfig,
+  type Id,
+  type SimulationConfig,
+  type Snapshot,
+} from "../simulation";
 import { Camera } from "./camera/Camera";
 import { CameraController } from "./camera/CameraController";
-import { BodyLayer } from "./scene/BodyView";
+import { BodyLayer, SelectionView } from "./scene/BodyView";
 import { ConstraintLayer } from "./scene/ConstraintView";
 import { FieldView } from "./scene/FieldView";
 import { Grid } from "./scene/Grid";
@@ -33,8 +38,11 @@ export class Renderer {
   private bodyLayer: BodyLayer;
   private constraintLayer: ConstraintLayer;
   private fieldView: FieldView;
+  private selectionView: SelectionView;
   private _camera = new Camera();
   private _controller = new CameraController();
+  private _lastSnapshot: Snapshot | null = null;
+  private _pendingFit: { paddingFraction: number } | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private _initPromise: Promise<void> | null = null;
   private _ready = false;
@@ -51,6 +59,35 @@ export class Renderer {
     this.bodyLayer = new BodyLayer(() => this._camera.zoom);
     this.constraintLayer = new ConstraintLayer(() => this._camera.zoom);
     this.fieldView = new FieldView(config);
+    this.selectionView = new SelectionView(() => this._camera.zoom);
+  }
+
+  setSelectedId(id: Id | null): void {
+    this.selectionView.setSelectedId(id);
+    if (this._lastSnapshot) {
+      this.selectionView.update(this._lastSnapshot);
+    }
+  }
+
+  /**
+   * Frame the snapshot's bodies inside the canvas with margin. Safe to
+   * call before `attach()` resolves; the request is queued and runs on
+   * the first render once the canvas is sized.
+   */
+  fitToContent(snapshot: Snapshot, paddingFraction = 0.12): void {
+    const bounds = computeBounds(snapshot);
+    if (!bounds) return;
+    if (this._camera.canvasSize.width <= 0 || this._camera.canvasSize.height <= 0) {
+      this._pendingFit = { paddingFraction };
+      return;
+    }
+    this._camera.fit(bounds, { paddingFraction });
+    this._geomDirty = true;
+    this._lastFieldTick = -1;
+    if (this.app) {
+      this._camera.apply(this.worldRoot);
+      this.grid.update(this._camera);
+    }
   }
 
   get controller(): CameraController {
@@ -75,7 +112,9 @@ export class Renderer {
   reset(): void {
     this.bodyLayer.clear();
     this.constraintLayer.clear();
+    this.selectionView.clear();
     this._lastFieldTick = -1;
+    this._lastSnapshot = null;
   }
 
   get camera(): Camera {
@@ -116,6 +155,7 @@ export class Renderer {
         this.worldRoot.addChild(this.fieldView.container);
         this.worldRoot.addChild(this.constraintLayer.node);
         this.worldRoot.addChild(this.bodyLayer.node);
+        this.worldRoot.addChild(this.selectionView.node);
 
         this._camera.setCanvas(app.renderer.width, app.renderer.height);
         this._camera.apply(this.worldRoot);
@@ -138,6 +178,20 @@ export class Renderer {
   /** Reconcile the scene with a new snapshot and render one frame. */
   render(snapshot: Snapshot): void {
     if (!this.app) return;
+    this._lastSnapshot = snapshot;
+
+    if (this._pendingFit) {
+      const bounds = computeBounds(snapshot);
+      if (bounds && this._camera.canvasSize.width > 0) {
+        this._camera.fit(bounds, {
+          paddingFraction: this._pendingFit.paddingFraction,
+        });
+        this._geomDirty = true;
+        this._lastFieldTick = -1;
+        this._pendingFit = null;
+      }
+    }
+
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
 
@@ -153,6 +207,7 @@ export class Renderer {
       this.bodyLayer.reconcile(snapshot);
     }
     this.constraintLayer.reconcile(snapshot);
+    this.selectionView.update(snapshot);
     this.updateFieldView(snapshot);
     this.app.render();
   }
@@ -213,4 +268,49 @@ export class Renderer {
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
   }
+}
+
+/**
+ * Compute the AABB used for fit-to-scene framing.
+ *
+ * Filters out very-large fixed boxes (e.g. the welcome scene's 40 m
+ * ground plate) so the framing reflects the interesting bodies, then
+ * adds a small bottom margin so the implied ground line stays visible.
+ */
+function computeBounds(
+  snapshot: Snapshot,
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  if (snapshot.bodies.length === 0) return null;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let included = 0;
+
+  for (const body of snapshot.bodies) {
+    let halfX: number;
+    let halfY: number;
+    if (body.kind === "ball" || body.kind === "magnet") {
+      halfX = body.radius;
+      halfY = body.radius;
+    } else {
+      const half = Math.hypot(body.width, body.height) / 2;
+      // Skip oversized fixed boxes (ground / walls) — they would force
+      // the camera to zoom out so far that everything else looks tiny.
+      if (body.fixed && half > 4) continue;
+      halfX = half;
+      halfY = half;
+    }
+    minX = Math.min(minX, body.position.x - halfX);
+    maxX = Math.max(maxX, body.position.x + halfX);
+    minY = Math.min(minY, body.position.y - halfY);
+    maxY = Math.max(maxY, body.position.y + halfY);
+    included++;
+  }
+
+  if (included === 0) return null;
+
+  // Reveal a sliver of "ground" so the scene is grounded visually.
+  const groundReveal = 0.4;
+  return { minX, minY: Math.min(minY, -groundReveal), maxX, maxY };
 }

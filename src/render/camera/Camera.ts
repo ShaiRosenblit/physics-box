@@ -87,4 +87,42 @@ export class Camera {
       maxY: this._center.y + halfH,
     };
   }
+
+  /**
+   * Frame the given world-space bounds inside the canvas, with optional
+   * fractional padding around the box (default 12%) and zoom clamps.
+   *
+   * If the canvas is not yet sized this is a no-op so callers can safely
+   * call it before `attach()` resolves and re-call once mounted.
+   */
+  fit(
+    bounds: { minX: number; minY: number; maxX: number; maxY: number },
+    options: {
+      readonly paddingFraction?: number;
+      readonly minZoom?: number;
+      readonly maxZoom?: number;
+    } = {},
+  ): void {
+    if (this._canvasWidth <= 0 || this._canvasHeight <= 0) return;
+
+    const padding = options.paddingFraction ?? 0.12;
+    const minZoom = options.minZoom ?? 4;
+    const maxZoom = options.maxZoom ?? 240;
+
+    const w = Math.max(bounds.maxX - bounds.minX, 1e-3);
+    const h = Math.max(bounds.maxY - bounds.minY, 1e-3);
+    const paddedW = w * (1 + padding * 2);
+    const paddedH = h * (1 + padding * 2);
+
+    const zoomByWidth = this._canvasWidth / paddedW;
+    const zoomByHeight = this._canvasHeight / paddedH;
+    const target = Math.min(zoomByWidth, zoomByHeight);
+    const clamped = Math.max(minZoom, Math.min(maxZoom, target));
+
+    this._zoom = clamped;
+    this._center = {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: (bounds.minY + bounds.maxY) / 2,
+    };
+  }
 }

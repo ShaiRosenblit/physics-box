@@ -64,7 +64,40 @@ npm run test       # run Vitest kernel suites once
 npm run test:watch # watch mode
 npm run test:e2e   # run Playwright UI smoke (chromium)
 npm run build      # typecheck + production build
+npm run preview    # serve the production build locally
 ```
+
+## Responsive shell and touch
+
+The shell adapts to three viewport modes (driven by a `useViewportMode` hook
+backed by `matchMedia`):
+
+- **Desktop ≥ 1024 px** — labelled `Toolbar` and `Inspector` flank the canvas.
+- **Tablet 640–1023 px** — both panels collapse to 44 px icon rails so the
+  canvas always dominates.
+- **Phone < 640 px** — full-bleed canvas with two floating buttons; tapping
+  either slides in a `Drawer` (`Toolbar` from the left, `Inspector` from
+  the bottom). Selecting a body auto-opens the inspector sheet.
+
+Canvas pointer events are owned by `usePointerGestures` (one-finger drag/pan/tap,
+two-finger pinch + pan with `touch-action: none`); the existing
+`CameraController` keeps mouse-wheel zoom and middle/right-button drag for
+desktop. See `src/ui/hooks/useViewportMode.ts`,
+`src/ui/canvas/usePointerGestures.ts`, and `src/ui/components/Drawer.tsx`.
+
+## Deploying
+
+The build is a static SPA — any host that serves `dist/` works.
+
+- **Vercel**: set framework preset to *Vite*, leave defaults. The relative
+  `base: "./"` in `vite.config.ts` makes the build work from any URL prefix.
+- **Netlify**: build command `npm run build`, publish directory `dist`.
+- **GitHub Pages** (project pages): `BASE_PATH=/your-repo/ npm run build`,
+  then publish `dist/`.
+
+The mobile shell ships the right `viewport`, `theme-color`, and a Web App
+Manifest (`public/manifest.webmanifest`) so the app installs cleanly to a
+phone home screen.
 
 The Playwright smoke spec doubles as the workflow rule's "Playwright MCP smoke pass" — it asserts presence/labels of the toolbar, inspector, playback bar, and canvas, plus playback semantics (advance, pause, step, reset). It also captures a reference screenshot at `tests/smoke/screenshots/welcome.png`.
 
