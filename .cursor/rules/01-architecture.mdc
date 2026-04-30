@@ -27,12 +27,31 @@ ui  ──commands──▶  simulation  ──snapshots──▶  render
 
 ## Adding a new entity type
 
-A new body type requires, in order:
+Anything the simulation can spawn — a body or a connector — must also be reachable from the UI. If it isn't in the toolbar, it doesn't exist for users, and the welcome scene becomes a museum of things they can't build.
+
+### New body type (Ball / Box / Magnet …)
+
+In order:
 
 1. A factory in `src/simulation/mechanics/<type>.ts` returning a normalized `BodySpec`.
 2. Snapshot fields in `src/simulation/core/types.ts` if needed.
 3. A view in `src/render/scene/BodyView.ts`.
-4. A toolbar entry in `src/ui/panels/Toolbar.tsx`.
+4. A toolbar entry in `src/ui/panels/Toolbar.tsx` (icon, label, `Tool` id) plus spawn handling in `src/ui/canvas/usePointerGestures.ts`.
+
+### New connector type (Rope / Hinge / Spring …)
+
+In order:
+
+1. A factory in `src/simulation/mechanics/<type>.ts` returning a normalized `ConstraintSpec`.
+2. Snapshot fields in `src/simulation/core/types.ts` if the connector needs to be drawn.
+3. A view in `src/render/scene/ConstraintView.ts`.
+4. A toolbar entry in `src/ui/panels/Toolbar.tsx` plus the multi-anchor placement gesture in `src/ui/canvas/usePointerGestures.ts`.
+
+### Toolbar step is the user contract
+
+Step 4 (toolbar + gesture wiring) is **strongly recommended** for every new entity type. The kernel and the welcome scene must not gain abilities the user can't reproduce on an empty canvas.
+
+It can be deferred — but only with an explicit note in the commit message saying why and when it will follow, and never across a milestone boundary.
 
 No cross-cutting edits. Each step lives in its own commit per `04-workflow.mdc`.
 
