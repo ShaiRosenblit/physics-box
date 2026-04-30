@@ -74,5 +74,12 @@ export type {
   MaterialProps,
 } from "./mechanics";
 
-export { scenes, defaultSceneName, sceneIds, empty, welcome } from "./scenes";
+export {
+  scenes,
+  defaultSceneName,
+  sceneIds,
+  empty,
+  galton,
+  welcome,
+} from "./scenes";
 export type { SceneFn, SceneName } from "./scenes";
