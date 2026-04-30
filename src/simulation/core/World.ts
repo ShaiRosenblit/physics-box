@@ -2,7 +2,7 @@ import { defaultConfig, type SimulationConfig } from "./config";
 import { EventBus, type EventName, type Listener, type Unsubscribe } from "./events";
 import { createIdFactory } from "./ids";
 import { Stepper } from "./Stepper";
-import type { BodySpec, Id, Snapshot, Vec2 } from "./types";
+import type { BodySpec, ConstraintSpec, Id, Snapshot, Vec2 } from "./types";
 import { PlanckAdapter } from "../adapters/PlanckAdapter";
 
 /**
@@ -81,9 +81,22 @@ export class World {
   }
 
   remove(id: Id): void {
-    if (!this._adapter.has(id)) return;
-    this._adapter.remove(id);
-    this._events.emit("remove", { id });
+    if (this._adapter.has(id)) {
+      this._adapter.remove(id);
+      this._events.emit("remove", { id });
+      return;
+    }
+    if (this._adapter.hasConstraint(id)) {
+      this._adapter.removeConstraint(id);
+      this._events.emit("remove", { id });
+    }
+  }
+
+  addConstraint(spec: ConstraintSpec): Id {
+    const id = this._nextId();
+    this._adapter.addConstraint(id, spec);
+    this._events.emit("add", { id });
+    return id;
   }
 
   /**

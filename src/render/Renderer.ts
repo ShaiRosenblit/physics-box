@@ -3,6 +3,7 @@ import type { Snapshot } from "../simulation";
 import { Camera } from "./camera/Camera";
 import { CameraController } from "./camera/CameraController";
 import { BodyLayer } from "./scene/BodyView";
+import { ConstraintLayer } from "./scene/ConstraintView";
 import { Grid } from "./scene/Grid";
 import { palette } from "./style/palette";
 
@@ -29,6 +30,7 @@ export class Renderer {
   private worldRoot = new Container();
   private grid = new Grid();
   private bodyLayer: BodyLayer;
+  private constraintLayer: ConstraintLayer;
   private _camera = new Camera();
   private _controller = new CameraController();
   private resizeObserver: ResizeObserver | null = null;
@@ -40,6 +42,7 @@ export class Renderer {
 
   constructor() {
     this.bodyLayer = new BodyLayer(() => this._camera.zoom);
+    this.constraintLayer = new ConstraintLayer(() => this._camera.zoom);
   }
 
   get controller(): CameraController {
@@ -50,9 +53,10 @@ export class Renderer {
     this.grid.node.visible = visible;
   }
 
-  /** Drop all body display objects. Call after a scene reload / world reset. */
+  /** Drop all body and constraint display objects. */
   reset(): void {
     this.bodyLayer.clear();
+    this.constraintLayer.clear();
   }
 
   get camera(): Camera {
@@ -90,6 +94,7 @@ export class Renderer {
         host.appendChild(app.canvas);
         app.stage.addChild(this.worldRoot);
         this.worldRoot.addChild(this.grid.node);
+        this.worldRoot.addChild(this.constraintLayer.node);
         this.worldRoot.addChild(this.bodyLayer.node);
 
         this._camera.setCanvas(app.renderer.width, app.renderer.height);
@@ -127,6 +132,7 @@ export class Renderer {
     } else {
       this.bodyLayer.reconcile(snapshot);
     }
+    this.constraintLayer.reconcile(snapshot);
     this.app.render();
   }
 
@@ -137,6 +143,7 @@ export class Renderer {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.bodyLayer.clear();
+    this.constraintLayer.clear();
 
     if (this._ready && this.app) {
       this.destroyApp(this.app);

@@ -1,6 +1,16 @@
 import * as planck from "planck";
 import type { SimulationConfig } from "../core/config";
-import type { BodySpec, BodyView, Id, Snapshot, Vec2 } from "../core/types";
+import type {
+  Anchor,
+  BodySpec,
+  BodyView,
+  ConstraintSpec,
+  ConstraintView,
+  Id,
+  RopeSpec,
+  Snapshot,
+  Vec2,
+} from "../core/types";
 import { lookupMaterial } from "../mechanics/materials";
 
 interface BodyRecord {
@@ -12,6 +22,13 @@ interface BodyRecord {
 interface DragState {
   readonly id: Id;
   readonly joint: planck.MouseJoint;
+}
+
+interface ConstraintRecord {
+  readonly id: Id;
+  readonly spec: ConstraintSpec;
+  readonly internalBodies: planck.Body[];
+  readonly joints: planck.Joint[];
 }
 
 /**
@@ -27,6 +44,7 @@ interface DragState {
 export class PlanckAdapter {
   private readonly world: planck.World;
   private readonly bodies = new Map<Id, BodyRecord>();
+  private readonly constraints = new Map<Id, ConstraintRecord>();
   private readonly groundBody: planck.Body;
   private dragState: DragState | null = null;
 
@@ -89,7 +107,7 @@ export class PlanckAdapter {
       if (!body.isDynamic()) return true;
       if (!fixture.testPoint(target)) return true;
       const data = body.getUserData();
-      if (typeof data === "number") {
+      if (typeof data === "number" && this.bodies.has(data as Id)) {
         foundId = data as Id;
         return false;
       }
@@ -145,17 +163,141 @@ export class PlanckAdapter {
     this.world.step(dt, velIters, posIters);
   }
 
+  addConstraint(id: Id, spec: ConstraintSpec): void {
+    if (this.constraints.has(id)) {
+      throw new Error(`PlanckAdapter.addConstraint: id ${id} already exists`);
+    }
+    if (spec.kind === "rope") {
+      this.constraints.set(id, this.buildRope(id, spec));
+      return;
+    }
+    throw new Error(
+      `PlanckAdapter.addConstraint: kind '${spec.kind}' not implemented yet`,
+    );
+  }
+
+  removeConstraint(id: Id): void {
+    const record = this.constraints.get(id);
+    if (!record) return;
+    for (const joint of record.joints) this.world.destroyJoint(joint);
+    for (const body of record.internalBodies) this.world.destroyBody(body);
+    this.constraints.delete(id);
+  }
+
+  hasConstraint(id: Id): boolean {
+    return this.constraints.has(id);
+  }
+
   buildSnapshot(tick: number, time: number): Snapshot {
     const ids = Array.from(this.bodies.keys()).sort((a, b) => a - b);
     const bodies: BodyView[] = ids.map((id) => {
       const record = this.bodies.get(id)!;
       return buildView(record);
     });
+
+    const constraintIds = Array.from(this.constraints.keys()).sort(
+      (a, b) => a - b,
+    );
+    const constraints: ConstraintView[] = constraintIds.map((id) => {
+      const record = this.constraints.get(id)!;
+      return buildConstraintView(record);
+    });
+
     return Object.freeze({
       tick,
       time,
       bodies: Object.freeze(bodies),
+      constraints: Object.freeze(constraints),
     });
+  }
+
+  private resolveAnchor(anchor: Anchor): {
+    body: planck.Body;
+    worldPoint: planck.Vec2;
+  } {
+    if (anchor.kind === "world") {
+      return {
+        body: this.groundBody,
+        worldPoint: planck.Vec2(anchor.point.x, anchor.point.y),
+      };
+    }
+    const record = this.bodies.get(anchor.id);
+    if (!record) {
+      throw new Error(`Anchor refers to unknown body id ${anchor.id}`);
+    }
+    const local = anchor.localPoint ?? { x: 0, y: 0 };
+    const worldPoint = record.body.getWorldPoint(planck.Vec2(local.x, local.y));
+    return {
+      body: record.body,
+      worldPoint: planck.Vec2(worldPoint.x, worldPoint.y),
+    };
+  }
+
+  private buildRope(id: Id, spec: RopeSpec): ConstraintRecord {
+    const start = this.resolveAnchor(spec.a);
+    const end = this.resolveAnchor(spec.b);
+
+    const span = planck.Vec2.sub(end.worldPoint, start.worldPoint);
+    const distance = span.length();
+    const length = Math.max(spec.length, Math.max(distance, 0.05));
+    const segments = Math.max(2, spec.segments ?? Math.max(6, Math.round(length / 0.18)));
+    const segLen = length / (segments + 1);
+    const segRadius = Math.max(0.04, segLen * 0.2);
+    const material = lookupMaterial(spec.material ?? "wood");
+
+    const internalBodies: planck.Body[] = [];
+    const joints: planck.Joint[] = [];
+
+    let prev = start.body;
+    let prevAnchor = start.worldPoint;
+    for (let i = 1; i <= segments; i++) {
+      const t = i / (segments + 1);
+      const x = start.worldPoint.x + span.x * t;
+      const y = start.worldPoint.y + span.y * t;
+
+      const segBody = this.world.createBody({
+        type: "dynamic",
+        position: planck.Vec2(x, y),
+        linearDamping: 0.05,
+        angularDamping: 0.05,
+        userData: `__rope:${id}:${i}`,
+      });
+      segBody.createFixture({
+        shape: new planck.CircleShape(segRadius),
+        density: material.density,
+        friction: material.friction,
+        restitution: 0.05,
+        filterCategoryBits: 0x0002,
+        filterMaskBits: 0xfffd,
+      });
+      internalBodies.push(segBody);
+
+      const segCenter = planck.Vec2(x, y);
+      const joint = new planck.DistanceJoint(
+        { frequencyHz: 0, dampingRatio: 0, length: segLen },
+        prev,
+        segBody,
+        prevAnchor,
+        segCenter,
+      );
+      this.world.createJoint(joint);
+      joints.push(joint);
+
+      prev = segBody;
+      prevAnchor = segCenter;
+    }
+
+    const finalJoint = new planck.DistanceJoint(
+      { frequencyHz: 0, dampingRatio: 0, length: segLen },
+      prev,
+      end.body,
+      prevAnchor,
+      end.worldPoint,
+    );
+    this.world.createJoint(finalJoint);
+    joints.push(finalJoint);
+
+    return { id, spec, internalBodies, joints };
   }
 }
 
@@ -164,6 +306,34 @@ function makeShape(spec: BodySpec): planck.Shape {
     return new planck.CircleShape(spec.radius);
   }
   return new planck.BoxShape(spec.width / 2, spec.height / 2);
+}
+
+function buildConstraintView(record: ConstraintRecord): ConstraintView {
+  const { id, spec } = record;
+  if (spec.kind === "rope") {
+    const path: Vec2[] = [];
+    const startJoint = record.joints[0];
+    if (startJoint) {
+      const a = startJoint.getAnchorA();
+      path.push(Object.freeze({ x: a.x, y: a.y }));
+    }
+    for (const body of record.internalBodies) {
+      const p = body.getPosition();
+      path.push(Object.freeze({ x: p.x, y: p.y }));
+    }
+    const endJoint = record.joints[record.joints.length - 1];
+    if (endJoint) {
+      const b = endJoint.getAnchorB();
+      path.push(Object.freeze({ x: b.x, y: b.y }));
+    }
+    return Object.freeze({
+      id,
+      kind: "rope" as const,
+      path: Object.freeze(path),
+      material: spec.material ?? "wood",
+    });
+  }
+  throw new Error(`buildConstraintView: kind '${spec.kind}' not implemented yet`);
 }
 
 function buildView(record: BodyRecord): BodyView {

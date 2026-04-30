@@ -56,8 +56,66 @@ export interface BoxView extends BaseBodyView {
 
 export type BodyView = BallView | BoxView;
 
+export type Anchor =
+  | { readonly kind: "world"; readonly point: Vec2 }
+  | { readonly kind: "body"; readonly id: Id; readonly localPoint?: Vec2 };
+
+export type ConstraintKind = "rope" | "hinge" | "spring";
+
+export interface RopeSpec {
+  readonly kind: "rope";
+  readonly a: Anchor;
+  readonly b: Anchor;
+  readonly length: number;
+  readonly segments?: number;
+  readonly material?: MaterialName;
+}
+
+export interface HingeSpec {
+  readonly kind: "hinge";
+  readonly bodyA: Id;
+  readonly bodyB?: Id;
+  readonly worldAnchor: Vec2;
+}
+
+export interface SpringSpec {
+  readonly kind: "spring";
+  readonly a: Anchor;
+  readonly b: Anchor;
+  readonly restLength?: number;
+  readonly frequencyHz?: number;
+  readonly dampingRatio?: number;
+}
+
+export type ConstraintSpec = RopeSpec | HingeSpec | SpringSpec;
+
+export interface RopeView {
+  readonly id: Id;
+  readonly kind: "rope";
+  readonly path: readonly Vec2[];
+  readonly material: MaterialName;
+}
+
+export interface HingeView {
+  readonly id: Id;
+  readonly kind: "hinge";
+  readonly anchor: Vec2;
+}
+
+export interface SpringView {
+  readonly id: Id;
+  readonly kind: "spring";
+  readonly a: Vec2;
+  readonly b: Vec2;
+  readonly restLength: number;
+  readonly currentLength: number;
+}
+
+export type ConstraintView = RopeView | HingeView | SpringView;
+
 export interface Snapshot {
   readonly tick: number;
   readonly time: number;
   readonly bodies: readonly BodyView[];
+  readonly constraints: readonly ConstraintView[];
 }
