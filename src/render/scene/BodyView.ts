@@ -244,6 +244,11 @@ function wrapRasterWoodBall(
   spr.height = body.radius * 2;
   spr.tint = palette.wood;
 
+  const clip = new Graphics();
+  clip.circle(0, 0, body.radius);
+  clip.fill({ color: 0xffffff });
+  spr.mask = clip;
+
   const edge = new Graphics();
   edge.circle(0, 0, body.radius);
   edge.stroke({
@@ -265,7 +270,7 @@ function wrapRasterWoodBall(
   const chargeOverlay = new Graphics();
   drawChargeMark(chargeOverlay, body.charge, body.radius, lineWidth);
 
-  c.addChild(shadow, spr, edge, orient, chargeOverlay);
+  c.addChild(shadow, spr, clip, edge, orient, chargeOverlay);
   return c;
 }
 
@@ -276,13 +281,14 @@ function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
     ? { fill: palette.paperShade, edge: palette.inkMuted }
     : materialStyles[body.material];
 
-  if (body.kind === "ball") {
+  if (body.kind === "ball" || body.kind === "balloon") {
     g.circle(0, -0.04, body.radius);
     g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
     g.circle(0, 0, body.radius);
-    g.fill({ color: style.fill, alpha: 1 });
+    const filmAlpha = body.kind === "balloon" ? 0.88 : 1;
+    g.fill({ color: style.fill, alpha: filmAlpha });
     g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
-    drawHighlight(g, body.material, body.radius);
+    drawHighlight(g, body.material, body.radius, body.kind);
     const tickLen = body.radius * 0.55;
     g.moveTo(0, 0);
     g.lineTo(tickLen, 0);
@@ -337,7 +343,7 @@ export class SelectionView {
       this.node.position.set(body.position.x, body.position.y);
       this.node.rotation = body.angle;
 
-      if (body.kind === "ball" || body.kind === "magnet") {
+      if (body.kind === "ball" || body.kind === "balloon" || body.kind === "magnet") {
         this.node.circle(0, 0, body.radius + inset);
         this.node.stroke({
           width: lineWidth,
@@ -483,7 +489,9 @@ function drawHighlight(
   g: Graphics,
   material: BodyView["material"],
   radius: number,
+  bodyKind: BodyView["kind"],
 ): void {
+  if (bodyKind === "balloon") return;
   const offset = radius * 0.32;
   const r = radius * 0.55;
   const alpha =
@@ -493,7 +501,9 @@ function drawHighlight(
         ? 0.14
         : material === "felt"
           ? 0.11
-          : 0.18;
+          : material === "latex"
+            ? 0.1
+            : 0.18;
   g.circle(-offset, offset, r);
   g.fill({ color: 0xfff4e3, alpha });
 }
