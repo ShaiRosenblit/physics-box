@@ -5,6 +5,9 @@ import { Stepper } from "./Stepper";
 import type { BodySpec, ConstraintSpec, Id, Snapshot, Vec2 } from "./types";
 import { PlanckAdapter } from "../adapters/PlanckAdapter";
 import { ChargeRegistry } from "../electromagnetism/ChargeRegistry";
+import { computeCoulombForces } from "../electromagnetism/coulomb";
+import { emConstants } from "../electromagnetism/constants";
+import { sampleE } from "../electromagnetism/field";
 
 /**
  * The simulation kernel facade.
@@ -29,6 +32,33 @@ export class World {
     this._config = config;
     this._adapter = new PlanckAdapter(config);
     this._stepper = new Stepper(config.dt, config.maxSubsteps);
+    this.registerEmSolvers();
+  }
+
+  private registerEmSolvers(): void {
+    this._preStepHooks.push(() => {
+      if (this._charges.size() < 2) return;
+      const states = this._adapter
+        .collectChargedBodies()
+        .sort((a, b) => a.id - b.id);
+      if (states.length < 2) return;
+      const forces = computeCoulombForces(states, emConstants(this._config));
+      this._adapter.applyForces(forces);
+    });
+  }
+
+  /**
+   * Sample the electric field at the given world point. Returns the
+   * zero vector if there are no charged bodies.
+   */
+  sampleField(p: Vec2): { readonly E: Vec2 } {
+    if (this._charges.size() === 0) {
+      return { E: { x: 0, y: 0 } };
+    }
+    const states = this._adapter
+      .collectChargedBodies()
+      .sort((a, b) => a.id - b.id);
+    return { E: sampleE(p, states, emConstants(this._config)) };
   }
 
   /**

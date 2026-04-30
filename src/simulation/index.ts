@@ -40,6 +40,11 @@ export {
   worldAnchor,
   bodyAnchor,
 } from "./mechanics";
+
+export { ChargeRegistry } from "./electromagnetism/ChargeRegistry";
+export { computeCoulombForces, type ChargedBodyState } from "./electromagnetism/coulomb";
+export { sampleE } from "./electromagnetism/field";
+export { emConstants, type EmConstants } from "./electromagnetism/constants";
 export type {
   BallInput,
   BoxInput,
