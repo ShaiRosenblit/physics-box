@@ -11,6 +11,9 @@ export interface UIState {
   showEField: boolean;
   showBField: boolean;
 
+  hasCharges: boolean;
+  hasMagnets: boolean;
+
   running: boolean;
   scene: SceneName;
 
@@ -19,6 +22,8 @@ export interface UIState {
   toggleGrid: () => void;
   toggleEField: () => void;
   toggleBField: () => void;
+  setHasCharges: (hasCharges: boolean) => void;
+  setHasMagnets: (hasMagnets: boolean) => void;
   setRunning: (running: boolean) => void;
 }
 
@@ -30,6 +35,9 @@ export const useUIStore = create<UIState>((set) => ({
   showEField: true,
   showBField: true,
 
+  hasCharges: false,
+  hasMagnets: false,
+
   running: true,
   scene: "welcome",
 
@@ -38,5 +46,9 @@ export const useUIStore = create<UIState>((set) => ({
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   toggleEField: () => set((s) => ({ showEField: !s.showEField })),
   toggleBField: () => set((s) => ({ showBField: !s.showBField })),
+  setHasCharges: (hasCharges) =>
+    set((s) => (s.hasCharges === hasCharges ? s : { hasCharges })),
+  setHasMagnets: (hasMagnets) =>
+    set((s) => (s.hasMagnets === hasMagnets ? s : { hasMagnets })),
   setRunning: (running) => set({ running }),
 }));

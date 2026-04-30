@@ -7,15 +7,12 @@ import { spring } from "../mechanics/spring";
 import { bodyAnchor, worldAnchor } from "../mechanics/anchors";
 
 /**
- * Welcome scene — v2 (M5).
+ * Welcome scene — v3 (M6).
  *
- * v1's wide ground, crate stack, settled balls, and right-side box,
- * plus three new fixtures so first run shows off constraints:
- *   - a hanging rope with a wooden bob, given a small initial swing
- *   - a vertical spring with a metal weight, displaced from rest
- *   - a hinged seesaw with a metal weight tipping the left end
- *
- * Composition is feature-driven; M8 will redesign with intent.
+ * Adds two suspended charged balls (one positive, one negative) so
+ * the E-field streamlines have something to draw from on first run.
+ * Both are anchored by stiff springs so they hover at rest height
+ * and don't drift across the workshop while the user reads the UI.
  */
 export function welcome(world: World): void {
   const groundHeight = 0.5;
@@ -121,6 +118,42 @@ export function welcome(world: World): void {
       width: 0.3,
       height: 0.3,
       material: "metal",
+    }),
+  );
+
+  const posCharge = world.add(
+    ball({
+      position: { x: -8.5, y: 4.5 },
+      radius: 0.32,
+      material: "metal",
+      charge: 6,
+    }),
+  );
+  world.addConstraint(
+    spring({
+      a: worldAnchor({ x: -8.5, y: 6.5 }),
+      b: bodyAnchor(posCharge),
+      restLength: 2.0,
+      frequencyHz: 3,
+      dampingRatio: 0.9,
+    }),
+  );
+
+  const negCharge = world.add(
+    ball({
+      position: { x: 8.5, y: 4.5 },
+      radius: 0.32,
+      material: "metal",
+      charge: -6,
+    }),
+  );
+  world.addConstraint(
+    spring({
+      a: worldAnchor({ x: 8.5, y: 6.5 }),
+      b: bodyAnchor(negCharge),
+      restLength: 2.0,
+      frequencyHz: 3,
+      dampingRatio: 0.9,
     }),
   );
 }

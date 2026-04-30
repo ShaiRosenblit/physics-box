@@ -113,9 +113,16 @@ export interface SpringView {
 
 export type ConstraintView = RopeView | HingeView | SpringView;
 
+export interface ChargedSourceView {
+  readonly id: Id;
+  readonly position: Vec2;
+  readonly charge: number;
+}
+
 export interface Snapshot {
   readonly tick: number;
   readonly time: number;
   readonly bodies: readonly BodyView[];
   readonly constraints: readonly ConstraintView[];
+  readonly charges: readonly ChargedSourceView[];
 }

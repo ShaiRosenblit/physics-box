@@ -4,6 +4,7 @@ import type {
   Anchor,
   BodySpec,
   BodyView,
+  ChargedSourceView,
   ConstraintSpec,
   ConstraintView,
   HingeSpec,
@@ -257,11 +258,27 @@ export class PlanckAdapter {
       return buildConstraintView(record);
     });
 
+    const charges: ChargedSourceView[] = [];
+    for (const id of ids) {
+      const record = this.bodies.get(id)!;
+      const q = record.spec.charge ?? 0;
+      if (q === 0) continue;
+      const p = record.body.getPosition();
+      charges.push(
+        Object.freeze({
+          id,
+          position: Object.freeze({ x: p.x, y: p.y }),
+          charge: q,
+        }),
+      );
+    }
+
     return Object.freeze({
       tick,
       time,
       bodies: Object.freeze(bodies),
       constraints: Object.freeze(constraints),
+      charges: Object.freeze(charges),
     });
   }
 

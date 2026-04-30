@@ -6,13 +6,16 @@ import {
   sampleE,
   World,
   type ChargedBodyState,
+  type Id,
 } from "../index";
 import { defaultConfig } from "../core/config";
 
 const ec = emConstants(defaultConfig);
 
-function make(id: number, x: number, y: number, q: number): ChargedBodyState {
-  return { id, position: { x, y }, charge: q };
+const id = (n: number) => n as unknown as Id;
+
+function make(idNum: number, x: number, y: number, q: number): ChargedBodyState {
+  return { id: id(idNum), position: { x, y }, charge: q };
 }
 
 describe("Coulomb force", () => {
@@ -20,8 +23,8 @@ describe("Coulomb force", () => {
     const a = make(1, 0, 0, 1);
     const b = make(2, 1, 0, 1);
     const f = computeCoulombForces([a, b], ec);
-    const fa = f.get(1)!;
-    const fb = f.get(2)!;
+    const fa = f.get(id(1))!;
+    const fb = f.get(id(2))!;
 
     expect(fa.x).toBeLessThan(0);
     expect(fb.x).toBeGreaterThan(0);
@@ -35,8 +38,8 @@ describe("Coulomb force", () => {
     const b = make(2, 1, 0, -1);
     const f = computeCoulombForces([a, b], ec);
 
-    expect(f.get(1)!.x).toBeGreaterThan(0);
-    expect(f.get(2)!.x).toBeLessThan(0);
+    expect(f.get(id(1))!.x).toBeGreaterThan(0);
+    expect(f.get(id(2))!.x).toBeLessThan(0);
   });
 
   it("Newton's third law: net force on the system is zero", () => {
@@ -60,7 +63,7 @@ describe("Coulomb force", () => {
     const a = make(1, 0, 0, 1);
     const b = make(2, 0, 0, 1);
     const f = computeCoulombForces([a, b], ec);
-    const fa = f.get(1)!;
+    const fa = f.get(id(1))!;
     expect(Number.isFinite(fa.x)).toBe(true);
     expect(Number.isFinite(fa.y)).toBe(true);
   });
@@ -69,7 +72,7 @@ describe("Coulomb force", () => {
     const big = ec.maxEmForce * 100;
     const states = [make(1, 0, 0, big), make(2, 0.01, 0, big)];
     const f = computeCoulombForces(states, ec);
-    const fa = f.get(1)!;
+    const fa = f.get(id(1))!;
     const m = Math.hypot(fa.x, fa.y);
     expect(m).toBeLessThanOrEqual(ec.maxEmForce + 1e-6);
   });

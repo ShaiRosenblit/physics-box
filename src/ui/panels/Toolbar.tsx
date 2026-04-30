@@ -18,6 +18,8 @@ export function Toolbar() {
   const showGrid = useUIStore((s) => s.showGrid);
   const showEField = useUIStore((s) => s.showEField);
   const showBField = useUIStore((s) => s.showBField);
+  const hasCharges = useUIStore((s) => s.hasCharges);
+  const hasMagnets = useUIStore((s) => s.hasMagnets);
   const toggleGrid = useUIStore((s) => s.toggleGrid);
   const toggleEField = useUIStore((s) => s.toggleEField);
   const toggleBField = useUIStore((s) => s.toggleBField);
@@ -50,17 +52,17 @@ export function Toolbar() {
         <ToggleButton
           label="E field"
           testId={testIds.toggleEField}
-          pressed={showEField}
+          pressed={showEField && hasCharges}
           onClick={toggleEField}
-          disabled
+          disabled={!hasCharges}
           disabledReason="No charges in scene"
         />
         <ToggleButton
           label="B field"
           testId={testIds.toggleBField}
-          pressed={showBField}
+          pressed={showBField && hasMagnets}
           onClick={toggleBField}
-          disabled
+          disabled={!hasMagnets}
           disabledReason="No magnets in scene"
         />
       </Section>

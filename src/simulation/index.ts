@@ -15,6 +15,7 @@ export type {
   BodyView,
   BallView,
   BoxView,
+  ChargedSourceView,
   ConstraintKind,
   ConstraintSpec,
   ConstraintView,

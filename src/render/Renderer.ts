@@ -1,9 +1,10 @@
 import { Application, Container } from "pixi.js";
-import type { Snapshot } from "../simulation";
+import { defaultConfig, type SimulationConfig, type Snapshot } from "../simulation";
 import { Camera } from "./camera/Camera";
 import { CameraController } from "./camera/CameraController";
 import { BodyLayer } from "./scene/BodyView";
 import { ConstraintLayer } from "./scene/ConstraintView";
+import { FieldView } from "./scene/FieldView";
 import { Grid } from "./scene/Grid";
 import { palette } from "./style/palette";
 
@@ -31,6 +32,7 @@ export class Renderer {
   private grid = new Grid();
   private bodyLayer: BodyLayer;
   private constraintLayer: ConstraintLayer;
+  private fieldView: FieldView;
   private _camera = new Camera();
   private _controller = new CameraController();
   private resizeObserver: ResizeObserver | null = null;
@@ -39,10 +41,15 @@ export class Renderer {
   private _disposed = false;
   private _lastGeomZoom = 0;
   private _geomDirty = false;
+  private _lastFieldTick = -1;
+  private _lastFieldZoom = 0;
+  private _lastFieldCenterX = Number.NaN;
+  private _lastFieldCenterY = Number.NaN;
 
-  constructor() {
+  constructor(config: SimulationConfig = defaultConfig) {
     this.bodyLayer = new BodyLayer(() => this._camera.zoom);
     this.constraintLayer = new ConstraintLayer(() => this._camera.zoom);
+    this.fieldView = new FieldView(config);
   }
 
   get controller(): CameraController {
@@ -53,10 +60,16 @@ export class Renderer {
     this.grid.node.visible = visible;
   }
 
+  setShowEField(visible: boolean): void {
+    this.fieldView.setShowE(visible);
+    this._lastFieldTick = -1;
+  }
+
   /** Drop all body and constraint display objects. */
   reset(): void {
     this.bodyLayer.clear();
     this.constraintLayer.clear();
+    this._lastFieldTick = -1;
   }
 
   get camera(): Camera {
@@ -94,6 +107,7 @@ export class Renderer {
         host.appendChild(app.canvas);
         app.stage.addChild(this.worldRoot);
         this.worldRoot.addChild(this.grid.node);
+        this.worldRoot.addChild(this.fieldView.container);
         this.worldRoot.addChild(this.constraintLayer.node);
         this.worldRoot.addChild(this.bodyLayer.node);
 
@@ -133,7 +147,24 @@ export class Renderer {
       this.bodyLayer.reconcile(snapshot);
     }
     this.constraintLayer.reconcile(snapshot);
+    this.updateFieldView(snapshot);
     this.app.render();
+  }
+
+  private updateFieldView(snapshot: Snapshot): void {
+    const center = this._camera.center;
+    const zoom = this._camera.zoom;
+    const tickChanged = snapshot.tick !== this._lastFieldTick;
+    const cameraChanged =
+      center.x !== this._lastFieldCenterX ||
+      center.y !== this._lastFieldCenterY ||
+      Math.abs(Math.log(zoom / Math.max(this._lastFieldZoom, 1e-9))) >= 0.05;
+    if (!tickChanged && !cameraChanged) return;
+    this._lastFieldTick = snapshot.tick;
+    this._lastFieldZoom = zoom;
+    this._lastFieldCenterX = center.x;
+    this._lastFieldCenterY = center.y;
+    this.fieldView.update(snapshot.charges, this._camera);
   }
 
   dispose(): void {

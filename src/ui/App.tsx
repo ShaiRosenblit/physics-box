@@ -14,6 +14,9 @@ export function App() {
   const sim = useSimulation(defaultSceneName);
 
   const showGrid = useUIStore((s) => s.showGrid);
+  const showEField = useUIStore((s) => s.showEField);
+  const hasCharges = useUIStore((s) => s.hasCharges);
+  const setHasCharges = useUIStore((s) => s.setHasCharges);
   const setRunning = useUIStore((s) => s.setRunning);
 
   useEffect(() => {
@@ -32,7 +35,9 @@ export function App() {
       const dt = Math.min((now - last) / 1000, 1 / 30);
       last = now;
       sim.world.step(dt);
-      renderer.render(sim.world.snapshot());
+      const snap = sim.world.snapshot();
+      renderer.render(snap);
+      setHasCharges(snap.charges.length > 0);
       raf = requestAnimationFrame(loop);
     };
 
@@ -54,6 +59,10 @@ export function App() {
   useEffect(() => {
     rendererRef.current?.setShowGrid(showGrid);
   }, [showGrid]);
+
+  useEffect(() => {
+    rendererRef.current?.setShowEField(showEField && hasCharges);
+  }, [showEField, hasCharges]);
 
   const onPlay = () => {
     sim.resume();

@@ -6,6 +6,7 @@ interface BodyEntry {
   readonly node: Graphics;
   readonly kind: BodyView["kind"];
   readonly material: BodyView["material"];
+  readonly chargeSign: -1 | 0 | 1;
 }
 
 /**
@@ -26,15 +27,21 @@ export class BodyLayer {
 
     for (const body of snapshot.bodies) {
       seen.add(body.id);
+      const sign = signOf(body.charge);
       let entry = this.entries.get(body.id);
-      if (!entry || entry.kind !== body.kind || entry.material !== body.material) {
+      if (
+        !entry ||
+        entry.kind !== body.kind ||
+        entry.material !== body.material ||
+        entry.chargeSign !== sign
+      ) {
         if (entry) {
           this.node.removeChild(entry.node);
           entry.node.destroy();
         }
         const node = drawBody(body, this.cameraZoomGetter());
         this.node.addChild(node);
-        entry = { node, kind: body.kind, material: body.material };
+        entry = { node, kind: body.kind, material: body.material, chargeSign: sign };
         this.entries.set(body.id, entry);
       }
       entry.node.position.set(body.position.x, body.position.y);
@@ -83,6 +90,7 @@ function drawBody(body: BodyView, cameraZoom: number): Graphics {
     g.moveTo(0, 0);
     g.lineTo(tickLen, 0);
     g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
+    drawChargeMark(g, body.charge, body.radius, lineWidth);
   } else {
     const hw = body.width / 2;
     const hh = body.height / 2;
@@ -92,4 +100,31 @@ function drawBody(body: BodyView, cameraZoom: number): Graphics {
   }
 
   return g;
+}
+
+function signOf(q: number): -1 | 0 | 1 {
+  if (q > 0) return 1;
+  if (q < 0) return -1;
+  return 0;
+}
+
+function drawChargeMark(
+  g: Graphics,
+  charge: number,
+  radius: number,
+  lineWidth: number,
+): void {
+  if (charge === 0) return;
+  const color = charge > 0 ? palette.chargePos : palette.chargeNeg;
+  g.circle(0, 0, radius * 1.05);
+  g.stroke({ width: lineWidth * 1.2, color, alpha: 0.8 });
+  const armLen = radius * 0.45;
+  g.moveTo(-armLen, 0);
+  g.lineTo(armLen, 0);
+  g.stroke({ width: lineWidth * 1.4, color, alpha: 0.95 });
+  if (charge > 0) {
+    g.moveTo(0, -armLen);
+    g.lineTo(0, armLen);
+    g.stroke({ width: lineWidth * 1.4, color, alpha: 0.95 });
+  }
 }
