@@ -165,6 +165,18 @@ export const PulleyIcon = (p: Props) => (
   </Svg>
 );
 
+export const BeltIcon = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="4.5" cy="8" r="2.6" />
+    <circle cx="11.5" cy="8" r="2.6" />
+    <path
+      d="M7.1 5.5 L8.9 5.5 M7.1 10.5 L8.9 10.5"
+      strokeWidth="1.2"
+      opacity="0.85"
+    />
+  </Svg>
+);
+
 export const GridIcon = (p: Props) => (
   <Svg {...p}>
     <rect x="2.5" y="2.5" width="11" height="11" />

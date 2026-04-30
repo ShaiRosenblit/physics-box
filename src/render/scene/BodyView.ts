@@ -518,6 +518,10 @@ export class SelectionView {
         constraint.groundB.y,
         lineWidth,
       );
+      return;
+    }
+    if (constraint.kind === "belt") {
+      this.strokeWorldPolyline(constraint.path, lineWidth);
     }
   }
 

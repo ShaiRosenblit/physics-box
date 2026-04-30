@@ -21,7 +21,8 @@ export type Tool =
   | "rope"
   | "hinge"
   | "spring"
-  | "pulley";
+  | "pulley"
+  | "belt";
 
 /** Default parameters used the next time a spawn tool places a body. */
 export interface NeutralBallSpawnPreset {
@@ -196,9 +197,12 @@ export const CONNECTOR_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
   "hinge",
   "spring",
   "pulley",
+  "belt",
 ]);
 
-export function isConnectorTool(tool: Tool): tool is "rope" | "hinge" | "spring" | "pulley" {
+export function isConnectorTool(
+  tool: Tool,
+): tool is "rope" | "hinge" | "spring" | "pulley" | "belt" {
   return CONNECTOR_TOOLS.has(tool);
 }
 

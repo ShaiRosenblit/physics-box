@@ -1,5 +1,13 @@
 import { PULLEY_DEFAULT_HALF_SPREAD } from "../mechanics/pulley";
-import type { ConstraintPatch, ConstraintSpec, HingeSpec, PulleySpec, RopeSpec, SpringSpec } from "./types";
+import type {
+  BeltSpec,
+  ConstraintPatch,
+  ConstraintSpec,
+  HingeSpec,
+  PulleySpec,
+  RopeSpec,
+  SpringSpec,
+} from "./types";
 
 export const MIN_CONNECTOR_REST = 0.05;
 export const MIN_PULLEY_HALF_SPREAD = 0.05;
@@ -46,6 +54,11 @@ export function mergeConstraintPatch(spec: ConstraintSpec, patch: ConstraintPatc
       if (patch.ratio !== undefined) n = { ...n, ratio: patch.ratio };
       return n;
     }
+    case "belt": {
+      let n: BeltSpec = { ...spec };
+      if (patch.ratio !== undefined) n = { ...n, ratio: patch.ratio };
+      return n;
+    }
     default: {
       const _e: never = spec;
       return _e;
@@ -76,6 +89,15 @@ export function sanitizeConstraintSpec(spec: ConstraintSpec): ConstraintSpec {
     );
     const ratio = Math.max(0.01, spec.ratio ?? 1);
     return { ...spec, halfSpread: hs, ratio };
+  }
+  if (spec.kind === "belt") {
+    if (spec.ratio === undefined) return spec;
+    const r = spec.ratio;
+    if (!Number.isFinite(r) || Math.abs(r) < 1e-6) {
+      const { ratio: _drop, ...rest } = spec;
+      return { ...rest };
+    }
+    return spec;
   }
   return spec;
 }

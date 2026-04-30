@@ -2,6 +2,7 @@ import * as planck from "planck";
 import type { SimulationConfig } from "../core/config";
 import type {
   Anchor,
+  BeltSpec,
   BodySpec,
   BodyView,
   ChargedSourceView,
@@ -24,6 +25,10 @@ import {
 } from "../core/constraintPatch";
 import { lookupMaterial } from "../mechanics/materials";
 import type { BuoyantBodyState } from "../mechanics/buoyancy";
+import {
+  beltDisplayPath,
+  effectivePulleyRadiusFromSpec,
+} from "../core/beltGeometry";
 import { PULLEY_DEFAULT_HALF_SPREAD } from "../mechanics/pulley";
 
 const PULLEY_MIN_HALF_SPREAD = 0.05;
@@ -71,6 +76,8 @@ interface ConstraintRecord {
   readonly spec: ConstraintSpec;
   readonly internalBodies: planck.Body[];
   readonly joints: planck.Joint[];
+  /** Belt: `joints[1]` is a ground revolute we created for the driven body. */
+  readonly beltOwnsDrivenPivot?: boolean;
 }
 
 /**
@@ -238,6 +245,9 @@ export class PlanckAdapter {
     ) {
       this.endDrag();
     }
+    this.removeConstraintsReferencingIds(
+      new Set([asm.housingId, asm.rotorId]),
+    );
     this.world.destroyJoint(asm.joint);
     const hRec = this.bodies.get(asm.housingId);
     const rRec = this.bodies.get(asm.rotorId);
@@ -391,6 +401,7 @@ export class PlanckAdapter {
     const record = this.bodies.get(id);
     if (!record) return;
     if (this.dragState?.id === id) this.endDrag();
+    this.removeConstraintsReferencingIds(new Set([id]));
     this.world.destroyBody(record.body);
     this.bodies.delete(id);
   }
@@ -676,7 +687,51 @@ export class PlanckAdapter {
     return out;
   }
 
+  private constraintReferencesAnyId(spec: ConstraintSpec, ids: Set<Id>): boolean {
+    if (spec.kind === "belt") {
+      return ids.has(spec.driverRotorId) || ids.has(spec.drivenBodyId);
+    }
+    if (spec.kind === "pulley") {
+      return ids.has(spec.bodyA) || ids.has(spec.bodyB);
+    }
+    if (spec.kind === "hinge") {
+      return ids.has(spec.bodyA) ||
+        (spec.bodyB !== undefined && ids.has(spec.bodyB));
+    }
+    if (spec.kind === "rope" || spec.kind === "spring") {
+      const hit = (a: Anchor) => a.kind === "body" && ids.has(a.id);
+      return hit(spec.a) || hit(spec.b);
+    }
+    const exhaustive: never = spec;
+    void exhaustive;
+    return false;
+  }
+
+  private removeConstraintsReferencingIds(ids: Set<Id>): void {
+    const toRemove: Id[] = [];
+    for (const [cid, rec] of this.constraints) {
+      if (this.constraintReferencesAnyId(rec.spec, ids)) {
+        toRemove.push(cid);
+      }
+    }
+    for (const cid of toRemove) {
+      const rec = this.constraints.get(cid);
+      if (!rec) continue;
+      this.disposeConstraintRecord(rec);
+      this.constraints.delete(cid);
+    }
+  }
+
   private disposeConstraintRecord(record: ConstraintRecord): void {
+    if (record.spec.kind === "belt") {
+      const gear = record.joints[0];
+      if (gear) this.world.destroyJoint(gear);
+      if (record.beltOwnsDrivenPivot) {
+        const aux = record.joints[1];
+        if (aux) this.world.destroyJoint(aux);
+      }
+      return;
+    }
     for (const joint of record.joints) this.world.destroyJoint(joint);
     for (const body of record.internalBodies) this.world.destroyBody(body);
   }
@@ -696,6 +751,10 @@ export class PlanckAdapter {
     }
     if (spec.kind === "pulley") {
       this.constraints.set(id, this.buildPulley(id, spec));
+      return;
+    }
+    if (spec.kind === "belt") {
+      this.constraints.set(id, this.buildBelt(id, spec));
       return;
     }
     const exhaustive: never = spec;
@@ -776,6 +835,29 @@ export class PlanckAdapter {
       const pb = next;
       if (pulleySpecsEquivalent(pa, pb)) return;
       this.replaceConstraintKeepingId(id, next);
+      return;
+    }
+    if (next.kind === "belt") {
+      const pa = prev as BeltSpec;
+      const pb = next;
+      if (
+        pa.driverRotorId === pb.driverRotorId &&
+        pa.drivenBodyId === pb.drivenBodyId &&
+        (pa.ratio ?? null) === (pb.ratio ?? null)
+      ) {
+        return;
+      }
+      if (
+        pa.driverRotorId === pb.driverRotorId &&
+        pa.drivenBodyId === pb.drivenBodyId
+      ) {
+        const gj = rec.joints[0] as planck.GearJoint;
+        gj.setRatio(resolveBeltGearRatio(pb, this.bodies));
+        this.constraints.set(id, { ...rec, spec: pb });
+        return;
+      }
+      this.replaceConstraintKeepingId(id, pb);
+      return;
     }
   }
 
@@ -791,7 +873,7 @@ export class PlanckAdapter {
     );
     const constraints: ConstraintView[] = constraintIds.map((id) => {
       const record = this.constraints.get(id)!;
-      return buildConstraintView(record);
+      return buildConstraintView(record, this.bodies);
     });
 
     const charges: ChargedSourceView[] = [];
@@ -1011,6 +1093,93 @@ export class PlanckAdapter {
     this.world.createJoint(joint);
     return { id, spec, internalBodies: [], joints: [joint] };
   }
+
+  private findRevoluteToGround(body: planck.Body): planck.RevoluteJoint | null {
+    for (let e = body.getJointList(); e; e = e.next) {
+      const j = e.joint;
+      if (j === null || j.getType() !== planck.RevoluteJoint.TYPE) continue;
+      if (e.other === this.groundBody) {
+        return j as planck.RevoluteJoint;
+      }
+    }
+    return null;
+  }
+
+  private buildBelt(id: Id, spec: BeltSpec): ConstraintRecord {
+    const rotorRec = this.bodies.get(spec.driverRotorId);
+    const drivenRec = this.bodies.get(spec.drivenBodyId);
+    if (!rotorRec) {
+      throw new Error(`belt: driver rotor id ${spec.driverRotorId} not found`);
+    }
+    if (rotorRec.spec.kind !== "engine_rotor") {
+      throw new Error("belt: driver must be an engine flywheel (engine_rotor)");
+    }
+    if (!drivenRec) {
+      throw new Error(`belt: driven body id ${spec.drivenBodyId} not found`);
+    }
+    if (!drivenRec.body.isDynamic()) {
+      throw new Error("belt: driven body must be dynamic");
+    }
+    const housingId = this.engineHousingOf.get(spec.driverRotorId);
+    if (housingId === undefined) {
+      throw new Error("belt: driver is not part of an engine assembly");
+    }
+    const asm = this.engineAssemblies.get(housingId);
+    if (!asm || asm.rotorId !== spec.driverRotorId) {
+      throw new Error("belt: engine assembly mismatch");
+    }
+
+    let drivenRevolute = this.findRevoluteToGround(drivenRec.body);
+    let ownsPivot = false;
+    if (!drivenRevolute) {
+      const p = drivenRec.body.getPosition();
+      const anchor = planck.Vec2(p.x, p.y);
+      drivenRevolute = new planck.RevoluteJoint(
+        { collideConnected: false },
+        this.groundBody,
+        drivenRec.body,
+        anchor,
+      );
+      this.world.createJoint(drivenRevolute);
+      ownsPivot = true;
+    }
+
+    const ratio = resolveBeltGearRatio(spec, this.bodies);
+    const gear = new planck.GearJoint(
+      { collideConnected: false },
+      rotorRec.body,
+      drivenRec.body,
+      asm.joint,
+      drivenRevolute,
+      ratio,
+    );
+    this.world.createJoint(gear);
+
+    const joints = ownsPivot ? [gear, drivenRevolute] : [gear];
+    return {
+      id,
+      spec,
+      internalBodies: [],
+      joints,
+      ...(ownsPivot ? { beltOwnsDrivenPivot: true as const } : {}),
+    };
+  }
+}
+
+function resolveBeltGearRatio(spec: BeltSpec, bodies: Map<Id, BodyRecord>): number {
+  if (
+    spec.ratio !== undefined &&
+    Number.isFinite(spec.ratio) &&
+    Math.abs(spec.ratio) > 1e-9
+  ) {
+    return spec.ratio;
+  }
+  const rotorRec = bodies.get(spec.driverRotorId);
+  const drivenRec = bodies.get(spec.drivenBodyId);
+  if (!rotorRec || !drivenRec) return -1;
+  const rDr = effectivePulleyRadiusFromSpec(rotorRec.spec);
+  const rDn = effectivePulleyRadiusFromSpec(drivenRec.spec);
+  return -(rDn / Math.max(rDr, 1e-6));
 }
 
 function pulleySpecsEquivalent(a: PulleySpec, b: PulleySpec): boolean {
@@ -1112,7 +1281,10 @@ function makeShape(spec: BodySpec): planck.Shape {
   return new planck.BoxShape(spec.width / 2, spec.height / 2);
 }
 
-function buildConstraintView(record: ConstraintRecord): ConstraintView {
+function buildConstraintView(
+  record: ConstraintRecord,
+  bodies: Map<Id, BodyRecord>,
+): ConstraintView {
   const { id, spec } = record;
   if (spec.kind === "rope") {
     const path: Vec2[] = [];
@@ -1194,6 +1366,42 @@ function buildConstraintView(record: ConstraintRecord): ConstraintView {
       anchorA: Object.freeze({ x: aa.x, y: aa.y }),
       anchorB: Object.freeze({ x: ab.x, y: ab.y }),
       ratio: spec.ratio ?? 1,
+    });
+  }
+
+  if (spec.kind === "belt") {
+    const rotorRec = bodies.get(spec.driverRotorId);
+    const drivenRec = bodies.get(spec.drivenBodyId);
+    const gj = record.joints[0] as planck.GearJoint;
+    const ratio = gj.getRatio();
+    if (!rotorRec || !drivenRec) {
+      return Object.freeze({
+        id,
+        kind: "belt" as const,
+        path: Object.freeze([]),
+        driverRotorId: spec.driverRotorId,
+        drivenBodyId: spec.drivenBodyId,
+        ratio,
+      });
+    }
+    const p1 = rotorRec.body.getPosition();
+    const p2 = drivenRec.body.getPosition();
+    const r1 = effectivePulleyRadiusFromSpec(rotorRec.spec);
+    const r2 = effectivePulleyRadiusFromSpec(drivenRec.spec);
+    const raw = beltDisplayPath(
+      { x: p1.x, y: p1.y },
+      r1,
+      { x: p2.x, y: p2.y },
+      r2,
+    );
+    const path = raw.map((q) => Object.freeze({ x: q.x, y: q.y }));
+    return Object.freeze({
+      id,
+      kind: "belt" as const,
+      path: Object.freeze(path),
+      driverRotorId: spec.driverRotorId,
+      drivenBodyId: spec.drivenBodyId,
+      ratio,
     });
   }
 

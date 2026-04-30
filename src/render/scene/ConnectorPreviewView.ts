@@ -2,9 +2,9 @@ import { Container, Graphics } from "pixi.js";
 import { PULLEY_DEFAULT_HALF_SPREAD, type Vec2 } from "../../simulation";
 import { palette, stroke } from "../style/palette";
 
-/** Two-click connectors (rope / hinge / spring). */
+/** Two-click connectors (rope / hinge / spring / belt). */
 export interface ConnectorPreviewLinearState {
-  readonly kind: "rope" | "hinge" | "spring";
+  readonly kind: "rope" | "hinge" | "spring" | "belt";
   readonly a: Vec2;
   /** End point. May equal `a` when the user hasn't moved yet. */
   readonly b: Vec2;

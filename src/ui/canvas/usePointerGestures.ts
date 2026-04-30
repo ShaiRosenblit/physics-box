@@ -12,11 +12,11 @@ export type SpawnMode =
   | "magnet-"
   | "engine+"
   | "engine-";
-export type ConnectorTool = "rope" | "hinge" | "spring" | "pulley";
+export type ConnectorTool = "rope" | "hinge" | "spring" | "pulley" | "belt";
 
 export type ConnectorPending =
   | {
-      readonly tool: "rope" | "spring" | "hinge";
+      readonly tool: "rope" | "spring" | "hinge" | "belt";
       readonly a: ResolvedAnchor;
     }
   | {
@@ -86,7 +86,8 @@ function isConnectorTool(tool: string): ConnectorTool | null {
     tool === "rope" ||
     tool === "hinge" ||
     tool === "spring" ||
-    tool === "pulley"
+    tool === "pulley" ||
+    tool === "belt"
   ) {
     return tool;
   }
@@ -99,7 +100,7 @@ function anchorValidForRole(
   role: "a" | "b",
   anchor: ResolvedAnchor,
 ): boolean {
-  if (tool === "hinge" && role === "a" && anchor.kind !== "body") return false;
+  if (tool === "belt" && role === "a" && anchor.kind !== "body") return false;
   return true;
 }
 
@@ -486,12 +487,34 @@ export function usePointerGestures(
       const anchor = resolveAnchor(worldPt);
 
       if (!pendingConnector) {
-        if (!anchorValidForRole(tool, "a", anchor)) return;
+        if (tool === "belt") {
+          if (!isBodyAnchor(anchor)) return;
+          const snap = cbRef.current.world.snapshot();
+          const bv = snap.bodies.find((b) => b.id === anchor.id);
+          if (!bv || bv.kind !== "engine_rotor") return;
+        } else if (!anchorValidForRole(tool, "a", anchor)) return;
         setPending({ tool, a: anchor });
         return;
       }
 
       if (pendingConnector.tool === "pulley") return;
+
+      if (pendingConnector.tool === "belt") {
+        if (!isBodyAnchor(anchor)) return;
+        const snap = cbRef.current.world.snapshot();
+        const a = pendingConnector.a;
+        if (!isBodyAnchor(a)) return;
+        if (anchor.id === a.id) return;
+        const driverView = snap.bodies.find((b) => b.id === a.id);
+        const drivenView = snap.bodies.find((b) => b.id === anchor.id);
+        if (!driverView || !drivenView) return;
+        if (driverView.kind !== "engine_rotor") return;
+        if (drivenView.fixed) return;
+        if (drivenView.kind === "engine") return;
+        setPending(null);
+        cbRef.current.onConnectorCommit?.("belt", a, anchor);
+        return;
+      }
 
       if (!anchorValidForRole(tool, "b", anchor)) return;
       const a = pendingConnector.a;

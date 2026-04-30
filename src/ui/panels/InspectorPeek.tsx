@@ -95,7 +95,9 @@ function summarizeConstraint(view: ConstraintView): {
         ? "Spring"
         : view.kind === "hinge"
           ? "Hinge"
-          : "Pulley";
+          : view.kind === "belt"
+            ? "Belt"
+            : "Pulley";
 
   let stats = "";
   if (view.kind === "rope") {
@@ -104,6 +106,8 @@ function summarizeConstraint(view: ConstraintView): {
     stats = `${fmt(view.frequencyHz)} Hz · L₀ ${fmt(view.restLength)} m`;
   } else if (view.kind === "pulley") {
     stats = `ratio ${fmt(view.ratio)} · spread ${fmt(view.halfSpread)}`;
+  } else if (view.kind === "belt") {
+    stats = `r ${fmt(view.ratio)} · ${view.driverRotorId}→${view.drivenBodyId}`;
   } else {
     stats = `${fmt(view.anchor.x)}, ${fmt(view.anchor.y)}`;
   }

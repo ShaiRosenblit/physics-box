@@ -86,6 +86,10 @@ function drawConstraint(
   }
   if (view.kind === "pulley") {
     drawPulley(g, view, zoom);
+    return;
+  }
+  if (view.kind === "belt") {
+    drawBelt(g, view, zoom);
   }
 }
 
@@ -178,6 +182,22 @@ function drawHinge(
     .fill({ color: palette.metal, alpha: 1 })
     .stroke({ width: hubW, color: palette.metalEdge, alpha: 0.9 });
   g.circle(ax, ay, r * 0.35).fill({ color: palette.inkPrimary, alpha: 0.6 });
+}
+
+function drawBelt(
+  g: Graphics,
+  view: Extract<ConstraintView, { kind: "belt" }>,
+  zoom: number,
+): void {
+  if (view.path.length < 2) return;
+  const lineWidth = stroke.bodyOutline / zoom;
+  const edge = palette.feltEdge;
+  g.moveTo(view.path[0]!.x, view.path[0]!.y);
+  for (let i = 1; i < view.path.length; i++) {
+    g.lineTo(view.path[i]!.x, view.path[i]!.y);
+  }
+  g.closePath();
+  g.stroke({ width: lineWidth, color: edge, alpha: 0.78 });
 }
 
 function drawPulley(

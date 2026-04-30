@@ -4,6 +4,7 @@ import { balloon } from "../mechanics/balloon";
 import { box } from "../mechanics/box";
 import { engine } from "../mechanics/engine";
 import { magnet } from "../mechanics/magnet";
+import { belt } from "../mechanics/belt";
 import { rope } from "../mechanics/rope";
 import { pulley } from "../mechanics/pulley";
 import { hinge } from "../mechanics/hinge";
@@ -72,6 +73,36 @@ export function welcome(world: World): void {
       angularDamping: 0.12,
     }),
   );
+
+  const beltDriveHousing = world.add(
+    engine({
+      position: { x: 2.25, y: 0.22 },
+      width: 0.34,
+      height: 0.2,
+      rotorRadius: 0.075,
+      torque: 55,
+      fixed: true,
+      angularDamping: 0.1,
+    }),
+  );
+  const beltSnap = world.snapshot();
+  const beltHousing = beltSnap.bodies.find((b) => b.id === beltDriveHousing);
+  const beltRotorId =
+    beltHousing?.kind === "engine" ? beltHousing.rotorId : null;
+  const beltDisc = world.add(
+    ball({
+      position: { x: 3.55, y: 0.22 },
+      radius: 0.11,
+      material: "wood",
+      linearDamping: 0.05,
+      angularDamping: 0.15,
+    }),
+  );
+  if (beltRotorId !== null) {
+    world.addConstraint(
+      belt({ driverRotorId: beltRotorId, drivenBodyId: beltDisc }),
+    );
+  }
 
   const ropeBob = world.add(
     ball({

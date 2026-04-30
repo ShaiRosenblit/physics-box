@@ -14,6 +14,7 @@ export type {
 } from "./core/events";
 export type {
   Anchor,
+  BeltSpec,
   BodyKind,
   BodyPatch,
   BodySpec,
@@ -24,6 +25,7 @@ export type {
   BalloonSpec,
   BalloonView,
   BoxView,
+  BeltView,
   EngineSpec,
   EngineHousingView,
   EngineRotorSpec,
@@ -60,6 +62,7 @@ export {
   hinge,
   spring,
   pulley,
+  belt,
   PULLEY_DEFAULT_HALF_SPREAD,
   materials,
   worldAnchor,
@@ -93,6 +96,7 @@ export type {
   HingeInput,
   SpringInput,
   PulleyInput,
+  BeltInput,
   MaterialProps,
 } from "./mechanics";
 

@@ -12,5 +12,6 @@ export {
   PULLEY_DEFAULT_HALF_SPREAD,
   type PulleyInput,
 } from "./pulley";
+export { belt, type BeltInput } from "./belt";
 export { worldAnchor, bodyAnchor } from "./anchors";
 export { materials, lookupMaterial, type MaterialProps } from "./materials";

@@ -184,7 +184,7 @@ export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }
   | { readonly kind: "body"; readonly id: Id; readonly localPoint?: Vec2 };
 
-export type ConstraintKind = "rope" | "hinge" | "spring" | "pulley";
+export type ConstraintKind = "rope" | "hinge" | "spring" | "pulley" | "belt";
 
 export interface RopeSpec {
   readonly kind: "rope";
@@ -223,7 +223,24 @@ export interface PulleySpec {
   readonly ratio?: number;
 }
 
-export type ConstraintSpec = RopeSpec | HingeSpec | SpringSpec | PulleySpec;
+/**
+ * Open belt coupling engine flywheel rotation to a driven body via Planck
+ * `GearJoint` and two `RevoluteJoint`s (housing–rotor, ground–driven).
+ */
+export interface BeltSpec {
+  readonly kind: "belt";
+  readonly driverRotorId: Id;
+  readonly drivenBodyId: Id;
+  /** Planck gear ratio; omit for −r_driven/r_driver (same-direction rolling). */
+  readonly ratio?: number;
+}
+
+export type ConstraintSpec =
+  | RopeSpec
+  | HingeSpec
+  | SpringSpec
+  | PulleySpec
+  | BeltSpec;
 
 /** Sparse updates for patchConstraint — only fields valid for this kind apply. */
 export interface ConstraintPatch {
@@ -282,7 +299,23 @@ export interface PulleyView {
   readonly ratio: number;
 }
 
-export type ConstraintView = RopeView | HingeView | SpringView | PulleyView;
+export interface BeltView {
+  readonly id: Id;
+  readonly kind: "belt";
+  /** Screen / hit path: upper strand, lower strand, closed. */
+  readonly path: readonly Vec2[];
+  readonly driverRotorId: Id;
+  readonly drivenBodyId: Id;
+  /** Resolved Planck gear ratio. */
+  readonly ratio: number;
+}
+
+export type ConstraintView =
+  | RopeView
+  | HingeView
+  | SpringView
+  | PulleyView
+  | BeltView;
 
 export interface ChargedSourceView {
   readonly id: Id;

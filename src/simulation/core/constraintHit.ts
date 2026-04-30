@@ -85,6 +85,9 @@ function distToConstraint(c: ConstraintView, p: Vec2): number {
     );
     return dMin;
   }
+  if (c.kind === "belt") {
+    return minDistAlongPolyline(p, c.path);
+  }
   return Number.POSITIVE_INFINITY;
 }
 

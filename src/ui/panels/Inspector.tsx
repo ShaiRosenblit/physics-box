@@ -360,6 +360,31 @@ function ConstraintDetails({ view }: { view: ConstraintView }) {
           />
         </>
       )}
+
+      {view.kind === "belt" && (
+        <>
+          <ReadRow label="Driver rotor" value={`#${view.driverRotorId}`} />
+          <ReadRow label="Driven body" value={`#${view.drivenBodyId}`} />
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Gear ratio</span>
+            <input
+              aria-label="Belt gear ratio"
+              type="number"
+              min={-40}
+              max={40}
+              step={0.05}
+              style={ctl}
+              value={view.ratio}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && Math.abs(v) > 1e-6) {
+                  patchConstraint(view.id, { ratio: v });
+                }
+              }}
+            />
+          </div>
+        </>
+      )}
       <RemoveFromSceneFooter id={view.id} />
     </div>
   );
@@ -375,6 +400,8 @@ function constraintKindShort(kind: ConstraintView["kind"]): string {
       return "Spring";
     case "pulley":
       return "Pulley";
+    case "belt":
+      return "Belt";
   }
 }
 

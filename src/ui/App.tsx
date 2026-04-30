@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ball,
   balloon,
+  belt,
   bodyAnchor,
   box,
   defaultSceneName,
@@ -324,11 +325,24 @@ export function App() {
   };
 
   const handleConnectorCommit = (
-    tool: "rope" | "hinge" | "spring",
+    tool: "rope" | "hinge" | "spring" | "belt",
     a: ResolvedAnchor,
     b: ResolvedAnchor,
   ) => {
     const presets = useUIStore.getState().connectorPresets;
+    if (tool === "belt") {
+      if (a.kind !== "body" || b.kind !== "body") return;
+      if (a.id === b.id) return;
+      const snap = sim.world.snapshot();
+      const da = snap.bodies.find((x) => x.id === a.id);
+      const db = snap.bodies.find((x) => x.id === b.id);
+      if (!da || !db || da.kind !== "engine_rotor" || db.fixed) return;
+      if (db.kind === "engine") return;
+      sim.world.addConstraint(
+        belt({ driverRotorId: a.id, drivenBodyId: b.id }),
+      );
+      return;
+    }
     if (tool === "rope") {
       const pr = presets.rope;
       const length = anchorDistance(sim.world.snapshot(), a, b);
@@ -627,7 +641,13 @@ function computePreviewState(
   const pa = resolveAnchorPosition(snap, pending.a);
   if (!pa) return null;
   const pb = cursor ?? pa;
-  return { kind: pending.tool, a: pa, b: pb };
+  const snapping =
+    pending.tool === "rope" ||
+    pending.tool === "spring" ||
+    pending.tool === "belt"
+      ? cursor !== null && world.bodyAt(cursor) !== null
+      : undefined;
+  return { kind: pending.tool, a: pa, b: pb, snapping };
 }
 
 function DrawerHeader(props: { title: string; onClose: () => void }) {

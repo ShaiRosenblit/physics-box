@@ -4,6 +4,7 @@ import { testIds } from "../a11y/ids";
 import {
   BallIcon,
   BalloonIcon,
+  BeltIcon,
   BFieldIcon,
   BoxIcon,
   ChargeMinusIcon,
@@ -49,6 +50,7 @@ const connectorTools: readonly ToolDef[] = [
   { id: "hinge", label: "Hinge", icon: HingeIcon },
   { id: "spring", label: "Spring", icon: SpringIcon },
   { id: "pulley", label: "Pulley", icon: PulleyIcon },
+  { id: "belt", label: "Belt", icon: BeltIcon },
 ];
 
 const selectTool: ToolDef = { id: "select", label: "Select", icon: SelectIcon };
