@@ -1,9 +1,12 @@
 import { Application, Container } from "pixi.js";
 import type { Snapshot } from "../simulation";
 import { Camera } from "./camera/Camera";
+import { CameraController } from "./camera/CameraController";
 import { BodyLayer } from "./scene/BodyView";
 import { Grid } from "./scene/Grid";
 import { palette } from "./style/palette";
+
+const GEOM_REFRESH_LOG_THRESHOLD = 0.4;
 
 export interface RendererOptions {
   readonly background?: number;
@@ -27,11 +30,18 @@ export class Renderer {
   private grid = new Grid();
   private bodyLayer: BodyLayer;
   private _camera = new Camera();
+  private _controller = new CameraController();
   private resizeObserver: ResizeObserver | null = null;
   private _initPromise: Promise<void> | null = null;
+  private _lastGeomZoom = 0;
+  private _geomDirty = false;
 
   constructor() {
     this.bodyLayer = new BodyLayer(() => this._camera.zoom);
+  }
+
+  get controller(): CameraController {
+    return this._controller;
   }
 
   get camera(): Camera {
@@ -70,9 +80,14 @@ export class Renderer {
         this._camera.setCanvas(app.renderer.width, app.renderer.height);
         this._camera.apply(this.worldRoot);
         this.grid.update(this._camera);
+        this._lastGeomZoom = this._camera.zoom;
 
         this.resizeObserver = new ResizeObserver(() => this.handleResize());
         this.resizeObserver.observe(host);
+
+        this._controller.attach(host, this._camera, () => {
+          this._geomDirty = true;
+        });
       });
 
     return this._initPromise;
@@ -83,11 +98,23 @@ export class Renderer {
     if (!this.app) return;
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
-    this.bodyLayer.reconcile(snapshot);
+
+    if (
+      this._geomDirty &&
+      Math.abs(Math.log(this._camera.zoom / this._lastGeomZoom)) >=
+        GEOM_REFRESH_LOG_THRESHOLD
+    ) {
+      this.bodyLayer.refreshGeometry(snapshot);
+      this._lastGeomZoom = this._camera.zoom;
+      this._geomDirty = false;
+    } else {
+      this.bodyLayer.reconcile(snapshot);
+    }
     this.app.render();
   }
 
   dispose(): void {
+    this._controller.detach();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.bodyLayer.clear();
