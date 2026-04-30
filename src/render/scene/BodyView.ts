@@ -1,56 +1,67 @@
-import { Container, Graphics } from "pixi.js";
+import {
+  Container,
+  Graphics,
+  NineSliceSprite,
+  Sprite,
+  type Texture,
+} from "pixi.js";
 import type { BodyView, Id, Snapshot } from "../../simulation";
 import { materialStyles, opacity, palette, stroke } from "../style/palette";
 
+/** PNG-driven body looks; optional until `BodyLayer.setRasterTextures` runs. */
+export interface RasterBodyTextures {
+  readonly woodBox?: Texture;
+  readonly woodBall?: Texture;
+}
+
+/** 128² nine-slice PNG: keep outer ~25% as fixed corners/bracing. */
+const WOOD_BOX_SLICE = 32;
+
 interface BodyEntry {
-  readonly node: Graphics;
-  readonly kind: BodyView["kind"];
-  readonly material: BodyView["material"];
-  readonly chargeSign: -1 | 0 | 1;
-  readonly dipoleSign: -1 | 0 | 1;
+  readonly node: Container;
+  readonly styleKey: string;
 }
 
 /**
- * Reconciles per-body Graphics with a Snapshot.
+ * Reconciles per-body display nodes with a Snapshot.
  *
- * Adds, removes, and transforms body display objects by id. Geometry
- * is drawn once at creation; per-frame work is just position/rotation
- * and the transient set diff.
+ * Wood boxes and wooden balls may use workshop PNGs when raster textures
+ * are configured; other bodies stay procedural Graphics.
  */
 export class BodyLayer {
   readonly node = new Container();
   private readonly entries = new Map<Id, BodyEntry>();
+  private rasterTextures: RasterBodyTextures = {};
 
   constructor(private readonly cameraZoomGetter: () => number) {}
+
+  /**
+   * Enables PNG materials for wood boxes (non-fixed) and wood balls.
+   * Call before the first `render` once assets are loaded.
+   */
+  setRasterTextures(textures: RasterBodyTextures): void {
+    this.rasterTextures = textures;
+  }
 
   reconcile(snapshot: Snapshot): void {
     const seen = new Set<Id>();
 
     for (const body of snapshot.bodies) {
       seen.add(body.id);
-      const sign = signOf(body.charge);
-      const dSign = body.kind === "magnet" ? signOf(body.dipole) : 0;
+      const styleKey = bodyStyleKey(body, this.rasterTextures);
       let entry = this.entries.get(body.id);
-      if (
-        !entry ||
-        entry.kind !== body.kind ||
-        entry.material !== body.material ||
-        entry.chargeSign !== sign ||
-        entry.dipoleSign !== dSign
-      ) {
+      if (!entry || entry.styleKey !== styleKey) {
         if (entry) {
           this.node.removeChild(entry.node);
           entry.node.destroy();
         }
-        const node = drawBody(body, this.cameraZoomGetter());
+        const node = createBodyNode(
+          body,
+          this.cameraZoomGetter(),
+          this.rasterTextures,
+        );
         this.node.addChild(node);
-        entry = {
-          node,
-          kind: body.kind,
-          material: body.material,
-          chargeSign: sign,
-          dipoleSign: dSign,
-        };
+        entry = { node, styleKey };
         this.entries.set(body.id, entry);
       }
       entry.node.position.set(body.position.x, body.position.y);
@@ -84,6 +95,160 @@ export class BodyLayer {
   }
 }
 
+function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
+  const sign = signOf(body.charge);
+  const dSign = body.kind === "magnet" ? signOf(body.dipole) : 0;
+  const woodBox =
+    body.kind === "box" &&
+    body.material === "wood" &&
+    !body.fixed &&
+    raster.woodBox !== undefined;
+  const woodBall =
+    body.kind === "ball" &&
+    body.material === "wood" &&
+    raster.woodBall !== undefined;
+  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}`;
+}
+
+function createBodyNode(
+  body: BodyView,
+  cameraZoom: number,
+  raster: RasterBodyTextures,
+): Container {
+  if (
+    body.kind === "box" &&
+    body.material === "wood" &&
+    !body.fixed &&
+    raster.woodBox
+  ) {
+    return wrapRasterWoodBox(body, cameraZoom, raster.woodBox);
+  }
+  if (body.kind === "ball" && body.material === "wood" && raster.woodBall) {
+    return wrapRasterWoodBall(body, cameraZoom, raster.woodBall);
+  }
+
+  const g = buildProceduralBody(body, cameraZoom);
+  const c = new Container();
+  c.addChild(g);
+  return c;
+}
+
+function wrapRasterWoodBox(
+  body: Extract<BodyView, { kind: "box" }>,
+  cameraZoom: number,
+  texture: Texture,
+): Container {
+  const c = new Container();
+  const slice = new NineSliceSprite({
+    texture,
+    leftWidth: WOOD_BOX_SLICE,
+    rightWidth: WOOD_BOX_SLICE,
+    topHeight: WOOD_BOX_SLICE,
+    bottomHeight: WOOD_BOX_SLICE,
+    width: body.width,
+    height: body.height,
+    anchor: 0.5,
+  });
+
+  slice.tint = palette.wood;
+
+  const lineWidth = stroke.bodyOutline / cameraZoom;
+  const g = new Graphics();
+  const hw = body.width / 2;
+  const hh = body.height / 2;
+  g.rect(-hw, -hh, body.width, body.height);
+  g.stroke({
+    width: lineWidth,
+    color: palette.woodGrain,
+    alpha: 0.85,
+  });
+
+  c.addChild(slice);
+  c.addChild(g);
+  return c;
+}
+
+function wrapRasterWoodBall(
+  body: Extract<BodyView, { kind: "ball" }>,
+  cameraZoom: number,
+  texture: Texture,
+): Container {
+  const c = new Container();
+  const lineWidth = stroke.bodyOutline / cameraZoom;
+  const style = materialStyles.wood;
+
+  const shadow = new Graphics();
+  shadow.circle(0, -0.04, body.radius);
+  shadow.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+
+  const spr = new Sprite(texture);
+  spr.anchor.set(0.5);
+  spr.width = body.radius * 2;
+  spr.height = body.radius * 2;
+  spr.tint = palette.wood;
+
+  const edge = new Graphics();
+  edge.circle(0, 0, body.radius);
+  edge.stroke({
+    width: lineWidth,
+    color: style.edge,
+    alpha: 0.9,
+  });
+
+  const tickLen = body.radius * 0.55;
+  const orient = new Graphics();
+  orient.moveTo(0, 0);
+  orient.lineTo(tickLen, 0);
+  orient.stroke({
+    width: lineWidth * 0.8,
+    color: style.edge,
+    alpha: 0.45,
+  });
+
+  const chargeOverlay = new Graphics();
+  drawChargeMark(chargeOverlay, body.charge, body.radius, lineWidth);
+
+  c.addChild(shadow, spr, edge, orient, chargeOverlay);
+  return c;
+}
+
+function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
+  const g = new Graphics();
+  const lineWidth = stroke.bodyOutline / cameraZoom;
+  const style = body.fixed
+    ? { fill: palette.paperShade, edge: palette.inkMuted }
+    : materialStyles[body.material];
+
+  if (body.kind === "ball") {
+    g.circle(0, -0.04, body.radius);
+    g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+    g.circle(0, 0, body.radius);
+    g.fill({ color: style.fill, alpha: 1 });
+    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+    drawHighlight(g, body.material, body.radius);
+    const tickLen = body.radius * 0.55;
+    g.moveTo(0, 0);
+    g.lineTo(tickLen, 0);
+    g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
+    drawChargeMark(g, body.charge, body.radius, lineWidth);
+  } else if (body.kind === "magnet") {
+    g.circle(0, -0.04, body.radius);
+    g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+    drawMagnet(g, body.radius, body.dipole, lineWidth, style);
+  } else {
+    const hw = body.width / 2;
+    const hh = body.height / 2;
+    g.rect(-hw, -hh - 0.04, body.width, body.height);
+    g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow * 0.9 });
+    g.rect(-hw, -hh, body.width, body.height);
+    g.fill({ color: style.fill, alpha: 1 });
+    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+    drawBoxGrain(g, body.material, hw, hh);
+  }
+
+  return g;
+}
+
 /**
  * Draws a soft accent ring around the currently-selected body.
  *
@@ -110,7 +275,7 @@ export class SelectionView {
 
     const zoom = Math.max(this.cameraZoomGetter(), 1e-3);
     const lineWidth = (stroke.selection + 0.6) / zoom;
-    const inset = 4 / zoom; // small visual gap between body and ring
+    const inset = 4 / zoom;
 
     this.node.position.set(body.position.x, body.position.y);
     this.node.rotation = body.angle;
@@ -150,43 +315,6 @@ export class SelectionView {
     this.currentId = null;
     this.node.clear();
   }
-}
-
-function drawBody(body: BodyView, cameraZoom: number): Graphics {
-  const g = new Graphics();
-  const lineWidth = stroke.bodyOutline / cameraZoom;
-  const style = body.fixed
-    ? { fill: palette.paperShade, edge: palette.inkMuted }
-    : materialStyles[body.material];
-
-  if (body.kind === "ball") {
-    g.circle(0, -0.04, body.radius);
-    g.fill({ color: 0x2a2520, alpha: 0.1 });
-    g.circle(0, 0, body.radius);
-    g.fill({ color: style.fill, alpha: 1 });
-    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
-    drawHighlight(g, body.material, body.radius);
-    const tickLen = body.radius * 0.55;
-    g.moveTo(0, 0);
-    g.lineTo(tickLen, 0);
-    g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
-    drawChargeMark(g, body.charge, body.radius, lineWidth);
-  } else if (body.kind === "magnet") {
-    g.circle(0, -0.04, body.radius);
-    g.fill({ color: 0x2a2520, alpha: 0.1 });
-    drawMagnet(g, body.radius, body.dipole, lineWidth, style);
-  } else {
-    const hw = body.width / 2;
-    const hh = body.height / 2;
-    g.rect(-hw, -hh - 0.04, body.width, body.height);
-    g.fill({ color: 0x2a2520, alpha: 0.08 });
-    g.rect(-hw, -hh, body.width, body.height);
-    g.fill({ color: style.fill, alpha: 1 });
-    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
-    drawBoxGrain(g, body.material, hw, hh);
-  }
-
-  return g;
 }
 
 function drawHighlight(
@@ -233,21 +361,17 @@ function drawMagnet(
 ): void {
   const top = dipole >= 0 ? palette.magnetN : palette.magnetS;
   const bot = dipole >= 0 ? palette.magnetS : palette.magnetN;
-  // Body disc background
   g.circle(0, 0, radius);
   g.fill({ color: style.fill, alpha: 1 });
   g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
-  // Top half (north)
   g.beginPath();
   g.arc(0, 0, radius * 0.78, 0, Math.PI, false);
   g.lineTo(-radius * 0.78, 0);
   g.fill({ color: top, alpha: 0.9 });
-  // Bottom half (south)
   g.beginPath();
   g.arc(0, 0, radius * 0.78, Math.PI, Math.PI * 2, false);
   g.lineTo(radius * 0.78, 0);
   g.fill({ color: bot, alpha: 0.9 });
-  // Equator stroke
   g.moveTo(-radius * 0.78, 0);
   g.lineTo(radius * 0.78, 0);
   g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.6 });

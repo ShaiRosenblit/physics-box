@@ -38,6 +38,8 @@ export const opacity = {
   bodyShadow: 0.08,
   panelShadow: 0.06,
   selection: 0.3,
+  /** Workbench tiling under the adaptive grid (`BenchBackdrop`). */
+  benchBackdrop: 0.94,
 } as const;
 
 import type { MaterialName } from "../../simulation";

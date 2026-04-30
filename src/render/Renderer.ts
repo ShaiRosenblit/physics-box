@@ -7,7 +7,9 @@ import {
 } from "../simulation";
 import { Camera } from "./camera/Camera";
 import { CameraController } from "./camera/CameraController";
+import { BenchBackdrop } from "./scene/BenchBackdrop";
 import { BodyLayer, SelectionView } from "./scene/BodyView";
+import { loadRenderTextures } from "./loadRenderTextures";
 import {
   ConnectorPreviewView,
   type ConnectorPreviewState,
@@ -30,14 +32,17 @@ export interface RendererOptions {
  *
  * Consumes immutable Snapshot objects and never reaches back into the
  * simulation kernel. Layers, back to front:
- *   - background (clear color)
- *   - grid
- *   - body layer
- *   - (M6+) field layer, selection layer
+ *   - workbench backdrop (tiled PNG)
+ *   - adaptive grid (optional)
+ *   - electric / magnetic fields
+ *   - connectors (ropes, springs, hinges)
+ *   - bodies (procedural + optional raster wood)
+ *   - selection ring, connector preview
  */
 export class Renderer {
   private app: Application | null = null;
   private worldRoot = new Container();
+  private benchBackdrop: BenchBackdrop | null = null;
   private grid = new Grid();
   private bodyLayer: BodyLayer;
   private constraintLayer: ConstraintLayer;
@@ -97,6 +102,7 @@ export class Renderer {
     if (this.app) {
       this._camera.apply(this.worldRoot);
       this.grid.update(this._camera);
+      this.benchBackdrop?.update(this._camera);
     }
   }
 
@@ -155,13 +161,26 @@ export class Renderer {
         autoDensity: true,
         autoStart: false,
       })
-      .then(() => {
+      .then(async () => {
         if (this._disposed) {
           this.destroyApp(app);
           return;
         }
         host.appendChild(app.canvas);
         app.stage.addChild(this.worldRoot);
+
+        const loaded = await loadRenderTextures();
+        if (this._disposed) {
+          this.destroyApp(app);
+          return;
+        }
+        this.benchBackdrop = new BenchBackdrop(loaded.benchTile);
+        this.worldRoot.addChildAt(this.benchBackdrop.node, 0);
+        this.bodyLayer.setRasterTextures({
+          woodBox: loaded.woodBox,
+          woodBall: loaded.ballWood,
+        });
+
         this.worldRoot.addChild(this.grid.node);
         this.worldRoot.addChild(this.fieldView.container);
         this.worldRoot.addChild(this.constraintLayer.node);
@@ -172,6 +191,7 @@ export class Renderer {
         this._camera.setCanvas(app.renderer.width, app.renderer.height);
         this._camera.apply(this.worldRoot);
         this.grid.update(this._camera);
+        if (this.benchBackdrop) this.benchBackdrop.update(this._camera);
         this._lastGeomZoom = this._camera.zoom;
 
         this.resizeObserver = new ResizeObserver(() => this.handleResize());
@@ -206,6 +226,7 @@ export class Renderer {
 
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
+    this.benchBackdrop?.update(this._camera);
 
     if (
       this._geomDirty &&
@@ -257,6 +278,8 @@ export class Renderer {
     this.bodyLayer.clear();
     this.constraintLayer.clear();
     this.connectorPreview.clear();
+    this.benchBackdrop?.destroy();
+    this.benchBackdrop = null;
 
     if (this._ready && this.app) {
       this.destroyApp(this.app);
@@ -281,6 +304,7 @@ export class Renderer {
     this._camera.setCanvas(this.app.renderer.width, this.app.renderer.height);
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
+    this.benchBackdrop?.update(this._camera);
   }
 }
 
