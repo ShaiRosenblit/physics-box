@@ -1,6 +1,7 @@
 import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
 import { box } from "../mechanics/box";
+import { addWorkshopEnclosure } from "./workshopEnclosure";
 
 /** One coordinate of Halton sequence (deterministic, low-discrepancy; no RNG). */
 function halton1d(index: number, base: 2 | 3): number {
@@ -20,19 +21,10 @@ function halton1d(index: number, base: 2 | 3): number {
  * high friction) and hopper marbles tuned for slow sideways creep after each hit.
  */
 export function galton(world: World): void {
-  const groundHeight = 0.5;
-  /** Top surface of the floor plate (see empty / welcome scenes). */
+  /** Top surface of the floor plate (see `addWorkshopEnclosure`). */
   const groundTopY = 0;
 
-  world.add(
-    box({
-      position: { x: 0, y: -groundHeight / 2 },
-      width: 40,
-      height: groundHeight,
-      fixed: true,
-      material: "wood",
-    }),
-  );
+  addWorkshopEnclosure(world);
 
   const pegRadius = 0.038;
   const pegDx = 0.3;

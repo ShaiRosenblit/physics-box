@@ -303,9 +303,9 @@ export class Renderer {
 /**
  * Compute the AABB used for fit-to-scene framing.
  *
- * Filters out very-large fixed boxes (e.g. the welcome scene's 40 m
- * ground plate) so the framing reflects the interesting bodies, then
- * adds a small bottom margin so the implied ground line stays visible.
+ * Filters out very-large fixed boxes (e.g. the workshop floor plate, walls,
+ * and ceiling) so the framing reflects the interesting bodies, then adds a
+ * small bottom margin so the implied ground line stays visible.
  */
 function computeBounds(
   snapshot: Snapshot,

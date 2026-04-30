@@ -7,6 +7,7 @@ import { pulley } from "../mechanics/pulley";
 import { hinge } from "../mechanics/hinge";
 import { spring } from "../mechanics/spring";
 import { bodyAnchor, worldAnchor } from "../mechanics/anchors";
+import { addWorkshopEnclosure } from "./workshopEnclosure";
 
 /**
  * Welcome scene — v3 (M6).
@@ -17,16 +18,7 @@ import { bodyAnchor, worldAnchor } from "../mechanics/anchors";
  * and don't drift across the workshop while the user reads the UI.
  */
 export function welcome(world: World): void {
-  const groundHeight = 0.5;
-  world.add(
-    box({
-      position: { x: 0, y: -groundHeight / 2 },
-      width: 40,
-      height: groundHeight,
-      fixed: true,
-      material: "wood",
-    }),
-  );
+  addWorkshopEnclosure(world);
 
   const crateSize = 0.7;
   for (let i = 0; i < 3; i++) {
