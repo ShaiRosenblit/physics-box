@@ -64,4 +64,4 @@ export const defaultConfig: SimulationConfig = {
 };
 
 /** Passed by the UI shell so playback feels calmer; kernel tests use `defaultConfig` (timeScale 1). */
-export const playbackTimeScale = 0.5;
+export const playbackTimeScale = 0.125;
