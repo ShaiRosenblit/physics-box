@@ -2,7 +2,7 @@ import { defaultConfig, type SimulationConfig } from "./config";
 import { EventBus, type EventName, type Listener, type Unsubscribe } from "./events";
 import { createIdFactory } from "./ids";
 import { Stepper } from "./Stepper";
-import type { BodySpec, Id, Snapshot } from "./types";
+import type { BodySpec, Id, Snapshot, Vec2 } from "./types";
 import { PlanckAdapter } from "../adapters/PlanckAdapter";
 
 /**
@@ -84,6 +84,31 @@ export class World {
     if (!this._adapter.has(id)) return;
     this._adapter.remove(id);
     this._events.emit("remove", { id });
+  }
+
+  /**
+   * Begin dragging the dynamic body under the given world point. Returns
+   * the dragged body id, or null if no dynamic body is at that point.
+   * UI translates pointer events to this command — never mutating bodies
+   * directly. Mouse-joint mechanics are an implementation detail of the
+   * adapter.
+   */
+  startDragAt(p: Vec2): Id | null {
+    const id = this._adapter.findDynamicBodyAt(p);
+    if (id === null) return null;
+    return this._adapter.startDrag(id, p) ? id : null;
+  }
+
+  updateDrag(p: Vec2): void {
+    this._adapter.updateDrag(p);
+  }
+
+  endDrag(): void {
+    this._adapter.endDrag();
+  }
+
+  get dragging(): boolean {
+    return this._adapter.isDragging;
   }
 
   snapshot(): Snapshot {

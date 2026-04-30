@@ -1,12 +1,17 @@
 import * as planck from "planck";
 import type { SimulationConfig } from "../core/config";
-import type { BodySpec, BodyView, Id, Snapshot } from "../core/types";
+import type { BodySpec, BodyView, Id, Snapshot, Vec2 } from "../core/types";
 import { lookupMaterial } from "../mechanics/materials";
 
 interface BodyRecord {
   readonly id: Id;
   readonly spec: BodySpec;
   readonly body: planck.Body;
+}
+
+interface DragState {
+  readonly id: Id;
+  readonly joint: planck.MouseJoint;
 }
 
 /**
@@ -22,10 +27,13 @@ interface BodyRecord {
 export class PlanckAdapter {
   private readonly world: planck.World;
   private readonly bodies = new Map<Id, BodyRecord>();
+  private readonly groundBody: planck.Body;
+  private dragState: DragState | null = null;
 
   constructor(config: SimulationConfig) {
     this.world = new planck.World(planck.Vec2(config.gravity.x, config.gravity.y));
     this.world.setAllowSleeping(true);
+    this.groundBody = this.world.createBody();
   }
 
   add(id: Id, spec: BodySpec): void {
@@ -58,8 +66,74 @@ export class PlanckAdapter {
   remove(id: Id): void {
     const record = this.bodies.get(id);
     if (!record) return;
+    if (this.dragState?.id === id) this.endDrag();
     this.world.destroyBody(record.body);
     this.bodies.delete(id);
+  }
+
+  /**
+   * Find the body whose fixtures contain the given world point. Returns
+   * null if none. Static and kinematic bodies are skipped — only dynamic
+   * bodies are draggable.
+   */
+  findDynamicBodyAt(p: Vec2): Id | null {
+    const eps = 1e-3;
+    const aabb = new planck.AABB(
+      planck.Vec2(p.x - eps, p.y - eps),
+      planck.Vec2(p.x + eps, p.y + eps),
+    );
+    let foundId: Id | null = null;
+    const target = planck.Vec2(p.x, p.y);
+    this.world.queryAABB(aabb, (fixture) => {
+      const body = fixture.getBody();
+      if (!body.isDynamic()) return true;
+      if (!fixture.testPoint(target)) return true;
+      const data = body.getUserData();
+      if (typeof data === "number") {
+        foundId = data as Id;
+        return false;
+      }
+      return true;
+    });
+    return foundId;
+  }
+
+  startDrag(id: Id, target: Vec2): boolean {
+    const record = this.bodies.get(id);
+    if (!record) return false;
+    if (!record.body.isDynamic()) return false;
+    if (this.dragState) this.endDrag();
+
+    record.body.setAwake(true);
+    const mass = Math.max(record.body.getMass(), 0.05);
+    const joint = new planck.MouseJoint(
+      {
+        maxForce: 1000 * mass,
+        frequencyHz: 5,
+        dampingRatio: 0.7,
+      },
+      this.groundBody,
+      record.body,
+      planck.Vec2(target.x, target.y),
+    );
+    this.world.createJoint(joint);
+    this.dragState = { id, joint };
+    return true;
+  }
+
+  updateDrag(target: Vec2): void {
+    if (!this.dragState) return;
+    this.dragState.joint.setTarget(planck.Vec2(target.x, target.y));
+  }
+
+  endDrag(): void {
+    if (!this.dragState) return;
+    this.world.destroyJoint(this.dragState.joint);
+    this.dragState = null;
+  }
+
+  get isDragging(): boolean {
+    return this.dragState !== null;
   }
 
   has(id: Id): boolean {
