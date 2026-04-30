@@ -30,6 +30,40 @@ const MIN_WOOD_BOX_NINESLICE_DIM = 0.22;
  */
 const MIN_WOOD_BOX_NINESLICE_ASPECT = 0.26;
 
+/** World-space coil polyline — stay aligned with spring hit-testing (`constraintHit`). */
+function springOutlineWorld(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  restLength: number,
+): Array<{ readonly x: number; readonly y: number }> {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return [{ x: ax, y: ay }, { x: bx, y: by }];
+  const ux = dx / len;
+  const uy = dy / len;
+  const nx = -uy;
+  const ny = ux;
+  const coils = 10;
+  const amp = Math.min(0.12, restLength * 0.12);
+  const inset = 0.08;
+  const out: Array<{ x: number; y: number }> = [];
+  out.push({ x: ax, y: ay });
+  out.push({ x: ax + ux * inset, y: ay + uy * inset });
+  for (let i = 1; i <= coils; i++) {
+    const t = (i - 0.5) / coils;
+    const cx = ax + ux * (inset + t * (len - 2 * inset));
+    const cy = ay + uy * (inset + t * (len - 2 * inset));
+    const sign = i % 2 === 0 ? 1 : -1;
+    out.push({ x: cx + nx * amp * sign, y: cy + ny * amp * sign });
+  }
+  out.push({ x: bx - ux * inset, y: by - uy * inset });
+  out.push({ x: bx, y: by });
+  return out;
+}
+
 interface BodyEntry {
   readonly node: Container;
   readonly styleKey: string;
@@ -293,43 +327,148 @@ export class SelectionView {
   update(snapshot: Snapshot): void {
     this.node.clear();
     if (this.currentId === null) return;
-    const body = snapshot.bodies.find((b) => b.id === this.currentId);
-    if (!body) return;
 
     const zoom = Math.max(this.cameraZoomGetter(), 1e-3);
     const lineWidth = (stroke.selection + 0.6) / zoom;
-    const inset = 4 / zoom;
 
-    this.node.position.set(body.position.x, body.position.y);
-    this.node.rotation = body.angle;
+    const body = snapshot.bodies.find((b) => b.id === this.currentId);
+    if (body) {
+      const inset = 4 / zoom;
+      this.node.position.set(body.position.x, body.position.y);
+      this.node.rotation = body.angle;
 
-    if (body.kind === "ball" || body.kind === "magnet") {
-      this.node.circle(0, 0, body.radius + inset);
+      if (body.kind === "ball" || body.kind === "magnet") {
+        this.node.circle(0, 0, body.radius + inset);
+        this.node.stroke({
+          width: lineWidth,
+          color: palette.fieldB,
+          alpha: 0.95,
+        });
+        this.node.circle(0, 0, body.radius + inset);
+        this.node.stroke({
+          width: lineWidth * 2.6,
+          color: palette.fieldB,
+          alpha: opacity.selection,
+        });
+      } else {
+        const hw = body.width / 2 + inset;
+        const hh = body.height / 2 + inset;
+        this.node.rect(-hw, -hh, hw * 2, hh * 2);
+        this.node.stroke({
+          width: lineWidth,
+          color: palette.fieldB,
+          alpha: 0.95,
+        });
+        this.node.rect(-hw, -hh, hw * 2, hh * 2);
+        this.node.stroke({
+          width: lineWidth * 2.6,
+          color: palette.fieldB,
+          alpha: opacity.selection,
+        });
+      }
+      return;
+    }
+
+    const constraint = snapshot.constraints.find((c) => c.id === this.currentId);
+    if (!constraint) return;
+
+    this.node.position.set(0, 0);
+    this.node.rotation = 0;
+
+    if (constraint.kind === "rope") {
+      this.strokeWorldPolyline(constraint.path, lineWidth);
+      return;
+    }
+    if (constraint.kind === "spring") {
+      const pts = springOutlineWorld(
+        constraint.a.x,
+        constraint.a.y,
+        constraint.b.x,
+        constraint.b.y,
+        constraint.restLength,
+      );
+      this.strokeWorldPolyline(pts, lineWidth);
+      return;
+    }
+    if (constraint.kind === "hinge") {
+      const r = 0.065;
+      for (let pass = 0; pass < 2; pass++) {
+        const w = pass === 0 ? lineWidth : lineWidth * 2.6;
+        const a = pass === 0 ? 0.95 : opacity.selection;
+        this.node.circle(constraint.anchor.x, constraint.anchor.y, r);
+        this.node.stroke({
+          width: w,
+          color: palette.fieldB,
+          alpha: a,
+        });
+      }
+      return;
+    }
+    if (constraint.kind === "pulley") {
+      const rim = Math.max(constraint.halfSpread * 1.05, 0.06);
+      for (let pass = 0; pass < 2; pass++) {
+        const w = pass === 0 ? lineWidth : lineWidth * 2.6;
+        const a = pass === 0 ? 0.95 : opacity.selection;
+        this.node.circle(constraint.wheelCenter.x, constraint.wheelCenter.y, rim);
+        this.node.stroke({
+          width: w,
+          color: palette.fieldB,
+          alpha: a,
+        });
+      }
+      this.strokeSegment(
+        constraint.anchorA.x,
+        constraint.anchorA.y,
+        constraint.groundA.x,
+        constraint.groundA.y,
+        lineWidth,
+      );
+      this.strokeSegment(
+        constraint.anchorB.x,
+        constraint.anchorB.y,
+        constraint.groundB.x,
+        constraint.groundB.y,
+        lineWidth,
+      );
+    }
+  }
+
+  private strokeWorldPolyline(
+    pts: ReadonlyArray<{ readonly x: number; readonly y: number }>,
+    lineWidth: number,
+  ): void {
+    if (pts.length < 2) return;
+    for (let pass = 0; pass < 2; pass++) {
+      const w = pass === 0 ? lineWidth : lineWidth * 2.6;
+      const a = pass === 0 ? 0.95 : opacity.selection;
+      this.node.moveTo(pts[0]!.x, pts[0]!.y);
+      for (let i = 1; i < pts.length; i++) {
+        this.node.lineTo(pts[i]!.x, pts[i]!.y);
+      }
       this.node.stroke({
-        width: lineWidth,
+        width: w,
         color: palette.fieldB,
-        alpha: 0.95,
+        alpha: a,
       });
-      this.node.circle(0, 0, body.radius + inset);
+    }
+  }
+
+  private strokeSegment(
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    lineWidth: number,
+  ): void {
+    for (let pass = 0; pass < 2; pass++) {
+      const w = pass === 0 ? lineWidth : lineWidth * 2.6;
+      const a = pass === 0 ? 0.95 : opacity.selection;
+      this.node.moveTo(ax, ay);
+      this.node.lineTo(bx, by);
       this.node.stroke({
-        width: lineWidth * 2.6,
+        width: w,
         color: palette.fieldB,
-        alpha: opacity.selection,
-      });
-    } else {
-      const hw = body.width / 2 + inset;
-      const hh = body.height / 2 + inset;
-      this.node.rect(-hw, -hh, hw * 2, hh * 2);
-      this.node.stroke({
-        width: lineWidth,
-        color: palette.fieldB,
-        alpha: 0.95,
-      });
-      this.node.rect(-hw, -hh, hw * 2, hh * 2);
-      this.node.stroke({
-        width: lineWidth * 2.6,
-        color: palette.fieldB,
-        alpha: opacity.selection,
+        alpha: a,
       });
     }
   }

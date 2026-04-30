@@ -18,6 +18,7 @@ export type {
   BoxView,
   ChargedSourceView,
   ConstraintKind,
+  ConstraintPatch,
   ConstraintSpec,
   ConstraintView,
   HingeSpec,

@@ -149,11 +149,28 @@ export interface PulleySpec {
 
 export type ConstraintSpec = RopeSpec | HingeSpec | SpringSpec | PulleySpec;
 
+/** Sparse updates for patchConstraint — only fields valid for this kind apply. */
+export interface ConstraintPatch {
+  readonly length?: number;
+  readonly segments?: number;
+  readonly material?: MaterialName;
+  readonly restLength?: number;
+  readonly frequencyHz?: number;
+  readonly dampingRatio?: number;
+  readonly worldAnchor?: Vec2;
+  readonly halfSpread?: number;
+  readonly ratio?: number;
+}
+
 export interface RopeView {
   readonly id: Id;
   readonly kind: "rope";
   readonly path: readonly Vec2[];
   readonly material: MaterialName;
+  /** Nominal constrained length (`RopeSpec.length`). */
+  readonly nominalLength: number;
+  /** Segment count baked into this chain (`RopeSpec.segments` resolved at build time). */
+  readonly segmentLinks: number;
 }
 
 export interface HingeView {
@@ -173,6 +190,8 @@ export interface SpringView {
   readonly b: Vec2;
   readonly restLength: number;
   readonly currentLength: number;
+  readonly frequencyHz: number;
+  readonly dampingRatio: number;
 }
 
 export interface PulleyView {

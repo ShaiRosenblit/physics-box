@@ -2,11 +2,17 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { testIds } from "../a11y/ids";
 import { useUIStore } from "../state/store";
 import { useSimulationContext } from "../hooks/SimulationContext";
-import type { BodyView, MaterialName } from "../../simulation";
+import type { BodyView, ConstraintView, MaterialName } from "../../simulation";
 import type { ViewportMode } from "../hooks/useViewportMode";
 import { layout, ui } from "../style/tokens";
 
 const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt"];
+
+const MIN_ROPE_SEG_UI = 2;
+
+type SelectionPanelTarget =
+  | { kind: "body"; view: BodyView }
+  | { kind: "constraint"; view: ConstraintView };
 
 export interface InspectorProps {
   variant: "panel" | "rail" | "sheet";
@@ -16,11 +22,11 @@ export function Inspector({ variant }: InspectorProps) {
   const selectedId = useUIStore((s) => s.selectedId);
   const setInspectorOpen = useUIStore((s) => s.setInspectorOpen);
   const { world } = useSimulationContext();
-  const [view, setView] = useState<BodyView | null>(null);
+  const [target, setTarget] = useState<SelectionPanelTarget | null>(null);
 
   useEffect(() => {
     if (selectedId === null) {
-      setView(null);
+      setTarget(null);
       return;
     }
     let cancelled = false;
@@ -29,7 +35,12 @@ export function Inspector({ variant }: InspectorProps) {
       if (cancelled) return;
       const snap = world.snapshot();
       const body = snap.bodies.find((b) => b.id === selectedId) ?? null;
-      setView(body);
+      if (body) {
+        setTarget({ kind: "body", view: body });
+      } else {
+        const c = snap.constraints.find((co) => co.id === selectedId) ?? null;
+        setTarget(c ? { kind: "constraint", view: c } : null);
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -46,10 +57,12 @@ export function Inspector({ variant }: InspectorProps) {
         aria-label="Inspector"
         style={railStyle}
       >
-        <div style={railEyebrowStyle}>Body</div>
-        {view ? (
-          <div style={railValueStyle} title={`Body #${view.id}`}>
-            #{view.id}
+        <div style={railEyebrowStyle}>
+          {target === null ? "—" : target.kind === "body" ? "Body" : "Link"}
+        </div>
+        {target ? (
+          <div style={railValueStyle} title={`Id ${target.view.id}`}>
+            #{target.view.id}
           </div>
         ) : (
           <div style={{ ...railValueStyle, opacity: 0.5 }} aria-hidden="true">
@@ -80,13 +93,246 @@ export function Inspector({ variant }: InspectorProps) {
           </button>
         )}
       </div>
-      {view === null ? (
-        <div style={emptyStateStyle}>No body selected</div>
+      {target === null ? (
+        <div style={emptyStateStyle}>Nothing selected</div>
+      ) : target.kind === "body" ? (
+        <BodyDetails key={target.view.id} view={target.view} />
       ) : (
-        <BodyDetails key={view.id} view={view} />
+        <ConstraintDetails key={target.view.id} view={target.view} />
       )}
     </aside>
   );
+}
+
+function ConstraintDetails({ view }: { view: ConstraintView }) {
+  const { patchConstraint } = useSimulationContext();
+  const ctl = inspectorControlStyle;
+
+  return (
+    <div style={detailsStyle}>
+      <ReadRow label={constraintKindShort(view.kind)} value={`#${view.id}`} />
+
+      {view.kind === "rope" && (
+        <>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Nominal length</span>
+            <input
+              aria-label="Rope nominal length"
+              type="number"
+              min={0.05}
+              step={0.05}
+              style={ctl}
+              value={view.nominalLength}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v)) {
+                  patchConstraint(view.id, { length: Math.max(0.05, v) });
+                }
+              }}
+            />
+          </div>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Segments</span>
+            <input
+              aria-label="Rope segment links"
+              type="number"
+              min={MIN_ROPE_SEG_UI}
+              step={1}
+              style={ctl}
+              value={view.segmentLinks}
+              onChange={(e) => {
+                const iv = parseInt(e.target.value, 10);
+                if (Number.isFinite(iv)) {
+                  patchConstraint(view.id, {
+                    segments: Math.max(MIN_ROPE_SEG_UI, iv),
+                  });
+                }
+              }}
+            />
+          </div>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Material</span>
+            <select
+              aria-label="Rope material"
+              style={ctl}
+              value={view.material}
+              onChange={(e) =>
+                patchConstraint(view.id, {
+                  material: e.target.value as MaterialName,
+                })
+              }
+            >
+              {MATERIALS.map((m) => (
+                <option key={m} value={m}>
+                  {titleCase(m)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+
+      {view.kind === "spring" && (
+        <>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Rest length</span>
+            <input
+              aria-label="Spring rest length"
+              type="number"
+              min={0.05}
+              step={0.05}
+              style={ctl}
+              value={view.restLength}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v)) {
+                  patchConstraint(view.id, { restLength: Math.max(0.05, v) });
+                }
+              }}
+            />
+          </div>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Stiffness (Hz)</span>
+            <input
+              aria-label="Spring frequency Hz"
+              type="number"
+              min={0}
+              max={120}
+              step={0.5}
+              style={ctl}
+              value={view.frequencyHz}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && v >= 0) {
+                  patchConstraint(view.id, { frequencyHz: v });
+                }
+              }}
+            />
+          </div>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Damping</span>
+            <input
+              aria-label="Spring damping ratio"
+              type="number"
+              min={0}
+              max={5}
+              step={0.05}
+              style={ctl}
+              value={view.dampingRatio}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && v >= 0) {
+                  patchConstraint(view.id, { dampingRatio: v });
+                }
+              }}
+            />
+          </div>
+          <ReadRow label="Span" value={`${fmt(view.currentLength)} m`} />
+        </>
+      )}
+
+      {view.kind === "hinge" && (
+        <>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Pivot X</span>
+            <input
+              aria-label="Hinge pivot X"
+              type="number"
+              step={0.05}
+              style={ctl}
+              value={view.anchor.x}
+              onChange={(e) => {
+                const vx = parseFloat(e.target.value);
+                if (!Number.isFinite(vx)) return;
+                patchConstraint(view.id, {
+                  worldAnchor: { x: vx, y: view.anchor.y },
+                });
+              }}
+            />
+          </div>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Pivot Y</span>
+            <input
+              aria-label="Hinge pivot Y"
+              type="number"
+              step={0.05}
+              style={ctl}
+              value={view.anchor.y}
+              onChange={(e) => {
+                const vy = parseFloat(e.target.value);
+                if (!Number.isFinite(vy)) return;
+                patchConstraint(view.id, {
+                  worldAnchor: { x: view.anchor.x, y: vy },
+                });
+              }}
+            />
+          </div>
+          <ReadRow
+            label="Bodies"
+            value={`A ${view.bodyA}${view.bodyB !== undefined ? ` · B ${view.bodyB}` : ""}`}
+          />
+        </>
+      )}
+
+      {view.kind === "pulley" && (
+        <>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Spread</span>
+            <input
+              aria-label="Pulley half spread"
+              type="number"
+              min={0.05}
+              max={2}
+              step={0.01}
+              style={ctl}
+              value={view.halfSpread}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && v > 0) {
+                  patchConstraint(view.id, { halfSpread: v });
+                }
+              }}
+            />
+          </div>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Ratio</span>
+            <input
+              aria-label="Pulley ratio"
+              type="number"
+              min={0.1}
+              max={20}
+              step={0.1}
+              style={ctl}
+              value={view.ratio}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && v > 0) {
+                  patchConstraint(view.id, { ratio: v });
+                }
+              }}
+            />
+          </div>
+          <ReadRow
+            label="Wheel"
+            value={`${fmt(view.wheelCenter.x)}, ${fmt(view.wheelCenter.y)}`}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+function constraintKindShort(kind: ConstraintView["kind"]): string {
+  switch (kind) {
+    case "rope":
+      return "Rope";
+    case "hinge":
+      return "Hinge";
+    case "spring":
+      return "Spring";
+    case "pulley":
+      return "Pulley";
+  }
 }
 
 function BodyDetails({ view }: { view: BodyView }) {

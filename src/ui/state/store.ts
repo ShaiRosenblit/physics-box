@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   defaultSceneName,
+  PULLEY_DEFAULT_HALF_SPREAD,
   type Id,
   type MaterialName,
   type SceneName,
@@ -99,6 +100,44 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
   };
 }
 
+export interface RopeConnectorPreset {
+  segments: number;
+  material: MaterialName;
+}
+
+export interface SpringConnectorPreset {
+  frequencyHz: number;
+  dampingRatio: number;
+}
+
+export interface PulleyConnectorPreset {
+  halfSpread: number;
+  ratio: number;
+}
+
+export type ConnectorPresetsBundle = {
+  rope: RopeConnectorPreset;
+  spring: SpringConnectorPreset;
+  pulley: PulleyConnectorPreset;
+};
+
+export type ConnectorPresetKey = keyof ConnectorPresetsBundle;
+
+export function createDefaultConnectorPresets(): ConnectorPresetsBundle {
+  return {
+    rope: { segments: 12, material: "wood" },
+    spring: { frequencyHz: 4, dampingRatio: 0.5 },
+    pulley: { halfSpread: PULLEY_DEFAULT_HALF_SPREAD, ratio: 1 },
+  };
+}
+
+export function connectorEligiblePresetTool(
+  tool: Tool,
+): ConnectorPresetKey | null {
+  if (tool === "rope" || tool === "spring" || tool === "pulley") return tool;
+  return null;
+}
+
 /** Connector tools place a constraint over two clicks rather than spawning a body. */
 export const CONNECTOR_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
   "rope",
@@ -134,6 +173,8 @@ export interface UIState {
 
   /** Per-tool defaults merged into spawned `BodySpec`s (placement only). */
   spawnPresets: SpawnPresetsBundle;
+  /** Defaults merged into the next rope / spring / pulley placement only. */
+  connectorPresets: ConnectorPresetsBundle;
 
   setTool: (tool: Tool) => void;
   setSelectedId: (id: Id | null) => void;
@@ -150,6 +191,10 @@ export interface UIState {
   setSpawnPresetPartial: <K extends SpawnPresetKey>(
     key: K,
     partial: Partial<SpawnPresetsBundle[K]>,
+  ) => void;
+  setConnectorPresetPartial: <K extends ConnectorPresetKey>(
+    key: K,
+    partial: Partial<ConnectorPresetsBundle[K]>,
   ) => void;
 }
 
@@ -172,6 +217,7 @@ export const useUIStore = create<UIState>((set) => ({
   scene: defaultSceneName,
 
   spawnPresets: createDefaultSpawnPresets(),
+  connectorPresets: createDefaultConnectorPresets(),
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
@@ -193,6 +239,13 @@ export const useUIStore = create<UIState>((set) => ({
       spawnPresets: {
         ...state.spawnPresets,
         [key]: { ...state.spawnPresets[key], ...partial },
+      },
+    })),
+  setConnectorPresetPartial: (key, partial) =>
+    set((state) => ({
+      connectorPresets: {
+        ...state.connectorPresets,
+        [key]: { ...state.connectorPresets[key], ...partial },
       },
     })),
 }));

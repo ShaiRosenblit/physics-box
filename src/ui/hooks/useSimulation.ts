@@ -6,6 +6,7 @@ import {
   playbackTimeScale,
   type BodyPatch,
   type BodySpec,
+  type ConstraintPatch,
   type Id,
   type SceneName,
 } from "../../simulation";
@@ -29,6 +30,8 @@ export interface SimulationApi {
   setGravityEnabled(enabled: boolean): void;
   /** Update body parameters without changing pose or velocities. */
   patchBody(id: Id, patch: BodyPatch): void;
+  /** Sparse constraint update (rope length / spring stiffness / hinge pivot …). */
+  patchConstraint(id: Id, patch: ConstraintPatch): void;
 }
 
 /**
@@ -89,6 +92,13 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
     [world],
   );
 
+  const patchConstraint = useCallback(
+    (id: Id, patch: ConstraintPatch) => {
+      world.patchConstraint(id, patch);
+    },
+    [world],
+  );
+
   return {
     world,
     tick,
@@ -101,5 +111,6 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
     loadScene,
     setGravityEnabled,
     patchBody,
+    patchConstraint,
   };
 }

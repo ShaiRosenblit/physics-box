@@ -2,8 +2,21 @@ import { defaultConfig, type SimulationConfig } from "./config";
 import { EventBus, type EventName, type Listener, type Unsubscribe } from "./events";
 import { createIdFactory } from "./ids";
 import { Stepper } from "./Stepper";
-import type { BodyPatch, BodySpec, ConstraintSpec, Id, Snapshot, Vec2 } from "./types";
+import type {
+  BodyPatch,
+  BodySpec,
+  ConstraintPatch,
+  ConstraintSpec,
+  Id,
+  Snapshot,
+  Vec2,
+} from "./types";
 import { clampBodySpecToConfig, mergeBodyPatch } from "./bodyPatch";
+import {
+  mergeConstraintPatch,
+  sanitizeConstraintSpec,
+} from "./constraintPatch";
+import { CONSTRAINT_PICK_RADIUS, pickClosestConstraint } from "./constraintHit";
 import { PlanckAdapter } from "../adapters/PlanckAdapter";
 import { ChargeRegistry } from "../electromagnetism/ChargeRegistry";
 import { computeCoulombForces } from "../electromagnetism/coulomb";
@@ -201,6 +214,22 @@ export class World {
     this._adapter.addConstraint(id, spec);
     this._events.emit("add", { id });
     return id;
+  }
+
+  patchConstraint(id: Id, patch: ConstraintPatch): void {
+    if (!this._adapter.hasConstraint(id)) return;
+    const prev = this._adapter.getConstraintSpec(id);
+    if (!prev) return;
+    const merged = sanitizeConstraintSpec(mergeConstraintPatch(prev, patch));
+    this._adapter.applyConstraintSpec(id, merged);
+  }
+
+  /**
+   * Nearest constraint geometry to `p` within a small edge distance threshold.
+   * UI should prefer `bodyAt` first when tapping near dynamic bodies.
+   */
+  constraintAt(p: Vec2): Id | null {
+    return pickClosestConstraint(this.snapshot().constraints, p, CONSTRAINT_PICK_RADIUS);
   }
 
   /**

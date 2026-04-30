@@ -15,6 +15,50 @@ import {
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.hypot(a.x - b.x, a.y - b.y);
 
+describe("patchConstraint", () => {
+  it("updates spring rest length and frequency without changing anchors", () => {
+    const world = new World({ ...defaultConfig, gravity: { x: 0, y: 0 } });
+    const a = world.add(
+      ball({ position: { x: 0, y: 0 }, radius: 0.2, material: "metal" }),
+    );
+    const b = world.add(
+      ball({ position: { x: 1.5, y: 0 }, radius: 0.2, material: "metal" }),
+    );
+    const id = world.addConstraint(
+      spring({
+        a: bodyAnchor(a),
+        b: bodyAnchor(b),
+        restLength: 1.2,
+        frequencyHz: 2,
+        dampingRatio: 0.1,
+      }),
+    );
+    world.patchConstraint(id, { restLength: 0.8, frequencyHz: 5 });
+    const v = world.snapshot().constraints.find((c) => c.id === id);
+    expect(v?.kind).toBe("spring");
+    if (v?.kind !== "spring") return;
+    expect(v.restLength).toBeCloseTo(0.8, 5);
+    expect(v.frequencyHz).toBeCloseTo(5, 5);
+  });
+
+  it("rebuilds rope when nominal length changes", () => {
+    const world = new World();
+    const id = world.addConstraint(
+      rope({
+        a: worldAnchor({ x: 0, y: 5 }),
+        b: worldAnchor({ x: 1, y: 5 }),
+        length: 2,
+        segments: 8,
+      }),
+    );
+    world.patchConstraint(id, { length: 2.8 });
+    const v = world.snapshot().constraints.find((c) => c.id === id);
+    expect(v?.kind).toBe("rope");
+    if (v?.kind !== "rope") return;
+    expect(v.nominalLength).toBeCloseTo(2.8, 5);
+  });
+});
+
 describe("Rope", () => {
   it("settles into a hanging chain whose path length stays close to its configured length", () => {
     const world = new World();

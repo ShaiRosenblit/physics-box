@@ -403,6 +403,10 @@ export function usePointerGestures(
             const spawn = isSpawnTool(tool);
             if (spawn && w) {
               cbRef.current.onSpawn(spawn, w);
+            } else if (tool === "select" && w) {
+              const bodyTap = cbRef.current.world.bodyAt(w);
+              if (bodyTap !== null) cbRef.current.onSelect(bodyTap);
+              else cbRef.current.onSelect(cbRef.current.world.constraintAt(w));
             } else {
               cbRef.current.onSelect(null);
             }

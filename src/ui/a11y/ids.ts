@@ -29,4 +29,5 @@ export const testIds = {
   inspectorPeek: "inspector-peek",
   buttonFitView: "button-fit-view",
   spawnToolOptions: "spawn-tool-options",
+  connectorToolOptions: "connector-tool-options",
 } as const;

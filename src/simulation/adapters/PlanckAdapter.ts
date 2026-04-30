@@ -16,6 +16,10 @@ import type {
   SpringSpec,
   Vec2,
 } from "../core/types";
+import {
+  ropeRebuildNeeded,
+  springAnchorsMatch,
+} from "../core/constraintPatch";
 import { lookupMaterial } from "../mechanics/materials";
 import { PULLEY_DEFAULT_HALF_SPREAD } from "../mechanics/pulley";
 
@@ -301,10 +305,12 @@ export class PlanckAdapter {
     }
   }
 
-  addConstraint(id: Id, spec: ConstraintSpec): void {
-    if (this.constraints.has(id)) {
-      throw new Error(`PlanckAdapter.addConstraint: id ${id} already exists`);
-    }
+  private disposeConstraintRecord(record: ConstraintRecord): void {
+    for (const joint of record.joints) this.world.destroyJoint(joint);
+    for (const body of record.internalBodies) this.world.destroyBody(body);
+  }
+
+  private installConstraintInternal(id: Id, spec: ConstraintSpec): void {
     if (spec.kind === "rope") {
       this.constraints.set(id, this.buildRope(id, spec));
       return;
@@ -323,20 +329,83 @@ export class PlanckAdapter {
     }
     const exhaustive: never = spec;
     throw new Error(
-      `PlanckAdapter.addConstraint: unknown kind ${(exhaustive as { kind: string }).kind}`,
+      `PlanckAdapter.installConstraintInternal: unknown kind ${(exhaustive as { kind: string }).kind}`,
     );
+  }
+
+  addConstraint(id: Id, spec: ConstraintSpec): void {
+    if (this.constraints.has(id)) {
+      throw new Error(`PlanckAdapter.addConstraint: id ${id} already exists`);
+    }
+    this.installConstraintInternal(id, spec);
+  }
+
+  /** Replace kinematic chain / joints while keeping the stable constraint id. */
+  replaceConstraintKeepingId(id: Id, spec: ConstraintSpec): void {
+    const old = this.constraints.get(id);
+    if (!old) return;
+    this.disposeConstraintRecord(old);
+    this.constraints.delete(id);
+    this.installConstraintInternal(id, spec);
   }
 
   removeConstraint(id: Id): void {
     const record = this.constraints.get(id);
     if (!record) return;
-    for (const joint of record.joints) this.world.destroyJoint(joint);
-    for (const body of record.internalBodies) this.world.destroyBody(body);
+    this.disposeConstraintRecord(record);
     this.constraints.delete(id);
   }
 
   hasConstraint(id: Id): boolean {
     return this.constraints.has(id);
+  }
+
+  /** @internal — consumed by World.patchConstraint. */
+  getConstraintSpec(id: Id): ConstraintSpec | undefined {
+    return this.constraints.get(id)?.spec;
+  }
+
+  applyConstraintSpec(id: Id, next: ConstraintSpec): void {
+    const rec = this.constraints.get(id);
+    if (!rec || rec.spec.kind !== next.kind) return;
+    const prev = rec.spec;
+    if (next.kind === "spring") {
+      if (springAnchorsMatch(prev as SpringSpec, next)) {
+        const dj = rec.joints[0] as planck.DistanceJoint;
+        dj.setLength(next.restLength ?? dj.getLength());
+        dj.setFrequency(next.frequencyHz ?? dj.getFrequency());
+        dj.setDampingRatio(next.dampingRatio ?? dj.getDampingRatio());
+        this.constraints.set(id, { ...rec, spec: next });
+        return;
+      }
+      this.replaceConstraintKeepingId(id, next);
+      return;
+    }
+    if (next.kind === "rope") {
+      if (!ropeRebuildNeeded(prev as RopeSpec, next as RopeSpec)) return;
+      this.replaceConstraintKeepingId(id, next);
+      return;
+    }
+    if (next.kind === "hinge") {
+      const ha = prev as HingeSpec;
+      const hb = next;
+      if (
+        ha.bodyA === hb.bodyA &&
+        ha.bodyB === hb.bodyB &&
+        ha.worldAnchor.x === hb.worldAnchor.x &&
+        ha.worldAnchor.y === hb.worldAnchor.y
+      ) {
+        return;
+      }
+      this.replaceConstraintKeepingId(id, next);
+      return;
+    }
+    if (next.kind === "pulley") {
+      const pa = prev as PulleySpec;
+      const pb = next;
+      if (pulleySpecsEquivalent(pa, pb)) return;
+      this.replaceConstraintKeepingId(id, next);
+    }
   }
 
   buildSnapshot(tick: number, time: number): Snapshot {
@@ -573,6 +642,23 @@ export class PlanckAdapter {
   }
 }
 
+function pulleySpecsEquivalent(a: PulleySpec, b: PulleySpec): boolean {
+  const hsA = a.halfSpread ?? PULLEY_DEFAULT_HALF_SPREAD;
+  const hsB = b.halfSpread ?? PULLEY_DEFAULT_HALF_SPREAD;
+  return (
+    a.bodyA === b.bodyA &&
+    a.bodyB === b.bodyB &&
+    a.wheelCenter.x === b.wheelCenter.x &&
+    a.wheelCenter.y === b.wheelCenter.y &&
+    a.localAnchorA.x === b.localAnchorA.x &&
+    a.localAnchorA.y === b.localAnchorA.y &&
+    a.localAnchorB.x === b.localAnchorB.x &&
+    a.localAnchorB.y === b.localAnchorB.y &&
+    hsA === hsB &&
+    (a.ratio ?? 1) === (b.ratio ?? 1)
+  );
+}
+
 function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
   if (oldS.kind !== newS.kind) return true;
   const matOld = oldS.material ?? "wood";
@@ -659,6 +745,8 @@ function buildConstraintView(record: ConstraintRecord): ConstraintView {
       kind: "rope" as const,
       path: Object.freeze(path),
       material: spec.material ?? "wood",
+      nominalLength: spec.length,
+      segmentLinks: record.internalBodies.length,
     });
   }
 
@@ -680,9 +768,7 @@ function buildConstraintView(record: ConstraintRecord): ConstraintView {
     const b = joint.getAnchorB();
     const dx = b.x - a.x;
     const dy = b.y - a.y;
-    const restLength = (joint as { getLength?: () => number }).getLength?.() ??
-      spec.restLength ??
-      Math.hypot(dx, dy);
+    const restLength = joint.getLength();
     return Object.freeze({
       id,
       kind: "spring" as const,
@@ -690,6 +776,8 @@ function buildConstraintView(record: ConstraintRecord): ConstraintView {
       b: Object.freeze({ x: b.x, y: b.y }),
       restLength,
       currentLength: Math.hypot(dx, dy),
+      frequencyHz: joint.getFrequency(),
+      dampingRatio: joint.getDampingRatio(),
     });
   }
 

@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { testIds } from "../a11y/ids";
 import { useUIStore } from "../state/store";
 import { useSimulationContext } from "../hooks/SimulationContext";
-import type { BodyView } from "../../simulation";
+import type { BodyView, ConstraintView } from "../../simulation";
+import { ui } from "../style/tokens";
+
+type PeekSelection =
+  | { kind: "body"; view: BodyView }
+  | { kind: "constraint"; view: ConstraintView };
 
 /**
  * Compact, non-modal status pill for phone mode.
@@ -17,11 +22,11 @@ export function InspectorPeek() {
   const dragging = useUIStore((s) => s.dragging);
   const setInspectorOpen = useUIStore((s) => s.setInspectorOpen);
   const { world } = useSimulationContext();
-  const [view, setView] = useState<BodyView | null>(null);
+  const [target, setTarget] = useState<PeekSelection | null>(null);
 
   useEffect(() => {
     if (selectedId === null) {
-      setView(null);
+      setTarget(null);
       return;
     }
     let cancelled = false;
@@ -30,7 +35,12 @@ export function InspectorPeek() {
       if (cancelled) return;
       const snap = world.snapshot();
       const body = snap.bodies.find((b) => b.id === selectedId) ?? null;
-      setView(body);
+      if (body) {
+        setTarget({ kind: "body", view: body });
+      } else {
+        const c = snap.constraints.find((co) => co.id === selectedId) ?? null;
+        setTarget(c ? { kind: "constraint", view: c } : null);
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -40,11 +50,14 @@ export function InspectorPeek() {
     };
   }, [selectedId, world]);
 
-  if (view === null) return null;
+  if (target === null) return null;
 
   // Drag-aware visibility: keep the peek mounted (so it can fade) but
   // make it pointer-transparent and dim while the user is dragging.
-  const summary = summarize(view);
+  const summary =
+    target.kind === "constraint"
+      ? summarizeConstraint(target.view)
+      : summarizeBody(target.view);
 
   return (
     <button
@@ -70,7 +83,39 @@ export function InspectorPeek() {
   );
 }
 
-function summarize(view: BodyView): {
+function summarizeConstraint(view: ConstraintView): {
+  label: string;
+  stats: string;
+  tint: string;
+} {
+  const kind =
+    view.kind === "rope"
+      ? "Rope"
+      : view.kind === "spring"
+        ? "Spring"
+        : view.kind === "hinge"
+          ? "Hinge"
+          : "Pulley";
+
+  let stats = "";
+  if (view.kind === "rope") {
+    stats = `L ${fmt(view.nominalLength)} m · ${view.segmentLinks} seg`;
+  } else if (view.kind === "spring") {
+    stats = `${fmt(view.frequencyHz)} Hz · L₀ ${fmt(view.restLength)} m`;
+  } else if (view.kind === "pulley") {
+    stats = `ratio ${fmt(view.ratio)} · spread ${fmt(view.halfSpread)}`;
+  } else {
+    stats = `${fmt(view.anchor.x)}, ${fmt(view.anchor.y)}`;
+  }
+
+  return {
+    label: `#${view.id} · ${kind}`,
+    stats,
+    tint: ui.fieldB,
+  };
+}
+
+function summarizeBody(view: BodyView): {
   label: string;
   stats: string;
   tint: string;
@@ -82,26 +127,26 @@ function summarize(view: BodyView): {
       return {
         label: `#${view.id} · Ball ${view.charge > 0 ? "(+)" : "(−)"}`,
         stats: `${speedStr} · q ${fmt(view.charge)} C`,
-        tint: view.charge > 0 ? "#9c4a3a" : "#3a567a",
+        tint: view.charge > 0 ? ui.chargePos : ui.chargeNeg,
       };
     }
     return {
       label: `#${view.id} · Ball`,
       stats: speedStr,
-      tint: "#5a4f43",
+      tint: ui.inkMuted,
     };
   }
   if (view.kind === "magnet") {
     return {
       label: `#${view.id} · Magnet ${view.dipole >= 0 ? "N" : "S"}`,
       stats: `${speedStr} · m ${fmt(view.dipole)} A·m²`,
-      tint: "#a06a3f",
+      tint: ui.fieldB,
     };
   }
   return {
     label: `#${view.id} · Box`,
     stats: speedStr,
-    tint: "#5a4f43",
+    tint: ui.inkMuted,
   };
 }
 
@@ -114,11 +159,11 @@ function fmt(n: number): string {
   return n.toFixed(3);
 }
 
-const peekStyle: React.CSSProperties = {
+const peekStyle: CSSProperties = {
   appearance: "none",
   border: "none",
-  background: "#eae2d5",
-  color: "#2a2520",
+  background: ui.paperShade,
+  color: ui.inkPrimary,
   display: "flex",
   alignItems: "center",
   gap: 10,
@@ -129,13 +174,13 @@ const peekStyle: React.CSSProperties = {
   borderRadius: 22,
   boxShadow: "0 4px 14px rgba(42,37,32,0.14)",
   fontSize: 13,
-  fontFamily: 'inherit',
+  fontFamily: "inherit",
   textAlign: "left",
   cursor: "pointer",
   transition: "opacity 160ms ease-out",
 };
 
-const dotStyle = (color: string): React.CSSProperties => ({
+const dotStyle = (color: string): CSSProperties => ({
   width: 10,
   height: 10,
   borderRadius: 5,
@@ -143,25 +188,25 @@ const dotStyle = (color: string): React.CSSProperties => ({
   flexShrink: 0,
 });
 
-const labelStyle: React.CSSProperties = {
+const labelStyle: CSSProperties = {
   fontWeight: 500,
   whiteSpace: "nowrap",
 };
 
-const statsStyle: React.CSSProperties = {
+const statsStyle: CSSProperties = {
   flex: 1,
   fontFamily: '"SF Mono", ui-monospace, Menlo, monospace',
   fontVariantNumeric: "tabular-nums",
   fontSize: 11,
-  color: "#5a4f43",
+  color: ui.inkMuted,
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
 };
 
-const chevronStyle: React.CSSProperties = {
+const chevronStyle: CSSProperties = {
   fontSize: 12,
-  color: "#5a4f43",
+  color: ui.inkMuted,
   marginLeft: 4,
   transform: "rotate(0deg)",
 };

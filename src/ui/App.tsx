@@ -21,6 +21,7 @@ import { Renderer } from "../render";
 import type { ConnectorPreviewState } from "../render/scene/ConnectorPreviewView";
 import { Toolbar } from "./panels/Toolbar";
 import { SpawnToolOptions } from "./panels/SpawnToolOptions";
+import { ConnectorToolOptions } from "./panels/ConnectorToolOptions";
 import { Inspector } from "./panels/Inspector";
 import { InspectorPeek } from "./panels/InspectorPeek";
 import { PlaybackBar } from "./panels/PlaybackBar";
@@ -268,7 +269,9 @@ export function App() {
     a: ResolvedAnchor,
     b: ResolvedAnchor,
   ) => {
+    const presets = useUIStore.getState().connectorPresets;
     if (tool === "rope") {
+      const pr = presets.rope;
       const length = anchorDistance(sim.world.snapshot(), a, b);
       if (length < 0.05) return;
       sim.world.addConstraint(
@@ -276,12 +279,14 @@ export function App() {
           a: toAnchor(a),
           b: toAnchor(b),
           length,
-          material: "wood",
+          material: pr.material,
+          segments: pr.segments,
         }),
       );
       return;
     }
     if (tool === "spring") {
+      const ps = presets.spring;
       const restLength = anchorDistance(sim.world.snapshot(), a, b);
       if (restLength < 0.05) return;
       sim.world.addConstraint(
@@ -289,6 +294,8 @@ export function App() {
           a: toAnchor(a),
           b: toAnchor(b),
           restLength,
+          frequencyHz: ps.frequencyHz,
+          dampingRatio: ps.dampingRatio,
         }),
       );
       return;
@@ -319,6 +326,7 @@ export function App() {
     const ba = snap.bodies.find((b) => b.id === bodyA.id);
     const bb = snap.bodies.find((b) => b.id === bodyB.id);
     if (!ba || !bb || ba.fixed || bb.fixed) return;
+    const pp = useUIStore.getState().connectorPresets.pulley;
     sim.world.addConstraint(
       pulley({
         wheelCenter: center,
@@ -326,6 +334,8 @@ export function App() {
         bodyB: bodyB.id,
         localAnchorA: hitWorldToBodyLocal(ba, bodyA.hitPoint),
         localAnchorB: hitWorldToBodyLocal(bb, bodyB.hitPoint),
+        halfSpread: pp.halfSpread,
+        ratio: pp.ratio,
       }),
     );
   };
@@ -372,6 +382,7 @@ export function App() {
 
           <main style={canvasColumn}>
             <SpawnToolOptions />
+            <ConnectorToolOptions />
             <div style={canvasStage}>
             <div
               ref={hostRef}
