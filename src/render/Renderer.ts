@@ -44,6 +44,10 @@ export class Renderer {
     return this._controller;
   }
 
+  setShowGrid(visible: boolean): void {
+    this.grid.node.visible = visible;
+  }
+
   get camera(): Camera {
     return this._camera;
   }
