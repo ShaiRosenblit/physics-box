@@ -248,10 +248,12 @@ export class World {
    * directly. Mouse-joint mechanics are an implementation detail of the
    * adapter.
    */
-  startDragAt(p: Vec2): Id | null {
+  startDragAt(p: Vec2, opts?: { rotate?: boolean }): Id | null {
     const id = this._adapter.findDynamicBodyAt(p);
     if (id === null) return null;
-    return this._adapter.startDrag(id, p) ? id : null;
+    const rotate = !!(opts?.rotate && !this._running);
+    const teleport = !this._running && !rotate;
+    return this._adapter.startDrag(id, p, { teleport, rotate }) ? id : null;
   }
 
   updateDrag(p: Vec2): void {

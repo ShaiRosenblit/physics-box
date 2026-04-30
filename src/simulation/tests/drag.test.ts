@@ -62,6 +62,39 @@ describe("Drag", () => {
     expect(world.dragging).toBe(false);
   });
 
+  it("tracks the pointer rigidly while paused without stepping physics", () => {
+    const world = new World();
+    world.pause();
+    const id = world.add(
+      ball({ position: { x: 1, y: 6 }, radius: 0.4, material: "metal" }),
+    );
+    world.startDragAt({ x: 1, y: 6 });
+    expect(world.running).toBe(false);
+    world.updateDrag({ x: -0.75, y: 6 });
+    world.endDrag();
+
+    const view = world.snapshot().bodies.find((b) => b.id === id)!;
+    expect(view.kind).toBe("ball");
+    expect(view.position.x).toBeCloseTo(-0.75, 5);
+    expect(view.velocity.x).toBeCloseTo(0, 6);
+    expect(world.tick).toBe(0);
+  });
+
+  it("orbits orientation with the pointer around the body's center while paused (rotate gesture)", () => {
+    const world = new World();
+    world.pause();
+    const id = world.add(ball({ position: { x: 0, y: 4 }, radius: 0.5 }));
+    world.startDragAt({ x: 0.49, y: 4 }, { rotate: true });
+    world.updateDrag({ x: 0, y: 4.49 });
+    world.endDrag();
+
+    const view = world.snapshot().bodies.find((b) => b.id === id)!;
+    expect(view.kind).toBe("ball");
+    expect(view.position.x).toBeCloseTo(0, 3);
+    expect(view.position.y).toBeCloseTo(4, 3);
+    expect(view.angle).toBeCloseTo(Math.PI / 2, 2);
+  });
+
   it("starting a drag while already dragging swaps bodies", () => {
     const world = new World();
     const a = world.add(ball({ position: { x: -2, y: 5 }, radius: 0.4 }));

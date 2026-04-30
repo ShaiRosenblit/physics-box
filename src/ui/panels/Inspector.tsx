@@ -384,10 +384,69 @@ function BodyDetails({ view }: { view: BodyView }) {
   const speed = Math.hypot(view.velocity.x, view.velocity.y);
 
   const ctl = inspectorControlStyle;
+  const angleDeg = (view.angle * 180) / Math.PI;
 
   return (
     <div style={detailsStyle}>
       <ReadRow label="Body" value={`#${view.id} · ${labelOf(view.kind)}`} />
+
+      {!world.running ? (
+        <ReadRow label="Pause" value="Drag to reposition · Shift+drag turns" />
+      ) : null}
+
+      <div style={editRowStyle}>
+        <span style={editLabelStyle}>Position X</span>
+        <input
+          aria-label="Body center X"
+          type="number"
+          step={0.05}
+          style={ctl}
+          value={view.position.x}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) {
+              patchBody(view.id, {
+                position: { x: v, y: view.position.y },
+              });
+            }
+          }}
+        />
+      </div>
+      <div style={editRowStyle}>
+        <span style={editLabelStyle}>Position Y</span>
+        <input
+          aria-label="Body center Y"
+          type="number"
+          step={0.05}
+          style={ctl}
+          value={view.position.y}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) {
+              patchBody(view.id, {
+                position: { x: view.position.x, y: v },
+              });
+            }
+          }}
+        />
+      </div>
+      <div style={editRowStyle}>
+        <span style={editLabelStyle}>Angle °</span>
+        <input
+          aria-label="Body angle degrees"
+          type="number"
+          step={1}
+          style={ctl}
+          value={Number.isFinite(angleDeg) ? Math.round(angleDeg * 100) / 100 : 0}
+          onChange={(e) => {
+            const d = parseFloat(e.target.value);
+            if (!Number.isFinite(d)) return;
+            patchBody(view.id, {
+              angle: (d * Math.PI) / 180,
+            });
+          }}
+        />
+      </div>
 
       <div style={editRowStyle}>
         <span style={editLabelStyle}>Material</span>
@@ -585,7 +644,6 @@ function BodyDetails({ view }: { view: BodyView }) {
         value={`${fmt(view.position.x)}, ${fmt(view.position.y)} m`}
       />
       <ReadRow label="Speed" value={`${fmt(speed)} m/s`} />
-      <ReadRow label="Angle" value={`${fmt((view.angle * 180) / Math.PI)}°`} />
       <RemoveFromSceneFooter id={view.id} />
     </div>
   );

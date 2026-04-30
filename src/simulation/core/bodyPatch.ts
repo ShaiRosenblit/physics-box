@@ -50,6 +50,10 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
   let n: BodySpec = { ...spec };
   const p = patch;
 
+  if (p.position !== undefined) {
+    n = { ...n, position: { x: p.position.x, y: p.position.y } };
+  }
+  if (p.angle !== undefined) n = { ...n, angle: p.angle };
   if (p.charge !== undefined) {
     const base = { ...n, charge: p.charge } as BodySpec;
     n = base;

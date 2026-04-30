@@ -55,6 +55,8 @@ export type BodySpec = BallSpec | BoxSpec | MagnetSpec;
 
 /** Sparse mutation payload for patchBody — ignored keys stay unchanged. */
 export interface BodyPatch {
+  readonly position?: Vec2;
+  readonly angle?: number;
   readonly charge?: number;
   readonly material?: MaterialName;
   readonly fixed?: boolean;

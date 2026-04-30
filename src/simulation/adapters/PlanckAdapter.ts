@@ -34,10 +34,27 @@ interface BodyRecord {
   readonly body: planck.Body;
 }
 
-interface DragState {
+type DragJoint = {
+  readonly kind: "joint";
   readonly id: Id;
   readonly joint: planck.MouseJoint;
-}
+};
+
+type DragTeleport = {
+  readonly kind: "teleport";
+  readonly id: Id;
+  /** Grab point on the body in local space (`getLocalPoint` at drag start). */
+  readonly localGrab: planck.Vec2;
+};
+
+type DragRotate = {
+  readonly kind: "rotate";
+  readonly id: Id;
+  readonly startPointerAngle: number;
+  readonly startBodyAngle: number;
+};
+
+type DragState = DragJoint | DragTeleport | DragRotate;
 
 interface ConstraintRecord {
   readonly id: Id;
@@ -103,9 +120,20 @@ export class PlanckAdapter {
     this.bodies.set(id, { id, spec, body });
   }
 
-  /** @internal — consumed by World.patchBody merge path. */
+  /** @internal — consumed by World.patchBody merge path. Mirrors live pose. */
   getBodySpec(id: Id): BodySpec | undefined {
-    return this.bodies.get(id)?.spec;
+    const record = this.bodies.get(id);
+    if (!record) return undefined;
+    const b = record.body;
+    const bp = b.getPosition();
+    const v = b.getLinearVelocity();
+    return {
+      ...record.spec,
+      position: { x: bp.x, y: bp.y },
+      angle: b.getAngle(),
+      velocity: { x: v.x, y: v.y },
+      angularVelocity: b.getAngularVelocity(),
+    };
   }
 
   /**
@@ -143,7 +171,31 @@ export class PlanckAdapter {
     body.setLinearDamping(nextSpec.linearDamping ?? 0);
     body.setAngularDamping(nextSpec.angularDamping ?? 0);
 
-    this.bodies.set(id, { id, spec: nextSpec, body });
+    const curP = body.getPosition();
+    const curA = body.getAngle();
+    const wantA = nextSpec.angle ?? 0;
+    const poseEps = 1e-5;
+    const poseMoved =
+      Math.abs(nextSpec.position.x - curP.x) > poseEps ||
+      Math.abs(nextSpec.position.y - curP.y) > poseEps ||
+      Math.abs(wantA - curA) > poseEps;
+
+    let outSpec = nextSpec;
+    if (poseMoved) {
+      body.setTransform(
+        planck.Vec2(nextSpec.position.x, nextSpec.position.y),
+        wantA,
+      );
+      body.setLinearVelocity(planck.Vec2(0, 0));
+      body.setAngularVelocity(0);
+      outSpec = {
+        ...nextSpec,
+        velocity: { x: 0, y: 0 },
+        angularVelocity: 0,
+      };
+    }
+
+    this.bodies.set(id, { id, spec: outSpec, body });
   }
 
   remove(id: Id): void {
@@ -181,13 +233,39 @@ export class PlanckAdapter {
     return foundId;
   }
 
-  startDrag(id: Id, target: Vec2): boolean {
+  startDrag(id: Id, target: Vec2, opts: { teleport: boolean; rotate: boolean }): boolean {
     const record = this.bodies.get(id);
     if (!record) return false;
     if (!record.body.isDynamic()) return false;
     if (this.dragState) this.endDrag();
 
     record.body.setAwake(true);
+
+    if (opts.rotate) {
+      const pivot = record.body.getPosition();
+      const startPointerAngle = Math.atan2(
+        target.y - pivot.y,
+        target.x - pivot.x,
+      );
+      this.dragState = {
+        kind: "rotate",
+        id,
+        startPointerAngle,
+        startBodyAngle: record.body.getAngle(),
+      };
+      return true;
+    }
+
+    if (opts.teleport) {
+      const lp = record.body.getLocalPoint(planck.Vec2(target.x, target.y));
+      this.dragState = {
+        kind: "teleport",
+        id,
+        localGrab: planck.Vec2.clone(lp),
+      };
+      return true;
+    }
+
     const mass = Math.max(record.body.getMass(), 0.05);
     const joint = new planck.MouseJoint(
       {
@@ -200,19 +278,71 @@ export class PlanckAdapter {
       planck.Vec2(target.x, target.y),
     );
     this.world.createJoint(joint);
-    this.dragState = { id, joint };
+    this.dragState = { kind: "joint", id, joint };
     return true;
   }
 
   updateDrag(target: Vec2): void {
     if (!this.dragState) return;
-    this.dragState.joint.setTarget(planck.Vec2(target.x, target.y));
+    const record = this.bodies.get(this.dragState.id);
+    if (!record) return;
+    const body = record.body;
+
+    if (this.dragState.kind === "joint") {
+      this.dragState.joint.setTarget(planck.Vec2(target.x, target.y));
+      return;
+    }
+    if (this.dragState.kind === "teleport") {
+      const a = body.getAngle();
+      const lx = this.dragState.localGrab.x;
+      const ly = this.dragState.localGrab.y;
+      const cos = Math.cos(a);
+      const sin = Math.sin(a);
+      const ox = cos * lx - sin * ly;
+      const oy = sin * lx + cos * ly;
+      body.setPosition(planck.Vec2(target.x - ox, target.y - oy));
+      body.setLinearVelocity(planck.Vec2(0, 0));
+      body.setAngularVelocity(0);
+      return;
+    }
+
+    const pivot = body.getPosition();
+    const ptr = Math.atan2(target.y - pivot.y, target.x - pivot.x);
+    let delta = ptr - this.dragState.startPointerAngle;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    body.setAngle(this.dragState.startBodyAngle + delta);
+    body.setLinearVelocity(planck.Vec2(0, 0));
+    body.setAngularVelocity(0);
   }
 
   endDrag(): void {
     if (!this.dragState) return;
-    this.world.destroyJoint(this.dragState.joint);
+    if (this.dragState.kind === "joint") {
+      this.world.destroyJoint(this.dragState.joint);
+    }
+    const id = this.dragState.id;
     this.dragState = null;
+    this.syncRecordedSpecPoseFromBody(id);
+  }
+
+  /** Keeps authoritative `spec` aligned with Planck state after gestures. */
+  private syncRecordedSpecPoseFromBody(id: Id): void {
+    const record = this.bodies.get(id);
+    if (!record) return;
+    const bp = record.body.getPosition();
+    const v = record.body.getLinearVelocity();
+    this.bodies.set(id, {
+      id,
+      body: record.body,
+      spec: {
+        ...record.spec,
+        position: { x: bp.x, y: bp.y },
+        angle: record.body.getAngle(),
+        velocity: { x: v.x, y: v.y },
+        angularVelocity: record.body.getAngularVelocity(),
+      },
+    });
   }
 
   get isDragging(): boolean {

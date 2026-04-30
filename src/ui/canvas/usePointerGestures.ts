@@ -257,7 +257,9 @@ export function usePointerGestures(
         // resolves to a tap that captures it as anchor A or B.
         const connector = isConnectorTool(tool);
         const draggedId =
-          connector === null ? cbRef.current.world.startDragAt(world) : null;
+          connector === null
+            ? cbRef.current.world.startDragAt(world, { rotate: e.shiftKey })
+            : null;
         if (draggedId !== null) {
           cbRef.current.onSelect(draggedId);
           cbRef.current.onDragStateChange?.(true);
