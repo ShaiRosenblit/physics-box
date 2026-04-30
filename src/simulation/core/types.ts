@@ -7,14 +7,15 @@ export interface Vec2 {
 
 export type BodyKind = "ball" | "box";
 
+export type MaterialName = "wood" | "metal" | "cork";
+
 export interface BaseBodySpec {
-  readonly kind: BodyKind;
   readonly position: Vec2;
   readonly angle?: number;
   readonly velocity?: Vec2;
   readonly angularVelocity?: number;
   readonly fixed?: boolean;
-  readonly material?: string;
+  readonly material?: MaterialName;
   readonly charge?: number;
 }
 
@@ -31,15 +32,29 @@ export interface BoxSpec extends BaseBodySpec {
 
 export type BodySpec = BallSpec | BoxSpec;
 
-export interface BodyView {
+export interface BaseBodyView {
   readonly id: Id;
-  readonly kind: BodyKind;
   readonly position: Vec2;
   readonly angle: number;
   readonly velocity: Vec2;
   readonly angularVelocity: number;
+  readonly material: MaterialName;
   readonly charge: number;
+  readonly fixed: boolean;
 }
+
+export interface BallView extends BaseBodyView {
+  readonly kind: "ball";
+  readonly radius: number;
+}
+
+export interface BoxView extends BaseBodyView {
+  readonly kind: "box";
+  readonly width: number;
+  readonly height: number;
+}
+
+export type BodyView = BallView | BoxView;
 
 export interface Snapshot {
   readonly tick: number;
