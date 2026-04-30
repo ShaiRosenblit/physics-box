@@ -84,6 +84,7 @@ export {
   sceneIds,
   empty,
   galton,
+  random,
   welcome,
 } from "./scenes";
 export type { SceneFn, SceneName } from "./scenes";

@@ -12,6 +12,7 @@ const SCENE_LABEL: Record<SceneName, string> = {
   empty: "Empty",
   welcome: "Welcome",
   galton: "Galton board",
+  random: "Random",
 };
 
 export interface PlaybackBarProps {
