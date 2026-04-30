@@ -116,7 +116,8 @@ function closestPointOnBodyHull(body: BodyView, p: { x: number; y: number }): {
     body.kind === "ball" ||
     body.kind === "balloon" ||
     body.kind === "magnet" ||
-    body.kind === "engine_rotor"
+    body.kind === "engine_rotor" ||
+    body.kind === "crank"
   ) {
     const dx = p.x - body.position.x;
     const dy = p.y - body.position.y;

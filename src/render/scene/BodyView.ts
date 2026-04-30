@@ -173,7 +173,8 @@ function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
     body.kind === "ball" &&
     body.material === "wood" &&
     raster.woodBall !== undefined;
-  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}`;
+  const crank = body.kind === "crank" ? "C" : "-";
+  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}:${crank}`;
 }
 
 function createBodyNode(
@@ -347,6 +348,31 @@ function drawEngineRotor(
   drawChargeMark(g, body.charge, body.radius, lineWidth);
 }
 
+function drawCrankWheel(
+  g: Graphics,
+  body: Extract<BodyView, { kind: "crank" }>,
+  lineWidth: number,
+  style: { fill: number; edge: number },
+): void {
+  const r = body.radius;
+  g.circle(0, -0.04, r);
+  g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+  g.circle(0, 0, r);
+  g.fill({ color: style.fill, alpha: 1 });
+  g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+  drawHighlight(g, body.material, r, "ball");
+  const px = body.pinLocal.x;
+  const py = body.pinLocal.y;
+  g.moveTo(0, 0);
+  g.lineTo(px, py);
+  g.stroke({ width: lineWidth * 0.75, color: style.edge, alpha: 0.5 });
+  const pinR = Math.max(0.04, r * 0.12);
+  g.circle(px, py, pinR);
+  g.fill({ color: palette.inkMuted, alpha: 0.55 });
+  g.stroke({ width: lineWidth * 0.65, color: style.edge, alpha: 0.75 });
+  drawChargeMark(g, body.charge, r, lineWidth);
+}
+
 function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
   const g = new Graphics();
   const lineWidth = stroke.bodyOutline / cameraZoom;
@@ -371,6 +397,8 @@ function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
     drawEngineHousing(g, body, lineWidth, style);
   } else if (body.kind === "engine_rotor") {
     drawEngineRotor(g, body, lineWidth, style);
+  } else if (body.kind === "crank") {
+    drawCrankWheel(g, body, lineWidth, style);
   } else if (body.kind === "magnet") {
     g.circle(0, -0.04, body.radius);
     g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
@@ -424,7 +452,8 @@ export class SelectionView {
         body.kind === "ball" ||
         body.kind === "balloon" ||
         body.kind === "magnet" ||
-        body.kind === "engine_rotor"
+        body.kind === "engine_rotor" ||
+        body.kind === "crank"
       ) {
         this.node.circle(0, 0, body.radius + inset);
         this.node.stroke({

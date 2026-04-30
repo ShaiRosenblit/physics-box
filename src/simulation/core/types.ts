@@ -9,6 +9,7 @@ export type BodyKind =
   | "ball"
   | "balloon"
   | "box"
+  | "crank"
   | "engine"
   | "engine_rotor"
   | "magnet";
@@ -56,6 +57,20 @@ export interface BoxSpec extends BaseBodySpec {
   readonly height: number;
 }
 
+/**
+ * Circular flywheel with an off-center pin (local body space). Attach ropes or
+ * springs to the pin via `bodyAnchor(id, pinLocal)` — the UI does this
+ * automatically when the crank is clicked. The pin must lie on or inside the
+ * wheel radius.
+ */
+export interface CrankSpec extends BaseBodySpec {
+  readonly kind: "crank";
+  readonly radius: number;
+  readonly pinLocal: Vec2;
+  /** When false, dynamic cranks ignore collisions with other dynamic balls. */
+  readonly collideWithBalls?: boolean;
+}
+
 /** Rectangular housing; rotor is a separate body in a revolute joint. */
 export interface EngineSpec extends BaseBodySpec {
   readonly kind: "engine";
@@ -89,6 +104,7 @@ export type BodySpec =
   | BallSpec
   | BalloonSpec
   | BoxSpec
+  | CrankSpec
   | EngineSpec
   | EngineRotorSpec
   | MagnetSpec;
@@ -114,6 +130,8 @@ export interface BodyPatch {
   readonly dipole?: number;
   readonly torque?: number;
   readonly rotorRadius?: number;
+  /** Crank pin offset in body-local coordinates (m). */
+  readonly pinLocal?: Vec2;
 }
 
 export interface BaseBodyView {
@@ -172,10 +190,18 @@ export interface MagnetView extends BaseBodyView {
   readonly dipole: number;
 }
 
+export interface CrankView extends BaseBodyView {
+  readonly kind: "crank";
+  readonly radius: number;
+  readonly pinLocal: Vec2;
+  readonly collideDynamicBalls: boolean;
+}
+
 export type BodyView =
   | BallView
   | BalloonView
   | BoxView
+  | CrankView
   | EngineHousingView
   | EngineRotorView
   | MagnetView;

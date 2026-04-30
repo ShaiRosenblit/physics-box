@@ -5,6 +5,7 @@ import { box } from "../mechanics/box";
 import { engine } from "../mechanics/engine";
 import { magnet } from "../mechanics/magnet";
 import { belt } from "../mechanics/belt";
+import { crank } from "../mechanics/crank";
 import { rope } from "../mechanics/rope";
 import { pulley } from "../mechanics/pulley";
 import { hinge } from "../mechanics/hinge";
@@ -89,20 +90,41 @@ export function welcome(world: World): void {
   const beltHousing = beltSnap.bodies.find((b) => b.id === beltDriveHousing);
   const beltRotorId =
     beltHousing?.kind === "engine" ? beltHousing.rotorId : null;
-  const beltDisc = world.add(
-    ball({
+  const beltWheel = world.add(
+    crank({
       position: { x: 3.55, y: 0.22 },
       radius: 0.11,
+      pinRadius: 0.072,
       material: "wood",
       linearDamping: 0.05,
-      angularDamping: 0.15,
+      angularDamping: 0.2,
     }),
+  );
+  world.addConstraint(
+    hinge({ bodyA: beltWheel, worldAnchor: { x: 3.55, y: 0.22 } }),
   );
   if (beltRotorId !== null) {
     world.addConstraint(
-      belt({ driverRotorId: beltRotorId, drivenBodyId: beltDisc }),
+      belt({ driverRotorId: beltRotorId, drivenBodyId: beltWheel }),
     );
   }
+  const beltPull = world.add(
+    ball({
+      position: { x: 3.55, y: 0.95 },
+      radius: 0.09,
+      material: "cork",
+      linearDamping: 0.08,
+    }),
+  );
+  world.addConstraint(
+    rope({
+      a: bodyAnchor(beltWheel, { x: 0.072, y: 0 }),
+      b: bodyAnchor(beltPull),
+      length: 0.58,
+      segments: 6,
+      material: "wood",
+    }),
+  );
 
   const ropeBob = world.add(
     ball({

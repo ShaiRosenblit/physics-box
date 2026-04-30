@@ -1,5 +1,5 @@
 import type { SimulationConfig } from "./config";
-import type { BallSpec, BalloonSpec, BodyPatch, BodySpec } from "./types";
+import type { BallSpec, BalloonSpec, BodyPatch, BodySpec, CrankSpec } from "./types";
 
 export const MIN_BODY_RADIUS = 0.05;
 export const MIN_BOX_EXTENT = 0.05;
@@ -81,6 +81,24 @@ export function sanitizeBodyGeometry(spec: BodySpec): BodySpec {
     if (w === spec.width && h === spec.height) return spec;
     return { ...spec, width: w, height: h };
   }
+  if (spec.kind === "crank") {
+    const r = Math.max(MIN_BODY_RADIUS, spec.radius);
+    const maxPin = r * (1 - 1e-6);
+    let px = spec.pinLocal.x;
+    let py = spec.pinLocal.y;
+    const d = Math.hypot(px, py);
+    if (d > maxPin && d > 1e-9) {
+      const s = maxPin / d;
+      px *= s;
+      py *= s;
+    }
+    let next: CrankSpec = spec;
+    if (r !== spec.radius) next = { ...next, radius: r };
+    if (px !== spec.pinLocal.x || py !== spec.pinLocal.y) {
+      next = { ...next, pinLocal: { x: px, y: py } };
+    }
+    return next;
+  }
   const _: never = spec;
   return _;
 }
@@ -154,11 +172,29 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
     let b = n;
     if (p.radius !== undefined) b = { ...b, radius: p.radius };
     n = b;
-  } else {
+  } else if (n.kind === "crank") {
+    let c = n;
+    if (p.radius !== undefined) c = { ...c, radius: p.radius };
+    if (p.pinLocal !== undefined) {
+      c = { ...c, pinLocal: { x: p.pinLocal.x, y: p.pinLocal.y } };
+    }
+    if (p.collideWithBalls !== undefined) {
+      if (p.collideWithBalls) {
+        const { collideWithBalls: _omit, ...rest } = c;
+        c = rest as CrankSpec;
+      } else {
+        c = { ...c, collideWithBalls: false };
+      }
+    }
+    n = c;
+  } else if (n.kind === "magnet") {
     let m = n;
     if (p.radius !== undefined) m = { ...m, radius: p.radius };
     if (p.dipole !== undefined) m = { ...m, dipole: p.dipole };
     n = m;
+  } else {
+    const _: never = n;
+    void _;
   }
 
   return n;

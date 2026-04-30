@@ -6,7 +6,8 @@ export function effectivePulleyRadiusFromSpec(spec: BodySpec): number {
     spec.kind === "ball" ||
     spec.kind === "balloon" ||
     spec.kind === "magnet" ||
-    spec.kind === "engine_rotor"
+    spec.kind === "engine_rotor" ||
+    spec.kind === "crank"
   ) {
     return spec.radius;
   }
@@ -21,7 +22,8 @@ export function effectivePulleyRadiusFromView(view: BodyView): number {
     view.kind === "ball" ||
     view.kind === "balloon" ||
     view.kind === "magnet" ||
-    view.kind === "engine_rotor"
+    view.kind === "engine_rotor" ||
+    view.kind === "crank"
   ) {
     return view.radius;
   }

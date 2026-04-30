@@ -8,6 +8,7 @@ import {
   type BalloonSpawnPreset,
   type BoxSpawnPreset,
   type ChargedBallSpawnPreset,
+  type CrankSpawnPreset,
   type EngineSpawnPreset,
   type MagnetSpawnPreset,
   type NeutralBallSpawnPreset,
@@ -142,6 +143,12 @@ export function SpawnToolOptions() {
           maxBuoyancyLift={maxBuoyancyLift}
         />
       )}
+      {mode === "crank" && (
+        <CrankFields
+          preset={spawnPresets.crank}
+          onPatch={(p) => bump("crank", p)}
+        />
+      )}
     </div>
   );
 }
@@ -270,6 +277,119 @@ function EngineFields(props: {
           }}
         />
       </div>
+    </>
+  );
+}
+
+function CrankFields(props: {
+  preset: CrankSpawnPreset;
+  onPatch: (p: Partial<CrankSpawnPreset>) => void;
+}) {
+  const maxPin = Math.max(0.02, props.preset.radius * 0.98);
+  return (
+    <>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Wheel r</span>
+        <input
+          aria-label="Crank wheel radius"
+          type="number"
+          min={0.05}
+          step={0.02}
+          style={inputStyle}
+          value={fmtInput(props.preset.radius)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ radius: Math.max(0.05, v) });
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Pin r</span>
+        <input
+          aria-label="Pin distance along +X"
+          type="number"
+          min={0.02}
+          step={0.01}
+          style={inputStyle}
+          value={fmtInput(props.preset.pinRadius)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) {
+              props.onPatch({
+                pinRadius: Math.min(maxPin, Math.max(0.02, v)),
+              });
+            }
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Material</span>
+        <select
+          aria-label="Spawn material"
+          style={inputStyle}
+          value={props.preset.material}
+          onChange={(e) =>
+            props.onPatch({ material: e.target.value as MaterialName })
+          }
+        >
+          {MATERIALS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Lin. damp</span>
+        <input
+          aria-label="Linear damping"
+          type="number"
+          min={0}
+          max={50}
+          step={0.05}
+          style={inputStyle}
+          value={fmtInput(props.preset.linearDamping)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ linearDamping: Math.max(0, v) });
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Ang. damp</span>
+        <input
+          aria-label="Angular damping"
+          type="number"
+          min={0}
+          max={50}
+          step={0.05}
+          style={inputStyle}
+          value={fmtInput(props.preset.angularDamping)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ angularDamping: Math.max(0, v) });
+          }}
+        />
+      </div>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 11,
+          color: ui.inkPrimary,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={props.preset.collideDynamicBalls}
+          aria-label="Collide with dynamic balls"
+          onChange={(e) =>
+            props.onPatch({ collideDynamicBalls: e.target.checked })
+          }
+        />
+        <span>Ball–ball hits</span>
+      </label>
     </>
   );
 }

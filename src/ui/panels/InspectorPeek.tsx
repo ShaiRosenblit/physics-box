@@ -168,6 +168,13 @@ function summarizeBody(view: BodyView): {
       tint: ui.fieldB,
     };
   }
+  if (view.kind === "crank") {
+    return {
+      label: `#${view.id} · Crank`,
+      stats: `${speedStr} · r ${fmt(view.radius)} · pin ${fmt(view.pinLocal.x)},${fmt(view.pinLocal.y)}`,
+      tint: ui.inkMuted,
+    };
+  }
   return {
     label: `#${view.id} · Box`,
     stats: speedStr,

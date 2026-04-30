@@ -1,4 +1,5 @@
 export { ball, type BallInput } from "./ball";
+export { crank, type CrankInput } from "./crank";
 export { balloon, type BalloonInput } from "./balloon";
 export { box, type BoxInput } from "./box";
 export { engine, type EngineInput } from "./engine";

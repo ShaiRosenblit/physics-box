@@ -12,6 +12,7 @@ export type Tool =
   | "ball"
   | "balloon"
   | "box"
+  | "crank"
   | "ball+"
   | "ball-"
   | "magnet+"
@@ -70,6 +71,16 @@ export interface EngineSpawnPreset {
   angularDamping: number;
 }
 
+export interface CrankSpawnPreset {
+  radius: number;
+  /** Pin distance along body +x from hub (m); clamped inside wheel on spawn. */
+  pinRadius: number;
+  material: MaterialName;
+  linearDamping: number;
+  angularDamping: number;
+  collideDynamicBalls: boolean;
+}
+
 export type SpawnPresetsBundle = {
   ball: NeutralBallSpawnPreset;
   ballPlus: ChargedBallSpawnPreset;
@@ -80,6 +91,7 @@ export type SpawnPresetsBundle = {
   engineMinus: EngineSpawnPreset;
   box: BoxSpawnPreset;
   balloon: BalloonSpawnPreset;
+  crank: CrankSpawnPreset;
 };
 
 export type SpawnPresetKey = keyof SpawnPresetsBundle;
@@ -149,6 +161,14 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       angularDamping: 0.25,
       collideDynamicBalls: true,
       buoyancyLift: 1,
+    },
+    crank: {
+      radius: 0.22,
+      pinRadius: 0.14,
+      material: "metal",
+      linearDamping: 0,
+      angularDamping: 0.15,
+      collideDynamicBalls: true,
     },
   };
 }

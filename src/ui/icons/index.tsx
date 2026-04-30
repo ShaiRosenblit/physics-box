@@ -55,6 +55,15 @@ export const BoxIcon = (p: Props) => (
   </Svg>
 );
 
+/** Flywheel with off-center pin (stroke + dot). */
+export const CrankIcon = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="8" cy="8" r="5.2" />
+    <line x1="8" y1="8" x2="12.2" y2="8" strokeWidth="1" opacity="0.55" />
+    <circle cx="12.2" cy="8" r="1.15" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
 export const ChargePlusIcon = (p: Props) => (
   <Svg {...p}>
     <circle cx="8" cy="8" r="5.5" />

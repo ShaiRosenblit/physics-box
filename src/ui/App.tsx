@@ -5,6 +5,7 @@ import {
   belt,
   bodyAnchor,
   box,
+  crank,
   defaultSceneName,
   engine,
   hinge,
@@ -321,6 +322,19 @@ export function App() {
           angularDamping: p.angularDamping,
         }),
       );
+    } else if (kind === "crank") {
+      const p = presets.crank;
+      sim.add(
+        crank({
+          position: world,
+          radius: p.radius,
+          pinRadius: p.pinRadius,
+          material: p.material,
+          linearDamping: p.linearDamping,
+          angularDamping: p.angularDamping,
+          ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+        }),
+      );
     }
   };
 
@@ -330,6 +344,7 @@ export function App() {
     b: ResolvedAnchor,
   ) => {
     const presets = useUIStore.getState().connectorPresets;
+    const snapCommit = sim.world.snapshot();
     if (tool === "belt") {
       if (a.kind !== "body" || b.kind !== "body") return;
       if (a.id === b.id) return;
@@ -345,12 +360,12 @@ export function App() {
     }
     if (tool === "rope") {
       const pr = presets.rope;
-      const length = anchorDistance(sim.world.snapshot(), a, b);
+      const length = anchorDistance(snapCommit, a, b);
       if (length < 0.05) return;
       sim.world.addConstraint(
         rope({
-          a: toAnchor(a),
-          b: toAnchor(b),
+          a: toAnchor(a, snapCommit),
+          b: toAnchor(b, snapCommit),
           length,
           material: pr.material,
           segments: pr.segments,
@@ -360,12 +375,12 @@ export function App() {
     }
     if (tool === "spring") {
       const ps = presets.spring;
-      const restLength = anchorDistance(sim.world.snapshot(), a, b);
+      const restLength = anchorDistance(snapCommit, a, b);
       if (restLength < 0.05) return;
       sim.world.addConstraint(
         spring({
-          a: toAnchor(a),
-          b: toAnchor(b),
+          a: toAnchor(a, snapCommit),
+          b: toAnchor(b, snapCommit),
           restLength,
           frequencyHz: ps.frequencyHz,
           dampingRatio: ps.dampingRatio,
@@ -569,9 +584,34 @@ export function App() {
   );
 }
 
-function toAnchor(a: ResolvedAnchor): Anchor {
-  if (a.kind === "body") return bodyAnchor(a.id);
+function toAnchor(a: ResolvedAnchor, snap: Snapshot): Anchor {
+  if (a.kind === "body") {
+    const b = snap.bodies.find((x) => x.id === a.id);
+    if (b?.kind === "crank") {
+      return bodyAnchor(a.id, { x: b.pinLocal.x, y: b.pinLocal.y });
+    }
+    return bodyAnchor(a.id);
+  }
   return worldAnchor(a.point);
+}
+
+function resolveAnchorPosition(
+  snap: Snapshot,
+  a: ResolvedAnchor,
+): Vec2 | null {
+  if (a.kind === "world") return a.point;
+  const body = snap.bodies.find((b) => b.id === a.id);
+  if (!body) return null;
+  if (body.kind === "crank") {
+    const pl = body.pinLocal;
+    const c = Math.cos(body.angle);
+    const s = Math.sin(body.angle);
+    return {
+      x: body.position.x + pl.x * c - pl.y * s,
+      y: body.position.y + pl.x * s + pl.y * c,
+    };
+  }
+  return body.position;
 }
 
 function hitWorldToBodyLocal(body: BodyView, hitWorld: Vec2): Vec2 {
@@ -583,16 +623,6 @@ function hitWorldToBodyLocal(body: BodyView, hitWorld: Vec2): Vec2 {
     x: dx * c + dy * s,
     y: -dx * s + dy * c,
   };
-}
-
-function resolveAnchorPosition(
-  snap: Snapshot,
-  a: ResolvedAnchor,
-): Vec2 | null {
-  if (a.kind === "world") return a.point;
-  const body = snap.bodies.find((b) => b.id === a.id);
-  if (!body) return null;
-  return body.position;
 }
 
 function anchorDistance(

@@ -630,7 +630,7 @@ export class PlanckAdapter {
       let displacedArea = 0;
       if (spec.kind === "ball" || spec.kind === "balloon" || spec.kind === "magnet") {
         displacedArea = Math.PI * spec.radius * spec.radius;
-      } else if (spec.kind === "engine_rotor") {
+      } else if (spec.kind === "engine_rotor" || spec.kind === "crank") {
         displacedArea = Math.PI * spec.radius * spec.radius;
       } else {
         displacedArea = spec.width * spec.height;
@@ -1244,6 +1244,10 @@ function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
     if (oldS.radius !== newS.radius) return true;
     if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
   }
+  if (oldS.kind === "crank" && newS.kind === "crank") {
+    if (oldS.radius !== newS.radius) return true;
+    if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
+  }
   if (oldS.kind === "balloon" && newS.kind === "balloon") {
     if (oldS.radius !== newS.radius) return true;
     if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
@@ -1289,7 +1293,9 @@ function rebuildBodyFixtures(body: planck.Body, spec: BodySpec): void {
 function collisionFilter(
   spec: BodySpec,
 ): { filterCategoryBits: number; filterMaskBits: number } | undefined {
-  if (spec.kind !== "ball" && spec.kind !== "balloon") return undefined;
+  if (spec.kind !== "ball" && spec.kind !== "balloon" && spec.kind !== "crank") {
+    return undefined;
+  }
   if (spec.fixed) return undefined;
   if (spec.collideWithBalls !== false) return undefined;
   const cat = CAT_NO_DYNAMIC_BALL_COLLISION;
@@ -1300,7 +1306,7 @@ function collisionFilter(
 }
 
 function makeShape(spec: BodySpec): planck.Shape {
-  if (spec.kind === "ball" || spec.kind === "balloon") {
+  if (spec.kind === "ball" || spec.kind === "balloon" || spec.kind === "crank") {
     return new planck.CircleShape(spec.radius);
   }
   if (spec.kind === "magnet") {
@@ -1515,10 +1521,23 @@ function buildView(
       housingId: spec.housingId,
     });
   }
-  return Object.freeze({
-    ...base,
-    kind: "box" as const,
-    width: spec.width,
-    height: spec.height,
-  });
+  if (spec.kind === "crank") {
+    return Object.freeze({
+      ...base,
+      kind: "crank" as const,
+      radius: spec.radius,
+      pinLocal: Object.freeze({ x: spec.pinLocal.x, y: spec.pinLocal.y }),
+      collideDynamicBalls: spec.collideWithBalls !== false,
+    });
+  }
+  if (spec.kind === "box") {
+    return Object.freeze({
+      ...base,
+      kind: "box" as const,
+      width: spec.width,
+      height: spec.height,
+    });
+  }
+  const _: never = spec;
+  throw new Error(`buildView: unknown body kind ${(_ as { kind: string }).kind}`);
 }

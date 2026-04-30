@@ -496,6 +496,7 @@ function BodyDetails({ view }: { view: BodyView }) {
       {(view.kind === "ball" ||
         view.kind === "balloon" ||
         view.kind === "box" ||
+        view.kind === "crank" ||
         view.kind === "engine" ||
         view.kind === "engine_rotor") && (
         <div style={editRowStyle}>
@@ -602,6 +603,73 @@ function BodyDetails({ view }: { view: BodyView }) {
               onChange={(e) => {
                 const v = parseFloat(e.target.value);
                 if (Number.isFinite(v)) patchBody(view.id, { radius: Math.max(0.05, v) });
+              }}
+            />
+          </div>
+          <label style={toggleRowStyle}>
+            <input
+              type="checkbox"
+              checked={view.collideDynamicBalls}
+              aria-label="Collide with other dynamic balls"
+              onChange={(e) =>
+                patchBody(view.id, { collideWithBalls: e.target.checked })
+              }
+            />
+            <span>Ball–ball hits</span>
+          </label>
+        </>
+      )}
+
+      {view.kind === "crank" && (
+        <>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Wheel r</span>
+            <input
+              aria-label="Crank wheel radius"
+              type="number"
+              min={0.05}
+              step={0.02}
+              style={ctl}
+              value={view.radius}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v)) patchBody(view.id, { radius: Math.max(0.05, v) });
+              }}
+            />
+          </div>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Pin local X</span>
+            <input
+              aria-label="Pin offset local X"
+              type="number"
+              step={0.01}
+              style={ctl}
+              value={view.pinLocal.x}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v)) {
+                  patchBody(view.id, {
+                    pinLocal: { x: v, y: view.pinLocal.y },
+                  });
+                }
+              }}
+            />
+          </div>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Pin local Y</span>
+            <input
+              aria-label="Pin offset local Y"
+              type="number"
+              step={0.01}
+              style={ctl}
+              value={view.pinLocal.y}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v)) {
+                  patchBody(view.id, {
+                    pinLocal: { x: view.pinLocal.x, y: v },
+                  });
+                }
               }}
             />
           </div>
@@ -799,6 +867,8 @@ function labelOf(kind: BodyView["kind"]): string {
       return "Balloon";
     case "box":
       return "Box";
+    case "crank":
+      return "Crank";
     case "engine":
       return "Engine";
     case "engine_rotor":

@@ -324,7 +324,8 @@ function computeBounds(
       body.kind === "ball" ||
       body.kind === "balloon" ||
       body.kind === "magnet" ||
-      body.kind === "engine_rotor"
+      body.kind === "engine_rotor" ||
+      body.kind === "crank"
     ) {
       halfX = body.radius;
       halfY = body.radius;

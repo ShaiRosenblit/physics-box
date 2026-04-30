@@ -6,6 +6,7 @@ export type SpawnMode =
   | "ball"
   | "balloon"
   | "box"
+  | "crank"
   | "ball+"
   | "ball-"
   | "magnet+"
@@ -147,6 +148,7 @@ function isSpawnTool(tool: string): SpawnMode | null {
     tool === "ball" ||
     tool === "balloon" ||
     tool === "box" ||
+    tool === "crank" ||
     tool === "ball+" ||
     tool === "ball-" ||
     tool === "magnet+" ||
