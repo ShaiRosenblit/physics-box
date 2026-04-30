@@ -1,4 +1,5 @@
 import type { ComponentType, SVGProps } from "react";
+import { bodyToolThumbSrc } from "../assets/tools/thumbs";
 import { testIds } from "../a11y/ids";
 import {
   BallIcon,
@@ -17,6 +18,7 @@ import {
 } from "../icons";
 import { useUIStore, type Tool } from "../state/store";
 import type { ViewportMode } from "../hooks/useViewportMode";
+import { ToolGlyph } from "./ToolGlyph";
 
 type IconC = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -76,6 +78,7 @@ export function Toolbar({ variant }: ToolbarProps) {
             testId={`${testIds.toolButtonPrefix}${t.id}`}
             active={tool === t.id}
             icon={t.icon}
+            thumbSrc={bodyToolThumbSrc[t.id]}
             onClick={() => choose(t.id)}
           />
         ))}
@@ -150,6 +153,7 @@ export function Toolbar({ variant }: ToolbarProps) {
             testId={`${testIds.toolButtonPrefix}${t.id}`}
             active={tool === t.id}
             icon={t.icon}
+            thumbSrc={bodyToolThumbSrc[t.id]}
             onClick={() => choose(t.id)}
           />
         ))}
@@ -215,9 +219,9 @@ function FullToolButton(props: {
   testId: string;
   active: boolean;
   icon: IconC;
+  thumbSrc?: string;
   onClick: () => void;
 }) {
-  const Icon = props.icon;
   return (
     <button
       type="button"
@@ -231,7 +235,7 @@ function FullToolButton(props: {
       }}
     >
       <span style={iconWrapStyle} aria-hidden="true">
-        <Icon />
+        <ToolGlyph icon={props.icon} thumbSrc={props.thumbSrc} />
       </span>
       <span style={labelTextStyle}>{props.label}</span>
     </button>
@@ -276,9 +280,9 @@ function RailButton(props: {
   testId: string;
   active: boolean;
   icon: IconC;
+  thumbSrc?: string;
   onClick: () => void;
 }) {
-  const Icon = props.icon;
   return (
     <button
       type="button"
@@ -292,7 +296,7 @@ function RailButton(props: {
         ...(props.active ? buttonActiveStyle : {}),
       }}
     >
-      <Icon />
+      <ToolGlyph icon={props.icon} thumbSrc={props.thumbSrc} />
     </button>
   );
 }
