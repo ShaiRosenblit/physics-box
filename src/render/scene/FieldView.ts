@@ -27,13 +27,15 @@ export class FieldView {
   private readonly bGraphics = new Graphics();
   private readonly config: SimulationConfig;
 
-  private showE = true;
-  private showB = true;
+  private showE = false;
+  private showB = false;
 
   constructor(config: SimulationConfig) {
     this.config = config;
     this.container.addChild(this.bGraphics);
     this.container.addChild(this.eGraphics);
+    this.eGraphics.visible = false;
+    this.bGraphics.visible = false;
   }
 
   setShowE(visible: boolean): void {

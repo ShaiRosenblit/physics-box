@@ -49,8 +49,8 @@ export const useUIStore = create<UIState>((set) => ({
   selectedId: null,
 
   showGrid: true,
-  showEField: true,
-  showBField: true,
+  showEField: false,
+  showBField: false,
 
   hasCharges: false,
   hasMagnets: false,
