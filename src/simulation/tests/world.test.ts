@@ -96,6 +96,29 @@ describe("World", () => {
     expect(events.filter((e) => e === "add").length).toBe(2);
   });
 
+  it("does not accelerate dynamic bodies when gravity is disabled", () => {
+    const world = new World();
+    world.setGravityEnabled(false);
+    const id = world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    stepFor(world, 240);
+    const view = world.snapshot().bodies.find((b) => b.id === id)!;
+    expect(view.position.y).toBeCloseTo(5, 0);
+  });
+
+  it("keeps gravity preference across reset()", () => {
+    const world = new World();
+    world.setGravityEnabled(false);
+    world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    world.reset();
+    const id = world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    stepFor(world, 120);
+    expect(world.snapshot().bodies.find((b) => b.id === id)!.position.y).toBeCloseTo(
+      5,
+      0,
+    );
+    expect(world.gravityEnabled).toBe(false);
+  });
+
   it("falls under gravity and rests on a static box (collision)", () => {
     const world = new World();
     const groundTopY = 0;

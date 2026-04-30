@@ -18,7 +18,9 @@ export interface PlaybackBarProps {
   readonly tick: number;
   readonly compact: boolean;
   readonly scene: SceneName;
+  readonly gravityEnabled: boolean;
   readonly onSceneChange: (scene: SceneName) => void;
+  readonly onGravityChange: (enabled: boolean) => void;
   readonly onPlay: () => void;
   readonly onPause: () => void;
   readonly onStep: () => void;
@@ -52,6 +54,18 @@ export function PlaybackBar(props: PlaybackBarProps) {
             </option>
           ))}
         </select>
+        <label style={{ ...gravityToggleStyle, ...(props.compact ? gravityToggleCompactStyle : {}) }}>
+          <input
+            type="checkbox"
+            data-testid={testIds.toggleGravity}
+            checked={props.gravityEnabled}
+            onChange={(e) => props.onGravityChange(e.target.checked)}
+            aria-label="Gravity"
+            title="Gravity"
+            style={gravityCheckboxStyle}
+          />
+          {!props.compact && <span>Gravity</span>}
+        </label>
         {running ? (
           <PlaybackButton
             label="Pause"
@@ -177,6 +191,27 @@ const sceneSelectCompactStyle: React.CSSProperties = {
   minWidth: 92,
   padding: "6px 8px",
   borderRadius: 4,
+};
+
+const gravityToggleStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  cursor: "pointer",
+  userSelect: "none",
+  fontSize: 12,
+  color: "#2a2520",
+};
+
+const gravityToggleCompactStyle: React.CSSProperties = {
+  padding: "4px 0",
+};
+
+const gravityCheckboxStyle: React.CSSProperties = {
+  width: 14,
+  height: 14,
+  accentColor: "#2a2520",
+  cursor: "pointer",
 };
 
 const buttonStyle: React.CSSProperties = {

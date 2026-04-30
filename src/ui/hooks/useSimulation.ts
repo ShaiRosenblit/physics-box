@@ -14,6 +14,8 @@ export interface SimulationApi {
   readonly world: World;
   /** Latest tick observed by the hook. */
   readonly tick: number;
+  /** Whether Planck world gravity uses the configured vector (otherwise zero). */
+  readonly gravityEnabled: boolean;
   /** Add a body. Returns its id. */
   add(spec: BodySpec): Id;
   remove(id: Id): void;
@@ -23,6 +25,7 @@ export interface SimulationApi {
   stepOnce(): void;
   /** Reset the kernel and apply the named scene. Returns the loaded scene. */
   loadScene(name: SceneName): SceneName;
+  setGravityEnabled(enabled: boolean): void;
 }
 
 /**
@@ -41,6 +44,7 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
   const world = worldRef.current;
 
   const [tick, setTick] = useState(0);
+  const [gravityEnabled, setGravityEnabledState] = useState(true);
 
   useEffect(() => {
     const unsubStep = world.on("step", ({ tick: t }) => setTick(t));
@@ -67,5 +71,24 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
     [world],
   );
 
-  return { world, tick, add, remove, pause, resume, stepOnce, loadScene };
+  const setGravityEnabled = useCallback(
+    (enabled: boolean) => {
+      world.setGravityEnabled(enabled);
+      setGravityEnabledState(enabled);
+    },
+    [world],
+  );
+
+  return {
+    world,
+    tick,
+    gravityEnabled,
+    add,
+    remove,
+    pause,
+    resume,
+    stepOnce,
+    loadScene,
+    setGravityEnabled,
+  };
 }

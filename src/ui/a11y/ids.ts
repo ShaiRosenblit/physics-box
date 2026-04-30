@@ -14,6 +14,7 @@ export const testIds = {
   toggleGrid: "toggle-grid",
   toggleEField: "toggle-e-field",
   toggleBField: "toggle-b-field",
+  toggleGravity: "toggle-gravity",
 
   buttonPlay: "button-play",
   buttonPause: "button-pause",

@@ -33,6 +33,7 @@ export class World {
 
   private _tick = 0;
   private _running = true;
+  private _gravityEnabled = true;
 
   constructor(config: SimulationConfig = defaultConfig) {
     this._config = config;
@@ -89,6 +90,7 @@ export class World {
    */
   reset(): void {
     this._adapter = new PlanckAdapter(this._config);
+    this.applyGravityToAdapter();
     this._stepper.reset();
     this._charges.clear();
     this._nextId = createIdFactory();
@@ -116,6 +118,27 @@ export class World {
 
   get running(): boolean {
     return this._running;
+  }
+
+  get gravityEnabled(): boolean {
+    return this._gravityEnabled;
+  }
+
+  /**
+   * When disabled, Planck gravity is set to zero while preserving the
+   * configured vector for re-enable. Survives `reset()` and scene reloads.
+   */
+  setGravityEnabled(enabled: boolean): void {
+    if (enabled === this._gravityEnabled) return;
+    this._gravityEnabled = enabled;
+    this.applyGravityToAdapter();
+  }
+
+  private applyGravityToAdapter(): void {
+    const g = this._gravityEnabled
+      ? this._config.gravity
+      : { x: 0, y: 0 };
+    this._adapter.setGravity(g);
   }
 
   /** Pump real elapsed time into the fixed-dt accumulator. */

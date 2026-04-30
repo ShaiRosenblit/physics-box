@@ -65,6 +65,11 @@ export class PlanckAdapter {
     this.groundBody = this.world.createBody();
   }
 
+  /** Sets global gravity (SI-shaped units, same as simulation config). */
+  setGravity(g: Vec2): void {
+    this.world.setGravity(planck.Vec2(g.x, g.y));
+  }
+
   add(id: Id, spec: BodySpec): void {
     const material = lookupMaterial(spec.material);
     const body = this.world.createBody({

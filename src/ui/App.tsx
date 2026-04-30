@@ -412,7 +412,9 @@ export function App() {
           tick={sim.tick}
           compact={isPhone}
           scene={scene}
+          gravityEnabled={sim.gravityEnabled}
           onSceneChange={onSceneChange}
+          onGravityChange={sim.setGravityEnabled}
           onPlay={onPlay}
           onPause={onPause}
           onStep={onStep}
