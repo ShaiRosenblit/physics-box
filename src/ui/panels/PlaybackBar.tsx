@@ -11,6 +11,7 @@ import { useUIStore } from "../state/store";
 const SCENE_LABEL: Record<SceneName, string> = {
   empty: "Empty",
   welcome: "Welcome",
+  engines: "Engines demo",
   galton: "Galton board",
   random: "Random",
 };
