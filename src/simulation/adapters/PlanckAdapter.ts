@@ -165,6 +165,49 @@ export class PlanckAdapter {
     this.world.step(dt, velIters, posIters);
   }
 
+  /**
+   * Snapshot of all charged bodies' current state. Cheap pass over the
+   * bodies map; intended for the EM solvers that run once per substep.
+   */
+  collectChargedBodies(): Array<{
+    id: Id;
+    position: Vec2;
+    velocity: Vec2;
+    charge: number;
+    mass: number;
+  }> {
+    const out: Array<{
+      id: Id;
+      position: Vec2;
+      velocity: Vec2;
+      charge: number;
+      mass: number;
+    }> = [];
+    for (const [id, record] of this.bodies) {
+      const q = record.spec.charge ?? 0;
+      if (q === 0) continue;
+      const p = record.body.getPosition();
+      const v = record.body.getLinearVelocity();
+      out.push({
+        id,
+        position: { x: p.x, y: p.y },
+        velocity: { x: v.x, y: v.y },
+        charge: q,
+        mass: record.body.getMass(),
+      });
+    }
+    return out;
+  }
+
+  /** Apply per-body forces (in N, world coords) to the underlying bodies. */
+  applyForces(forces: Map<Id, Vec2>): void {
+    for (const [id, f] of forces) {
+      const record = this.bodies.get(id);
+      if (!record) continue;
+      record.body.applyForceToCenter(planck.Vec2(f.x, f.y), true);
+    }
+  }
+
   addConstraint(id: Id, spec: ConstraintSpec): void {
     if (this.constraints.has(id)) {
       throw new Error(`PlanckAdapter.addConstraint: id ${id} already exists`);

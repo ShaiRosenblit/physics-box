@@ -4,6 +4,7 @@ import { createIdFactory } from "./ids";
 import { Stepper } from "./Stepper";
 import type { BodySpec, ConstraintSpec, Id, Snapshot, Vec2 } from "./types";
 import { PlanckAdapter } from "../adapters/PlanckAdapter";
+import { ChargeRegistry } from "../electromagnetism/ChargeRegistry";
 
 /**
  * The simulation kernel facade.
@@ -19,6 +20,7 @@ export class World {
   private readonly _events = new EventBus();
   private _nextId = createIdFactory();
   private readonly _preStepHooks: Array<() => void> = [];
+  private readonly _charges = new ChargeRegistry();
 
   private _tick = 0;
   private _running = true;
@@ -37,9 +39,20 @@ export class World {
   reset(): void {
     this._adapter = new PlanckAdapter(this._config);
     this._stepper.reset();
+    this._charges.clear();
     this._nextId = createIdFactory();
     this._tick = 0;
     this._running = true;
+  }
+
+  /** @internal — used by EM solvers and the field-sampling helper. */
+  get adapter(): PlanckAdapter {
+    return this._adapter;
+  }
+
+  /** @internal — exposed for EM solvers and tests. */
+  get charges(): ChargeRegistry {
+    return this._charges;
   }
 
   get config(): SimulationConfig {
@@ -74,8 +87,12 @@ export class World {
   }
 
   add(spec: BodySpec): Id {
+    const charge = spec.charge ?? 0;
+    const clamped = clampToCap(charge, this._config.maxCharge);
+    const finalSpec = clamped === charge ? spec : { ...spec, charge: clamped };
     const id = this._nextId();
-    this._adapter.add(id, spec);
+    this._adapter.add(id, finalSpec);
+    if (clamped !== 0) this._charges.register(id, clamped);
     this._events.emit("add", { id });
     return id;
   }
@@ -83,6 +100,7 @@ export class World {
   remove(id: Id): void {
     if (this._adapter.has(id)) {
       this._adapter.remove(id);
+      this._charges.unregister(id);
       this._events.emit("remove", { id });
       return;
     }
@@ -156,4 +174,10 @@ export class World {
     this._tick += 1;
     this._events.emit("step", { tick: this._tick });
   }
+}
+
+function clampToCap(value: number, cap: number): number {
+  if (value > cap) return cap;
+  if (value < -cap) return -cap;
+  return value;
 }
