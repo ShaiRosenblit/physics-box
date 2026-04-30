@@ -1,4 +1,18 @@
+import { useEffect, useMemo, useState } from "react";
+import { World } from "../simulation";
+import { Renderer } from "../render";
+
 export function App() {
+  const world = useMemo(() => new World(), []);
+  const renderer = useMemo(() => new Renderer(), []);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const snap = world.snapshot();
+    renderer.render(snap);
+    setTick(snap.tick);
+  }, [renderer, world]);
+
   return (
     <div
       style={{
@@ -11,7 +25,15 @@ export function App() {
         fontSize: "0.85rem",
       }}
     >
-      Physics Box — scaffold
+      <div>
+        <div>Physics Box — scaffold</div>
+        <div
+          aria-live="polite"
+          style={{ marginTop: 8, fontSize: "0.75rem", opacity: 0.7 }}
+        >
+          tick {tick}
+        </div>
+      </div>
     </div>
   );
 }
