@@ -2,6 +2,19 @@ import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
 import { box } from "../mechanics/box";
 
+/** One coordinate of Halton sequence (deterministic, low-discrepancy; no RNG). */
+function halton1d(index: number, base: 2 | 3): number {
+  let f = 1;
+  let h = 0;
+  let i = index + 1;
+  while (i > 0) {
+    f /= base;
+    h += f * (i % base);
+    i = Math.floor(i / base);
+  }
+  return h;
+}
+
 /**
  * Galton board (bean machine): staggered fixed pegs and a hopper of neutral balls
  * that cascade through random-looking left/right deflections into bottom bins.
@@ -18,9 +31,9 @@ export function galton(world: World): void {
     }),
   );
 
-  const pegRadius = 0.065;
-  const pegDx = 0.42;
-  const pegDy = 0.38;
+  const pegRadius = 0.038;
+  const pegDx = 0.3;
+  const pegDy = 0.31;
   const numRows = 10;
   const pegArenaTop = 6.85;
 
@@ -85,25 +98,23 @@ export function galton(world: World): void {
     );
   }
 
-  const dropBallRadius = 0.1;
-  const hopperRowGap = dropBallRadius * 2 + 0.05;
-  const hopperColGap = dropBallRadius * 2 + 0.04;
-  const hopperCols = 6;
-  const hopperRows = 7;
-  const hopperBaseY = pegArenaTop + dropBallRadius + 0.55;
-  const hopperTopY = hopperBaseY + (hopperRows - 1) * hopperRowGap;
+  const dropBallRadius = 0.042;
+  const numDropBalls = 42;
+  const hopperY0 = pegArenaTop + pegRadius + dropBallRadius + 0.42;
+  const hopperY1 = hopperY0 + 1.05;
+  const hopperHalfX = Math.min(outerHalf - 0.28, 0.92);
 
-  for (let r = 0; r < hopperRows; r++) {
-    for (let c = 0; c < hopperCols; c++) {
-      const x = (c - (hopperCols - 1) / 2) * hopperColGap;
-      const y = hopperTopY - r * hopperRowGap;
-      world.add(
-        ball({
-          position: { x, y },
-          radius: dropBallRadius,
-          material: "wood",
-        }),
-      );
-    }
+  for (let i = 0; i < numDropBalls; i++) {
+    const u = halton1d(i, 2);
+    const v = halton1d(i, 3);
+    const x = (u - 0.5) * 2 * hopperHalfX;
+    const y = hopperY0 + v * (hopperY1 - hopperY0);
+    world.add(
+      ball({
+        position: { x, y },
+        radius: dropBallRadius,
+        material: "wood",
+      }),
+    );
   }
 }
