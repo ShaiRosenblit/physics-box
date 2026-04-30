@@ -730,6 +730,9 @@ export class PlanckAdapter {
         const aux = record.joints[1];
         if (aux) this.world.destroyJoint(aux);
       }
+      // Restore the default sleep behaviour suppressed in `buildBelt`.
+      const drivenRec = this.bodies.get(record.spec.drivenBodyId);
+      if (drivenRec) drivenRec.body.setSleepingAllowed(true);
       return;
     }
     for (const joint of record.joints) this.world.destroyJoint(joint);
@@ -1015,10 +1018,20 @@ export class PlanckAdapter {
       throw new Error(`hinge: bodyB id ${spec.bodyB} not found`);
     }
     const anchor = planck.Vec2(spec.worldAnchor.x, spec.worldAnchor.y);
+    // Box2D's GearJoint reads its dynamic body as `joint.getBodyB()` of the
+    // child revolute. Order the revolute so a static / ground body sits on
+    // bodyA, otherwise a belt that later reuses this hinge will couple to
+    // the static side and the dynamic body never spins.
+    const aIsStatic = !recordA.body.isDynamic();
+    const bIsStatic = !bodyB.isDynamic();
+    const [first, second] =
+      aIsStatic && !bIsStatic ? [recordA.body, bodyB]
+      : !aIsStatic && bIsStatic ? [bodyB, recordA.body]
+      : [recordA.body, bodyB];
     const joint = new planck.RevoluteJoint(
       {},
-      recordA.body,
-      bodyB,
+      first,
+      second,
       anchor,
     );
     this.world.createJoint(joint);
@@ -1094,12 +1107,24 @@ export class PlanckAdapter {
     return { id, spec, internalBodies: [], joints: [joint] };
   }
 
-  private findRevoluteToGround(body: planck.Body): planck.RevoluteJoint | null {
+  /**
+   * Find any revolute joint that pins this body against a static (or ground)
+   * counterpart — usable as `joint2` for a GearJoint. Box2D's GearJoint reads
+   * its dynamic side from `joint2.getBodyB()`, so we only return revolutes
+   * where the counterpart on `getBodyA()` is the static one (the hinge
+   * factory orders its joints that way).
+   */
+  private findRevoluteToStatic(body: planck.Body): planck.RevoluteJoint | null {
     for (let e = body.getJointList(); e; e = e.next) {
       const j = e.joint;
       if (j === null || j.getType() !== planck.RevoluteJoint.TYPE) continue;
-      if (e.other === this.groundBody) {
-        return j as planck.RevoluteJoint;
+      const rj = j as planck.RevoluteJoint;
+      const a = rj.getBodyA();
+      const b = rj.getBodyB();
+      // We want body to be on the dynamic (B) side and the other body static.
+      if (b !== body) continue;
+      if (a === this.groundBody || !a.isDynamic()) {
+        return rj;
       }
     }
     return null;
@@ -1129,7 +1154,7 @@ export class PlanckAdapter {
       throw new Error("belt: engine assembly mismatch");
     }
 
-    let drivenRevolute = this.findRevoluteToGround(drivenRec.body);
+    let drivenRevolute = this.findRevoluteToStatic(drivenRec.body);
     let ownsPivot = false;
     if (!drivenRevolute) {
       const p = drivenRec.body.getPosition();
@@ -1154,6 +1179,15 @@ export class PlanckAdapter {
       ratio,
     );
     this.world.createJoint(gear);
+
+    // Box2D auto-sleeps idle bodies, but it does not propagate wake through
+    // a GearJoint. Without this, the driven body sleeps a few frames after
+    // creation and the engine's torque can no longer move it. Both ends of
+    // the belt must therefore stay awake while the assembly exists.
+    rotorRec.body.setSleepingAllowed(false);
+    rotorRec.body.setAwake(true);
+    drivenRec.body.setSleepingAllowed(false);
+    drivenRec.body.setAwake(true);
 
     const joints = ownsPivot ? [gear, drivenRevolute] : [gear];
     return {
