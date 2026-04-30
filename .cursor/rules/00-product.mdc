@@ -1,0 +1,35 @@
+---
+description: Product DNA. Apply to every change.
+alwaysApply: true
+---
+
+# Product Rules
+
+Physics Box is a **2D physics sandbox** in the spirit of *The Incredible Machine*.
+
+## DNA
+
+- **Sandbox-first.** No levels, no goals, no scoring — yet.
+- **Warm, tactile workshop**, not a toy. Materials evoke wood, brushed metal, matte finishes. Soft light, subtle shadow.
+- **Real mechanics**, simplified electromagnetism. The physics must feel believable, not whimsical.
+
+## The three lenses (apply at every step)
+
+Every change is reviewed through three lenses, in order:
+
+1. **Physics correctness** — does the simulation behave as a thoughtful person would expect?
+2. **Visual quality** — is it readable, calm, materially honest? Does it match `VISUAL_GUIDELINES.md`?
+3. **Architectural clarity** — does it respect the boundary between simulation, render, and UI?
+
+If a change passes only two of the three, stop and reconsider.
+
+## Explicit non-goals
+
+- No level system, level editor, or scoring.
+- No full Maxwell equations. No induced currents. No relativity.
+- No cartoon palette. No saturated primaries. No bouncy/elastic UI motion.
+- No physics state in UI components.
+
+## Default mindset
+
+When in doubt: prefer **fewer features built well** over many features built half-way. Defer rather than degrade.

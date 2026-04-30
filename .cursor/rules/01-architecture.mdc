@@ -1,0 +1,53 @@
+---
+description: The boundary law between simulation, render, and UI.
+alwaysApply: true
+---
+
+# Architecture Rules
+
+The system has three modules with a strict, one-directional dependency flow:
+
+```
+ui  ──commands──▶  simulation  ──snapshots──▶  render
+                       │
+                       └── only PlanckAdapter imports `planck`
+```
+
+## The boundary law
+
+- `src/simulation/**` MUST NOT import:
+  - `react`, `react-dom`, any React hooks
+  - `pixi.js`
+  - `src/render/**`, `src/ui/**`
+  - browser globals (`window`, `document`, `navigator`, `localStorage`, `requestAnimationFrame`)
+- Only `src/simulation/adapters/PlanckAdapter.ts` may import `planck`. Nothing else in the codebase imports `planck`.
+- `src/render/**` MUST NOT import from `src/ui/**` or call into Planck. It consumes immutable `Snapshot` objects from the simulation.
+- `src/ui/**` interacts with simulation **only** via the `World` public API exposed through `useSimulation`. UI never mutates physics state directly.
+- `Snapshot` and `BodyView` returned by the kernel are read-only. In dev they are `Object.freeze`d.
+
+## Adding a new entity type
+
+A new body type requires, in order:
+
+1. A factory in `src/simulation/mechanics/<type>.ts` returning a normalized `BodySpec`.
+2. Snapshot fields in `src/simulation/core/types.ts` if needed.
+3. A view in `src/render/scene/BodyView.ts`.
+4. A toolbar entry in `src/ui/panels/Toolbar.tsx`.
+
+No cross-cutting edits. Each step lives in its own commit per `04-workflow.mdc`.
+
+## Determinism
+
+Same initial spec + same command stream + same `dt` ⇒ identical tick-by-tick snapshots. EM forces are inserted in stable id order. Any change that breaks determinism requires an explicit note.
+
+## What goes where
+
+| Concern | Module |
+|---|---|
+| Body shapes, masses, joints | `simulation/mechanics` |
+| Forces (Coulomb, Lorentz, dipole) | `simulation/electromagnetism` |
+| Time, stepping, snapshots | `simulation/core` |
+| Wrap Planck.js | `simulation/adapters` |
+| Initial scene factories | `simulation/scenes` |
+| Pixi scene graph, camera | `render` |
+| Buttons, panels, hooks, store | `ui` |

@@ -1,0 +1,48 @@
+---
+description: How we work. Milestones, tests, commits.
+alwaysApply: true
+---
+
+# Workflow Rules
+
+## Milestones
+
+Work proceeds milestone by milestone (M0 … M8). Within a milestone, work proceeds as small, ordered steps. Each step is reviewable and committable on its own.
+
+At the end of every milestone:
+
+1. All tests pass (`npm test`).
+2. Typecheck passes (`npm run typecheck`).
+3. Build passes (`npm run build`).
+4. From M3 onward: Playwright MCP smoke pass — verify presence and labels of toolbar, inspector, playback bar; assert tick counter advances when Play is pressed.
+5. Three-lens self-review: physics correctness, visual quality, architectural clarity.
+
+## Testing
+
+- Tests live in `src/simulation/tests/` and run with Vitest.
+- Any change to `simulation/core` or `simulation/electromagnetism` requires a corresponding test or an explicit note that an existing test covers it.
+- Determinism tests are non-negotiable. If a change breaks them, fix the change or update the test only with explicit reasoning.
+
+## Git discipline
+
+- **Conventional Commits**: `type(scope): subject`.
+  - Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `style`.
+  - Scopes: `kernel`, `mechanics`, `em`, `render`, `ui`, `rules`, `docs`, `build`, `test`, `repo`.
+- **Subject**: imperative, ≤72 chars, no trailing period.
+- **Body** (when needed): explains the *why* in 1–3 short lines.
+- **One commit = one meaningful step.** Aim for 2–4 commits per milestone.
+- Every commit must leave the repo in a working state (typecheck + tests pass).
+- **No remote, no pushing.** Repo stays local until explicitly requested otherwise.
+- **No pre-commit hooks.** Discipline + this rule is the enforcement.
+- No `wip` / `update` / `misc` subjects. No squashing past commits unless asked.
+- Never commit `node_modules`, `.env`, or secrets.
+
+## Playwright MCP
+
+From M3 onward, after any UI change:
+
+- Snapshot the page to verify structure.
+- Assert presence of `data-testid="toolbar"`, `data-testid="inspector"`, `data-testid="playback-bar"`, and the labelled canvas wrapper.
+- After clicking Play, assert the `aria-live="polite"` tick counter advances.
+
+This is a lightweight gate. Do not skip once UI exists.

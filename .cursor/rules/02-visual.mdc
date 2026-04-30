@@ -1,0 +1,23 @@
+---
+description: Visual rules. Pointer to VISUAL_GUIDELINES.md plus enforceable constraints.
+alwaysApply: true
+---
+
+# Visual Rules
+
+The single source of truth is [`VISUAL_GUIDELINES.md`](../../VISUAL_GUIDELINES.md). Anything below is the short, enforceable summary.
+
+## Hard constraints
+
+- **No saturated primaries** in the canvas or UI. The palette lives in `src/render/style/palette.ts`.
+- **No magic numbers** for color, spacing, or stroke width in components or views. Use tokens.
+- **No emoji or decorative icons** in the UI chrome unless explicitly requested.
+- **No bouncy / spring UI motion.** Easing is `ease-out` or `ease-in-out`, durations 120–240ms.
+- **Field lines are thin.** E lines: cool muted hue, ≤1px at zoom 1. B lines: warm muted hue, ≤1px at zoom 1.
+- **Shadows are subtle**: low opacity, soft, no hard offsets.
+
+## Workflow
+
+- Any new visual element must reference `VISUAL_GUIDELINES.md` and use existing tokens, or extend the token set in a dedicated commit (`feat(render): extend palette with …`).
+- Visual changes that aren't trivial get a screenshot pass via Playwright MCP (from M3 onward).
+- Procedural visuals first. Only generate assets when clearly necessary.

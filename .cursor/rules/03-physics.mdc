@@ -1,0 +1,46 @@
+---
+description: Physics rules. Pointer to PHYSICS_GUIDELINES.md plus enforceable constraints.
+alwaysApply: true
+---
+
+# Physics Rules
+
+The single source of truth is [`PHYSICS_GUIDELINES.md`](../../PHYSICS_GUIDELINES.md). Anything below is the short, enforceable summary.
+
+## Time
+
+- Fixed timestep `dt = 1/120 s`.
+- Accumulator pattern in `Stepper`. Max 8 substeps per outer `step()` call to avoid spiral-of-death.
+- `tick` is a monotonic integer; `time = tick * dt`.
+
+## Units
+
+- **Scaled / abstract units**: 1 world unit ≈ 1 meter visually. EM constants are retuned for sandbox feel — see `src/simulation/electromagnetism/constants.ts`.
+- All factories use SI-shaped quantities (kg, m, s) but the values are tuned, not measured.
+
+## Stability
+
+- All EM forces have softening: `1/(r^2 + eps^2)`.
+- Per-body EM force magnitude is clamped (`maxEmForce` in config).
+- Per-body velocity is clamped (`maxSpeed` in config).
+- Charges and dipole moments have configured maxima (clamped on `add` / `update`).
+
+## EM scope (MVP)
+
+Allowed:
+- Coulomb force between charged bodies.
+- Static or kinematic magnets carrying a 2D scalar dipole moment.
+- Lorentz force `F = q (v × B)` on charged bodies.
+- Dipole-on-dipole forces and torques (M7 only).
+
+Not allowed in MVP:
+- Induced currents.
+- B from moving charges.
+- Time-varying fields beyond what comes for free from moving sources.
+- Anything requiring numerical curl/divergence.
+
+## Determinism
+
+- EM forces are computed in stable id order before each Planck step.
+- No `Math.random` in the kernel. If randomness is needed, accept a seeded RNG via config.
+- Tests in `src/simulation/tests/determinism.test.ts` MUST stay green.
