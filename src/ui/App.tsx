@@ -72,23 +72,57 @@ export function App() {
     setRunning(true);
   };
 
-  const onCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
+  const draggingRef = useRef(false);
+
+  const worldFromEvent = (e: React.PointerEvent<HTMLDivElement>) => {
     const renderer = rendererRef.current;
-    if (!renderer || !renderer.isReady) return;
-    const tool = useUIStore.getState().tool;
-    if (tool !== "ball" && tool !== "box") return;
+    if (!renderer || !renderer.isReady) return null;
     const rect = e.currentTarget.getBoundingClientRect();
-    const world = renderer.camera.screenToWorld(
+    return renderer.camera.screenToWorld(
       e.clientX - rect.left,
       e.clientY - rect.top,
     );
+  };
+
+  const onCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const world = worldFromEvent(e);
+    if (!world) return;
+    const tool = useUIStore.getState().tool;
+    const setSelectedId = useUIStore.getState().setSelectedId;
     if (tool === "ball") {
       sim.add(ball({ position: world, radius: 0.4, material: "wood" }));
-    } else {
+      return;
+    }
+    if (tool === "box") {
       sim.add(
         box({ position: world, width: 0.7, height: 0.7, material: "wood" }),
       );
+      return;
+    }
+    const id = sim.world.startDragAt(world);
+    if (id !== null) {
+      draggingRef.current = true;
+      setSelectedId(id);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } else {
+      setSelectedId(null);
+    }
+  };
+
+  const onCanvasPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const world = worldFromEvent(e);
+    if (!world) return;
+    sim.world.updateDrag(world);
+  };
+
+  const endCanvasDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    sim.world.endDrag();
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
     }
   };
 
@@ -102,6 +136,9 @@ export function App() {
             data-testid={testIds.canvasHost}
             aria-label="Physics Box simulation canvas"
             onPointerDown={onCanvasPointerDown}
+            onPointerMove={onCanvasPointerMove}
+            onPointerUp={endCanvasDrag}
+            onPointerCancel={endCanvasDrag}
             style={{ position: "absolute", inset: 0 }}
           />
         </main>
