@@ -347,7 +347,14 @@ function drawHighlight(
 ): void {
   const offset = radius * 0.32;
   const r = radius * 0.55;
-  const alpha = material === "metal" ? 0.32 : material === "cork" ? 0.14 : 0.18;
+  const alpha =
+    material === "metal"
+      ? 0.32
+      : material === "cork"
+        ? 0.14
+        : material === "felt"
+          ? 0.11
+          : 0.18;
   g.circle(-offset, offset, r);
   g.fill({ color: 0xfff4e3, alpha });
 }

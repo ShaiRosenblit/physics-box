@@ -16,9 +16,8 @@ function halton1d(index: number, base: 2 | 3): number {
 }
 
 /**
- * Galton board (bean machine): staggered fixed pegs and a hopper of neutral balls
- * on a tall narrow strip above the apex so drops read as a thin vertical curtain.
- * Hopper balls use `collideWithBalls: false` so they stream without jamming each other.
+ * Galton board (bean machine): staggered fixed pegs (`felt` nails — dead bounce,
+ * high friction) and hopper marbles tuned for slow sideways creep after each hit.
  */
 export function galton(world: World): void {
   const groundHeight = 0.5;
@@ -40,8 +39,6 @@ export function galton(world: World): void {
   const pegDy = 0.31;
   const numRows = 10;
   const pegArenaTop = 6.85;
-  /** Pegs: very low restitution so marbles deflect sideways with little kick. */
-  const pegRestitution = 0.02;
 
   for (let row = 0; row < numRows; row++) {
     const count = row + 1;
@@ -53,8 +50,7 @@ export function galton(world: World): void {
           position: { x, y },
           radius: pegRadius,
           fixed: true,
-          material: "metal",
-          fixtureRestitution: pegRestitution,
+          material: "felt",
         }),
       );
     }
@@ -122,9 +118,11 @@ export function galton(world: World): void {
     );
   }
 
-  /** Bleed off speed between peg hits so paths stay inside the lattice. */
-  const marbleLinearDamping = 0.22;
-  const marbleRestitution = 0.06;
+  /** Bleed speed after peg contacts; high friction at peg wraps kills rebound and creep is slow. */
+  const marbleLinearDamping = 0.62;
+  const marbleAngularDamping = 0.56;
+  const marbleRestitution = 0.02;
+  const marbleFriction = 1.05;
 
   for (let i = 0; i < numDropBalls; i++) {
     const u = halton1d(i, 2);
@@ -138,7 +136,9 @@ export function galton(world: World): void {
         material: "wood",
         collideWithBalls: false,
         fixtureRestitution: marbleRestitution,
+        fixtureFriction: marbleFriction,
         linearDamping: marbleLinearDamping,
+        angularDamping: marbleAngularDamping,
       }),
     );
   }

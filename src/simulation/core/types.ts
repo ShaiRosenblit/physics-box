@@ -7,7 +7,7 @@ export interface Vec2 {
 
 export type BodyKind = "ball" | "box" | "magnet";
 
-export type MaterialName = "wood" | "metal" | "cork";
+export type MaterialName = "wood" | "metal" | "cork" | "felt";
 
 export interface BaseBodySpec {
   readonly position: Vec2;
@@ -19,6 +19,8 @@ export interface BaseBodySpec {
   readonly charge?: number;
   /** Overrides `material.restitution` for this body's fixtures when set. */
   readonly fixtureRestitution?: number;
+  /** Overrides `material.friction` for this body's fixtures when set. */
+  readonly fixtureFriction?: number;
   /** Planck body linear damping (default 0). */
   readonly linearDamping?: number;
   /** Planck body angular damping (default 0). */

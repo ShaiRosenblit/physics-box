@@ -10,6 +10,7 @@ export interface MagnetInput {
   angle?: number;
   fixed?: boolean;
   fixtureRestitution?: number;
+  fixtureFriction?: number;
   linearDamping?: number;
   angularDamping?: number;
 }
@@ -40,6 +41,7 @@ export function magnet(input: MagnetInput): MagnetSpec {
     ...(input.fixtureRestitution !== undefined
       ? { fixtureRestitution: input.fixtureRestitution }
       : {}),
+    ...(input.fixtureFriction !== undefined ? { fixtureFriction: input.fixtureFriction } : {}),
     ...(input.linearDamping !== undefined ? { linearDamping: input.linearDamping } : {}),
     ...(input.angularDamping !== undefined ? { angularDamping: input.angularDamping } : {}),
   };

@@ -15,6 +15,8 @@ export const palette = {
   metal: 0xb5b0a6,
   metalEdge: 0x80796e,
   cork: 0xc8a678,
+  felt: 0x928d84,
+  feltEdge: 0x656059,
 
   fieldE: 0x3f6e8c,
   fieldB: 0xa06a3f,
@@ -51,4 +53,5 @@ export const materialStyles: Readonly<Record<MaterialName, MaterialStyle>> = {
   wood: { fill: palette.wood, edge: palette.woodGrain },
   metal: { fill: palette.metal, edge: palette.metalEdge },
   cork: { fill: palette.cork, edge: palette.woodGrain },
+  felt: { fill: palette.felt, edge: palette.feltEdge },
 };

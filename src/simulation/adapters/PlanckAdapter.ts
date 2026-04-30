@@ -86,7 +86,7 @@ export class PlanckAdapter {
     body.createFixture({
       shape,
       density: material.density,
-      friction: material.friction,
+      friction: spec.fixtureFriction ?? material.friction,
       restitution: spec.fixtureRestitution ?? material.restitution,
       ...(filter ?? {}),
     });

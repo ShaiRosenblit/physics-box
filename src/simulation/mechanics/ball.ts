@@ -11,6 +11,7 @@ export interface BallInput {
   fixed?: boolean;
   collideWithBalls?: boolean;
   fixtureRestitution?: number;
+  fixtureFriction?: number;
   linearDamping?: number;
   angularDamping?: number;
 }
@@ -36,6 +37,7 @@ export function ball(input: BallInput): BallSpec {
     ...(input.fixtureRestitution !== undefined
       ? { fixtureRestitution: input.fixtureRestitution }
       : {}),
+    ...(input.fixtureFriction !== undefined ? { fixtureFriction: input.fixtureFriction } : {}),
     ...(input.linearDamping !== undefined ? { linearDamping: input.linearDamping } : {}),
     ...(input.angularDamping !== undefined ? { angularDamping: input.angularDamping } : {}),
   };
