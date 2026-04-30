@@ -14,10 +14,10 @@ import { PlanckAdapter } from "../adapters/PlanckAdapter";
  */
 export class World {
   private readonly _config: SimulationConfig;
-  private readonly _adapter: PlanckAdapter;
+  private _adapter: PlanckAdapter;
   private readonly _stepper: Stepper;
   private readonly _events = new EventBus();
-  private readonly _nextId = createIdFactory();
+  private _nextId = createIdFactory();
   private readonly _preStepHooks: Array<() => void> = [];
 
   private _tick = 0;
@@ -27,6 +27,19 @@ export class World {
     this._config = config;
     this._adapter = new PlanckAdapter(config);
     this._stepper = new Stepper(config.dt, config.maxSubsteps);
+  }
+
+  /**
+   * Tear down the current Planck world, the id factory, the accumulator,
+   * and the tick counter. Pre-step hooks and event listeners survive so
+   * UI/renderer subscriptions remain valid across scene reloads.
+   */
+  reset(): void {
+    this._adapter = new PlanckAdapter(this._config);
+    this._stepper.reset();
+    this._nextId = createIdFactory();
+    this._tick = 0;
+    this._running = true;
   }
 
   get config(): SimulationConfig {

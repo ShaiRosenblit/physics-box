@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-import { World, defaultSceneName, scenes } from "../simulation";
+import { useEffect, useRef } from "react";
+import { ball, box, defaultSceneName } from "../simulation";
 import { Renderer } from "../render";
 import { Toolbar } from "./panels/Toolbar";
 import { Inspector } from "./panels/Inspector";
 import { PlaybackBar } from "./panels/PlaybackBar";
+import { useSimulation } from "./hooks/useSimulation";
 import { useUIStore } from "./state/store";
 import { testIds } from "./a11y/ids";
 
 export function App() {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const worldRef = useRef<World | null>(null);
   const rendererRef = useRef<Renderer | null>(null);
-  const [tick, setTick] = useState(0);
+  const sim = useSimulation(defaultSceneName);
 
   const showGrid = useUIStore((s) => s.showGrid);
   const setRunning = useUIStore((s) => s.setRunning);
@@ -19,10 +19,6 @@ export function App() {
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-
-    const world = new World();
-    scenes[defaultSceneName](world);
-    worldRef.current = world;
 
     const renderer = new Renderer();
     rendererRef.current = renderer;
@@ -35,9 +31,8 @@ export function App() {
       if (cancelled) return;
       const dt = Math.min((now - last) / 1000, 1 / 30);
       last = now;
-      world.step(dt);
-      renderer.render(world.snapshot());
-      setTick(world.tick);
+      sim.world.step(dt);
+      renderer.render(sim.world.snapshot());
       raf = requestAnimationFrame(loop);
     };
 
@@ -52,29 +47,49 @@ export function App() {
       cancelled = true;
       cancelAnimationFrame(raf);
       renderer.dispose();
-      worldRef.current = null;
       rendererRef.current = null;
     };
-  }, []);
+  }, [sim.world]);
 
   useEffect(() => {
     rendererRef.current?.setShowGrid(showGrid);
   }, [showGrid]);
 
   const onPlay = () => {
-    worldRef.current?.resume();
+    sim.resume();
     setRunning(true);
   };
   const onPause = () => {
-    worldRef.current?.pause();
+    sim.pause();
     setRunning(false);
   };
   const onStep = () => {
-    worldRef.current?.stepOnce();
-    setTick(worldRef.current?.tick ?? 0);
+    sim.stepOnce();
   };
   const onReset = () => {
-    // M3 step 2 wires Reset to scene reload via useSimulation.
+    rendererRef.current?.reset();
+    sim.loadScene(defaultSceneName);
+    setRunning(true);
+  };
+
+  const onCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const renderer = rendererRef.current;
+    if (!renderer || !renderer.isReady) return;
+    const tool = useUIStore.getState().tool;
+    if (tool !== "ball" && tool !== "box") return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const world = renderer.camera.screenToWorld(
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+    );
+    if (tool === "ball") {
+      sim.add(ball({ position: world, radius: 0.4, material: "wood" }));
+    } else {
+      sim.add(
+        box({ position: world, width: 0.7, height: 0.7, material: "wood" }),
+      );
+    }
   };
 
   return (
@@ -86,13 +101,14 @@ export function App() {
             ref={hostRef}
             data-testid={testIds.canvasHost}
             aria-label="Physics Box simulation canvas"
+            onPointerDown={onCanvasPointerDown}
             style={{ position: "absolute", inset: 0 }}
           />
         </main>
         <Inspector />
       </div>
       <PlaybackBar
-        tick={tick}
+        tick={sim.tick}
         onPlay={onPlay}
         onPause={onPause}
         onStep={onStep}

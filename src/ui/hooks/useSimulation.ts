@@ -1,0 +1,69 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  World,
+  scenes,
+  type BodySpec,
+  type Id,
+  type SceneName,
+} from "../../simulation";
+
+export interface SimulationApi {
+  /** The owned World instance. Reference is stable across renders. */
+  readonly world: World;
+  /** Latest tick observed by the hook. */
+  readonly tick: number;
+  /** Add a body. Returns its id. */
+  add(spec: BodySpec): Id;
+  remove(id: Id): void;
+  pause(): void;
+  resume(): void;
+  /** Advance one fixed substep regardless of pause state. */
+  stepOnce(): void;
+  /** Reset the kernel and apply the named scene. Returns the loaded scene. */
+  loadScene(name: SceneName): SceneName;
+}
+
+/**
+ * Owns a single World instance for the lifetime of the host component.
+ * Exposes commands and an externally observable tick state. Renderer
+ * binding is intentionally separate (see App.tsx) so this hook stays
+ * usable in headless contexts (e.g. tests).
+ */
+export function useSimulation(initialScene: SceneName): SimulationApi {
+  const worldRef = useRef<World | null>(null);
+  if (worldRef.current === null) {
+    const w = new World();
+    scenes[initialScene](w);
+    worldRef.current = w;
+  }
+  const world = worldRef.current;
+
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const unsubStep = world.on("step", ({ tick: t }) => setTick(t));
+    return () => {
+      unsubStep();
+    };
+  }, [world]);
+
+  const add = useCallback((spec: BodySpec) => world.add(spec), [world]);
+  const remove = useCallback((id: Id) => world.remove(id), [world]);
+  const pause = useCallback(() => world.pause(), [world]);
+  const resume = useCallback(() => world.resume(), [world]);
+  const stepOnce = useCallback(() => {
+    world.stepOnce();
+    setTick(world.tick);
+  }, [world]);
+  const loadScene = useCallback(
+    (name: SceneName) => {
+      world.reset();
+      scenes[name](world);
+      setTick(0);
+      return name;
+    },
+    [world],
+  );
+
+  return { world, tick, add, remove, pause, resume, stepOnce, loadScene };
+}

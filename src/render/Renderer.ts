@@ -48,6 +48,11 @@ export class Renderer {
     this.grid.node.visible = visible;
   }
 
+  /** Drop all body display objects. Call after a scene reload / world reset. */
+  reset(): void {
+    this.bodyLayer.clear();
+  }
+
   get camera(): Camera {
     return this._camera;
   }

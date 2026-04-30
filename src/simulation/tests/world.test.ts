@@ -74,6 +74,28 @@ describe("World", () => {
     expect(steps).toEqual([1]);
   });
 
+  it("reset() returns the world to a fresh state but keeps subscriptions", () => {
+    const world = new World();
+    const events: string[] = [];
+    world.on("step", () => events.push("step"));
+    world.on("add", () => events.push("add"));
+
+    world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    world.stepOnce();
+    expect(world.tick).toBe(1);
+    expect(world.snapshot().bodies.length).toBe(1);
+
+    world.reset();
+    expect(world.tick).toBe(0);
+    expect(world.snapshot().bodies.length).toBe(0);
+    expect(world.running).toBe(true);
+
+    const id = world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    expect(id).toBe(1);
+    expect(events).toContain("step");
+    expect(events.filter((e) => e === "add").length).toBe(2);
+  });
+
   it("falls under gravity and rests on a static box (collision)", () => {
     const world = new World();
     const groundTopY = 0;
