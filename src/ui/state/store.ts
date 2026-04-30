@@ -32,6 +32,8 @@ export interface NeutralBallSpawnPreset {
   linearDamping: number;
   angularDamping: number;
   collideDynamicBalls: boolean;
+  /** Static in world (walls, pegs); same as inspector "Fixed (static)". */
+  fixed: boolean;
 }
 
 export interface ChargedBallSpawnPreset extends NeutralBallSpawnPreset {
@@ -41,6 +43,7 @@ export interface ChargedBallSpawnPreset extends NeutralBallSpawnPreset {
 export interface MagnetSpawnPreset {
   radius: number;
   dipoleMagnitude: number;
+  fixed: boolean;
 }
 
 export interface BoxSpawnPreset {
@@ -49,6 +52,7 @@ export interface BoxSpawnPreset {
   material: MaterialName;
   linearDamping: number;
   angularDamping: number;
+  fixed: boolean;
 }
 
 export interface BalloonSpawnPreset {
@@ -58,6 +62,7 @@ export interface BalloonSpawnPreset {
   angularDamping: number;
   collideDynamicBalls: boolean;
   buoyancyLift: number;
+  fixed: boolean;
 }
 
 export interface EngineSpawnPreset {
@@ -69,6 +74,7 @@ export interface EngineSpawnPreset {
   material: MaterialName;
   linearDamping: number;
   angularDamping: number;
+  fixed: boolean;
 }
 
 export interface CrankSpawnPreset {
@@ -79,6 +85,7 @@ export interface CrankSpawnPreset {
   linearDamping: number;
   angularDamping: number;
   collideDynamicBalls: boolean;
+  fixed: boolean;
 }
 
 export type SpawnPresetsBundle = {
@@ -104,6 +111,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       linearDamping: 0,
       angularDamping: 0,
       collideDynamicBalls: true,
+      fixed: false,
     },
     ballPlus: {
       radius: 0.32,
@@ -111,6 +119,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       linearDamping: 0,
       angularDamping: 0,
       collideDynamicBalls: true,
+      fixed: false,
       charge: 4,
     },
     ballMinus: {
@@ -119,15 +128,18 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       linearDamping: 0,
       angularDamping: 0,
       collideDynamicBalls: true,
+      fixed: false,
       charge: -4,
     },
     magnetPlus: {
       radius: 0.32,
       dipoleMagnitude: 12,
+      fixed: false,
     },
     magnetMinus: {
       radius: 0.32,
       dipoleMagnitude: 12,
+      fixed: false,
     },
     enginePlus: {
       width: 0.42,
@@ -137,6 +149,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       material: "metal",
       linearDamping: 0,
       angularDamping: 0.08,
+      fixed: false,
     },
     engineMinus: {
       width: 0.42,
@@ -146,6 +159,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       material: "metal",
       linearDamping: 0,
       angularDamping: 0.08,
+      fixed: false,
     },
     box: {
       width: 0.7,
@@ -153,6 +167,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       material: "wood",
       linearDamping: 0,
       angularDamping: 0,
+      fixed: false,
     },
     balloon: {
       radius: 0.32,
@@ -161,6 +176,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       angularDamping: 0.25,
       collideDynamicBalls: true,
       buoyancyLift: 1,
+      fixed: false,
     },
     crank: {
       radius: 0.22,
@@ -169,6 +185,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       linearDamping: 0,
       angularDamping: 0.15,
       collideDynamicBalls: true,
+      fixed: false,
     },
   };
 }

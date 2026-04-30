@@ -243,6 +243,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
+          fixed: p.fixed,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
       );
@@ -255,6 +256,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
+          fixed: p.fixed,
           charge: p.charge,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
@@ -268,6 +270,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
+          fixed: p.fixed,
           charge: p.charge,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
@@ -281,6 +284,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
+          fixed: p.fixed,
           buoyancyLift: p.buoyancyLift,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
@@ -293,6 +297,7 @@ export function App() {
           position: world,
           radius: p.radius,
           dipole: sign * p.dipoleMagnitude,
+          fixed: p.fixed,
         }),
       );
     } else if (kind === "engine+" || kind === "engine-") {
@@ -308,6 +313,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
+          fixed: p.fixed,
         }),
       );
     } else if (kind === "box") {
@@ -320,6 +326,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
+          fixed: p.fixed,
         }),
       );
     } else if (kind === "crank") {
@@ -332,6 +339,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
+          fixed: p.fixed,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
       );

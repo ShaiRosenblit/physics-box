@@ -45,6 +45,32 @@ const fieldStyle: CSSProperties = {
   alignItems: "stretch",
 };
 
+const spawnToggleLabelStyle: CSSProperties = {
+  display: "flex",
+  gap: 6,
+  alignItems: "center",
+  fontSize: 11,
+  color: ui.inkPrimary,
+  cursor: "pointer",
+};
+
+function SpawnFixedToggle(props: {
+  checked: boolean;
+  onChange: (fixed: boolean) => void;
+}) {
+  return (
+    <label style={spawnToggleLabelStyle}>
+      <input
+        type="checkbox"
+        checked={props.checked}
+        aria-label="Fixed in world"
+        onChange={(e) => props.onChange(e.target.checked)}
+      />
+      <span>Fixed (static)</span>
+    </label>
+  );
+}
+
 /** Compact controls for the active spawn tool ("recipe" before placement). */
 export function SpawnToolOptions() {
   const tool = useUIStore((s) => s.tool);
@@ -277,6 +303,10 @@ function EngineFields(props: {
           }}
         />
       </div>
+      <SpawnFixedToggle
+        checked={props.preset.fixed}
+        onChange={(fixed) => props.onPatch({ fixed })}
+      />
     </>
   );
 }
@@ -390,6 +420,10 @@ function CrankFields(props: {
         />
         <span>Ball–ball hits</span>
       </label>
+      <SpawnFixedToggle
+        checked={props.preset.fixed}
+        onChange={(fixed) => props.onPatch({ fixed })}
+      />
     </>
   );
 }
@@ -491,6 +525,10 @@ function BallFields(props: {
         />
         <span>Ball–ball hits</span>
       </label>
+      <SpawnFixedToggle
+        checked={props.preset.fixed}
+        onChange={(fixed) => props.onPatch({ fixed })}
+      />
       {charged ? (
         <div style={fieldStyle}>
           <span style={labelStyle}>{props.chargeLabel ?? "Charge"}</span>
@@ -630,6 +668,10 @@ function BalloonFields(props: {
         />
         <span>Ball–ball hits</span>
       </label>
+      <SpawnFixedToggle
+        checked={props.preset.fixed}
+        onChange={(fixed) => props.onPatch({ fixed })}
+      />
     </>
   );
 }
@@ -680,6 +722,10 @@ function MagnetFields(props: {
           }}
         />
       </div>
+      <SpawnFixedToggle
+        checked={props.preset.fixed}
+        onChange={(fixed) => props.onPatch({ fixed })}
+      />
     </>
   );
 }
@@ -767,6 +813,10 @@ function BoxFields(props: {
           }}
         />
       </div>
+      <SpawnFixedToggle
+        checked={props.preset.fixed}
+        onChange={(fixed) => props.onPatch({ fixed })}
+      />
     </>
   );
 }
