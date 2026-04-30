@@ -199,16 +199,3 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
 
   return n;
 }
-
-/** Move body center by half Δh along local +Y (world = rotate Δh/2) so bottom edge stays fixed. */
-export function shiftCenterToKeepBottomEdgeFixed(
-  baseCenter: { readonly x: number; readonly y: number },
-  angle: number,
-  dh: number,
-): { x: number; y: number } {
-  const half = dh / 2;
-  return {
-    x: baseCenter.x - Math.sin(angle) * half,
-    y: baseCenter.y + Math.cos(angle) * half,
-  };
-}

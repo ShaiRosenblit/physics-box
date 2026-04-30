@@ -23,7 +23,6 @@ import {
   ropeRebuildNeeded,
   springAnchorsMatch,
 } from "../core/constraintPatch";
-import { shiftCenterToKeepBottomEdgeFixed } from "../core/bodyPatch";
 import { lookupMaterial } from "../mechanics/materials";
 import type { BuoyantBodyState } from "../mechanics/buoyancy";
 import {
@@ -33,6 +32,31 @@ import {
 import { PULLEY_DEFAULT_HALF_SPREAD } from "../mechanics/pulley";
 
 const PULLEY_MIN_HALF_SPREAD = 0.05;
+
+const ORIENTED_BOX_MINY_EPS = 1e-12;
+
+/** Minimum world Y over box corners (horizontal floor: keep this when width/height change). */
+function orientedBoxMinWorldY(
+  cy: number,
+  angle: number,
+  width: number,
+  height: number,
+): number {
+  const hw = width / 2;
+  const hh = height / 2;
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  let minY = Infinity;
+  for (const sx of [-1, 1] as const) {
+    for (const sy of [-1, 1] as const) {
+      const lx = sx * hw;
+      const ly = sy * hh;
+      const y = cy + s * lx + c * ly;
+      if (y < minY) minY = y;
+    }
+  }
+  return minY;
+}
 
 /** Dynamic balls that ghost through each other (Galton marbles); still collide with default fixtures & rope links. */
 const CAT_NO_DYNAMIC_BALL_COLLISION = 0x0010;
@@ -314,9 +338,11 @@ export class PlanckAdapter {
    * Apply a full next spec to an existing body (pose and velocities unchanged).
    * Kind must match the existing body.
    *
-   * Box/engine height edits anchor the bottom face using the **live** body
-   * transform so edits during Planck's step (world locked) can be deferred
-   * without applying a stale center offset.
+   * Resizing while resting on a horizontal surface: preserve the lowest **world
+   * Y** hull point (box corners or circle bottom) so edits to `width` / `height`
+   * / `radius` don’t sink through the floor — not only `height` along body
+   * local +Y (which fails once the box is rotated). Defers via `queueUpdate`
+   * when the Planck world is locked mid-step.
    */
   applyBodySpec(
     id: Id,
@@ -349,21 +375,58 @@ export class PlanckAdapter {
     const body = record.body;
 
     let resolvedSpec = nextSpec;
-    if (
-      !opts?.skipBottomAnchor &&
-      (oldSpec.kind === "box" || oldSpec.kind === "engine") &&
-      (nextSpec.kind === "box" || nextSpec.kind === "engine")
-    ) {
-      const dh = nextSpec.height - oldSpec.height;
-      if (Math.abs(dh) > 1e-12) {
-        const bp = body.getPosition();
-        const angle = nextSpec.angle ?? body.getAngle();
-        const p = shiftCenterToKeepBottomEdgeFixed(
-          { x: bp.x, y: bp.y },
-          angle,
-          dh,
-        );
-        resolvedSpec = { ...nextSpec, position: p };
+    if (!opts?.skipBottomAnchor) {
+      const bp = body.getPosition();
+      const bx = bp.x;
+      const by = bp.y;
+      const angleOld = body.getAngle();
+      const angleNew = nextSpec.angle ?? angleOld;
+
+      if (
+        (oldSpec.kind === "box" && nextSpec.kind === "box") ||
+        (oldSpec.kind === "engine" && nextSpec.kind === "engine")
+      ) {
+        const dimChanged =
+          nextSpec.width !== oldSpec.width ||
+          nextSpec.height !== oldSpec.height;
+        if (dimChanged) {
+          const oldMinY = orientedBoxMinWorldY(
+            by,
+            angleOld,
+            oldSpec.width,
+            oldSpec.height,
+          );
+          const newMinY = orientedBoxMinWorldY(
+            by,
+            angleNew,
+            nextSpec.width,
+            nextSpec.height,
+          );
+          const dy = oldMinY - newMinY;
+          if (Math.abs(dy) > ORIENTED_BOX_MINY_EPS) {
+            resolvedSpec = {
+              ...nextSpec,
+              position: { x: bx, y: by + dy },
+            };
+          }
+        }
+      } else if (
+        (oldSpec.kind === "ball" && nextSpec.kind === "ball") ||
+        (oldSpec.kind === "balloon" && nextSpec.kind === "balloon") ||
+        (oldSpec.kind === "magnet" && nextSpec.kind === "magnet") ||
+        (oldSpec.kind === "crank" && nextSpec.kind === "crank")
+      ) {
+        if (nextSpec.radius !== oldSpec.radius) {
+          const oldMinY = by - oldSpec.radius;
+          const newMinY = by - nextSpec.radius;
+          const dy = oldMinY - newMinY;
+          if (Math.abs(dy) > ORIENTED_BOX_MINY_EPS) {
+            resolvedSpec = {
+              ...nextSpec,
+              position: { x: bx, y: by + dy },
+            };
+          }
+        }
       }
     }
 

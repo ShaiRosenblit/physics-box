@@ -13,6 +13,23 @@ import {
 
 const TICK = defaultConfig.dt;
 
+function orientedBoxMinY(b: BoxView): number {
+  const hw = b.width / 2;
+  const hh = b.height / 2;
+  const c = Math.cos(b.angle);
+  const s = Math.sin(b.angle);
+  let minY = Infinity;
+  for (const sx of [-1, 1] as const) {
+    for (const sy of [-1, 1] as const) {
+      const lx = sx * hw;
+      const ly = sy * hh;
+      const y = b.position.y + s * lx + c * ly;
+      if (y < minY) minY = y;
+    }
+  }
+  return minY;
+}
+
 function stepFor(world: World, ticks: number): void {
   for (let i = 0; i < ticks; i++) world.stepOnce();
 }
@@ -225,14 +242,15 @@ describe("World", () => {
     expect(world.charges.has(id)).toBe(false);
   });
 
-  it("patchBody rebuilds geometry while preserving pose", () => {
+  it("patchBody grows ball radius without lowering bottom (world Y)", () => {
     const world = new World();
     const id = world.add(ball({ position: { x: 1, y: 2 }, radius: 0.3 }));
     world.patchBody(id, { radius: 0.6 });
     const v = world.snapshot().bodies.find((b) => b.id === id)! as BallView;
     expect(v.radius).toBe(0.6);
     expect(v.position.x).toBeCloseTo(1, 5);
-    expect(v.position.y).toBeCloseTo(2, 5);
+    expect(v.position.y).toBeCloseTo(2.3, 5);
+    expect(v.position.y - v.radius).toBeCloseTo(1.7, 5);
   });
 
   it("patchBody lengthens a box upward: bottom face stays fixed", () => {
@@ -273,12 +291,39 @@ describe("World", () => {
     );
     stepFor(world, 400);
     const settled = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
-    const bottomBefore = settled.position.y - settled.height / 2;
+    const bottomBefore = orientedBoxMinY(settled);
     expect(Math.abs(bottomBefore)).toBeLessThan(0.02);
     world.patchBody(id, { height: 1.5 });
     const after = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
-    const bottomAfter = after.position.y - after.height / 2;
-    expect(bottomAfter).toBeCloseTo(bottomBefore, 2);
+    expect(orientedBoxMinY(after)).toBeCloseTo(bottomBefore, 2);
+  });
+
+  it("patchBody widen 90° box on floor keeps lowest corner Y", () => {
+    const world = new World();
+    world.add(
+      box({
+        position: { x: 0, y: -0.25 },
+        width: 40,
+        height: 0.5,
+        fixed: true,
+        material: "wood",
+      }),
+    );
+    const id = world.add(
+      box({
+        position: { x: 0, y: 0.45 },
+        width: 0.5,
+        height: 0.9,
+        angle: Math.PI / 2,
+        material: "wood",
+      }),
+    );
+    stepFor(world, 350);
+    const settled = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
+    const minY0 = orientedBoxMinY(settled);
+    world.patchBody(id, { width: 1.1 });
+    const after = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
+    expect(orientedBoxMinY(after)).toBeCloseTo(minY0, 2);
   });
 
   it("patchBody skips bottom anchor when position is set in the same patch", () => {
