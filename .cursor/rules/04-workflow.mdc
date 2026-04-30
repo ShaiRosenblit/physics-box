@@ -34,6 +34,7 @@ At the end of every milestone:
 - Every commit must leave the repo in a working state (typecheck + tests pass).
 - **Commit and push every ready change.** As soon as a change is ready — typecheck green, tests green, working state — commit it and push it to the remote on the same branch. Do not let ready work sit uncommitted or unpushed.
   - "Ready" means the step is coherent on its own, not necessarily that the milestone is done.
+  - **End of task:** Do not finish a response that altered the repo without committing and pushing (or state openly why not, e.g. the user asked to hold commits, blocked network, merge conflict awaiting resolution).
   - If there is no remote configured yet, set one up before pushing; do not silently skip the push.
   - If a push is rejected (e.g. non-fast-forward), stop and resolve it explicitly — never force-push to a shared branch without being asked.
 - **No pre-commit hooks.** Discipline + this rule is the enforcement.
