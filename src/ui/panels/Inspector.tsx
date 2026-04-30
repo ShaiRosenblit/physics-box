@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { testIds } from "../a11y/ids";
 import { useUIStore } from "../state/store";
 import { useSimulationContext } from "../hooks/SimulationContext";
-import type { BodyView, ConstraintView, MaterialName } from "../../simulation";
+import type { BodyView, ConstraintView, Id, MaterialName } from "../../simulation";
 import type { ViewportMode } from "../hooks/useViewportMode";
 import { layout, ui } from "../style/tokens";
 
@@ -13,6 +13,32 @@ const MIN_ROPE_SEG_UI = 2;
 type SelectionPanelTarget =
   | { kind: "body"; view: BodyView }
   | { kind: "constraint"; view: ConstraintView };
+
+function useRemoveSelection() {
+  const { remove } = useSimulationContext();
+  const setSelectedId = useUIStore((s) => s.setSelectedId);
+  return (id: Id) => {
+    remove(id);
+    setSelectedId(null);
+  };
+}
+
+function RemoveFromSceneFooter(props: { id: Id }) {
+  const removeSelection = useRemoveSelection();
+  return (
+    <div style={inspectorRemoveSectionStyle}>
+      <button
+        type="button"
+        data-testid={testIds.inspectorRemoveSelection}
+        aria-label="Remove selection from scene"
+        style={inspectorRemoveButtonStyle}
+        onClick={() => removeSelection(props.id)}
+      >
+        Remove from scene
+      </button>
+    </div>
+  );
+}
 
 export interface InspectorProps {
   variant: "panel" | "rail" | "sheet";
@@ -50,6 +76,8 @@ export function Inspector({ variant }: InspectorProps) {
     };
   }, [selectedId, world]);
 
+  const removeSelection = useRemoveSelection();
+
   if (variant === "rail") {
     return (
       <aside
@@ -69,6 +97,20 @@ export function Inspector({ variant }: InspectorProps) {
             —
           </div>
         )}
+        {target ? (
+          <button
+            type="button"
+            data-testid={testIds.inspectorRemoveSelection}
+            aria-label="Remove selection from scene"
+            title="Remove from scene"
+            onClick={() => {
+              removeSelection(target.view.id);
+            }}
+            style={railRemoveButtonStyle}
+          >
+            ×
+          </button>
+        ) : null}
       </aside>
     );
   }
@@ -318,6 +360,7 @@ function ConstraintDetails({ view }: { view: ConstraintView }) {
           />
         </>
       )}
+      <RemoveFromSceneFooter id={view.id} />
     </div>
   );
 }
@@ -543,6 +586,7 @@ function BodyDetails({ view }: { view: BodyView }) {
       />
       <ReadRow label="Speed" value={`${fmt(speed)} m/s`} />
       <ReadRow label="Angle" value={`${fmt((view.angle * 180) / Math.PI)}°`} />
+      <RemoveFromSceneFooter id={view.id} />
     </div>
   );
 }
@@ -738,6 +782,41 @@ const toggleRowStyle: CSSProperties = {
   fontSize: 11,
   borderBottom: `1px dashed ${ui.rule}`,
   paddingBottom: 4,
+};
+
+const inspectorRemoveSectionStyle: CSSProperties = {
+  paddingTop: 8,
+  marginTop: 4,
+  borderTop: `1px solid ${ui.rule}`,
+};
+
+const inspectorRemoveButtonStyle: CSSProperties = {
+  alignSelf: "stretch",
+  width: "100%",
+  height: layout.controlHeight,
+  padding: "0 8px",
+  borderRadius: layout.controlRadius,
+  border: `${layout.controlBorder}px solid ${ui.rule}`,
+  background: ui.paper,
+  color: ui.chargeNeg,
+  fontSize: 11,
+  fontWeight: 500,
+  cursor: "pointer",
+};
+
+const railRemoveButtonStyle: CSSProperties = {
+  appearance: "none",
+  flexShrink: 0,
+  width: 26,
+  height: 26,
+  padding: 0,
+  lineHeight: 1,
+  fontSize: 16,
+  color: ui.chargeNeg,
+  background: ui.paper,
+  borderRadius: layout.controlRadius,
+  border: `${layout.controlBorder}px solid ${ui.rule}`,
+  cursor: "pointer",
 };
 
 export function inspectorVariantFor(mode: ViewportMode): "panel" | "sheet" {

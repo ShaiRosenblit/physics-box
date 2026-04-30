@@ -168,6 +168,28 @@ export function App() {
     };
   }, [setSelectedId, setDragging, sim.world]);
 
+  /** Delete / Backspace removes the selection when focus is outside form controls. */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (useUIStore.getState().dragging) return;
+      const t = e.target;
+      if (
+        t instanceof Element &&
+        t.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return;
+      }
+      const id = useUIStore.getState().selectedId;
+      if (id === null) return;
+      e.preventDefault();
+      sim.remove(id);
+      setSelectedId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [sim, setSelectedId]);
+
   const onPlay = () => {
     sim.resume();
     setRunning(true);
