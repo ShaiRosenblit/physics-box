@@ -118,6 +118,7 @@ export class FieldView {
       id: m.id,
       position: m.position,
       dipole: m.dipole,
+      angle: m.angle,
     }));
     const ec = emConstants(this.config);
     const bounds = camera.visibleBounds();

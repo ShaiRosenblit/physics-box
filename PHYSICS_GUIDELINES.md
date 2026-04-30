@@ -65,13 +65,13 @@ F_12 = k_e * q1 * q2 * r̂ / (|r|² + ε²)
 
 ### Magnets and B field
 
-A magnet is a body with a 2D scalar dipole moment `m` (signed). For evaluation we use the 2D point-dipole reduction:
+Each magnet carries a **signed scalar strength** `dipole` (A·m²) and a body **heading** `θ` (Planck angle). The magnetic moment lies **in the simulation plane**:
 
-```
-B(r) = (μ₀_eff / 2π) * ((2 (m·r̂) r̂ - m) / |r|³)
-```
+**m** = dipole × (cos θ, sin θ)
 
-In the scalar-B treatment `B(r)` is taken as the out-of-plane component of this vector form, plus softening near sources.
+so “north” lies along the body’s local +x axis; a negative strength reverses the vector.
+
+The 3D dipole field **B** = (μ₀_eff / 4π) × (3 (**m**·**r̂**) **r̂** − **m**) / |**r**|³ is evaluated with **m** = (m_x, m_y, 0) and separation **r** = (Δx, Δy, ε), using the same softening length ε as elsewhere. This gives a non-zero **B_z** at points in the sandbox plane so in-plane charges still feel a Lorentz force. Streamlines integrate perpendicular to ∇B_z as before.
 
 ### Lorentz force
 
@@ -89,14 +89,15 @@ F = q * B * ( v.y, -v.x )       // sign per chosen convention, documented in cod
 
 ### Dipole-on-dipole (M7)
 
-A magnet in another magnet's field experiences both a force and a torque (the latter via `τ = m × B`, scalar in 2D). Computed pairwise after the B field is sampled at each magnet's center.
+Magnets feel a **translational** force from the standard point-dipole–dipole interaction (softened separation) and a **scalar torque** τ = (**m** × **B**_peer)·ẑ from the superposed in-plane **B** from other dipoles at the same ε offset. Torque is clamped per tick to `maxEmTorque`.
 
 ### Stability rules
 
 - **Force cap** per body per substep: clamp EM force magnitude to `maxEmForce`.
+- **Torque cap** per body per substep: clamp |τ| to `maxEmTorque`.
 - **Speed cap**: clamp body speed to `maxSpeed`.
 - **Charge cap** and **dipole cap**: enforced on `add` / `update`.
-- **Softening length** `ε` in every `1/r` and `1/r²` denominator.
+- **Softening length** `ε` in dipole separation and near-field regularization.
 
 These caps are documented in `src/simulation/core/config.ts` and visible (read-only) in the inspector.
 
@@ -122,7 +123,7 @@ These are listed so that requests to add them are answered consistently: not in 
 `src/simulation/core/config.ts` exports a single `defaultConfig` object collecting:
 
 - `gravity`, `dt`, `velIters`, `posIters`
-- `maxSubsteps`, `maxSpeed`, `maxEmForce`
+- `maxSubsteps`, `maxSpeed`, `maxEmForce`, `maxEmTorque`
 - `epsilon` (softening length), `kE`, `mu0Eff`
 - `maxCharge`, `maxDipole`, `maxChargedBodies`
 

@@ -184,8 +184,10 @@ export class PlanckAdapter {
     id: Id;
     position: Vec2;
     dipole: number;
+    angle: number;
   }> {
-    const out: Array<{ id: Id; position: Vec2; dipole: number }> = [];
+    const out: Array<{ id: Id; position: Vec2; dipole: number; angle: number }> =
+      [];
     for (const [id, record] of this.bodies) {
       if (record.spec.kind !== "magnet") continue;
       if (record.spec.dipole === 0) continue;
@@ -194,6 +196,7 @@ export class PlanckAdapter {
         id,
         position: { x: p.x, y: p.y },
         dipole: record.spec.dipole,
+        angle: record.body.getAngle(),
       });
     }
     return out;
@@ -239,6 +242,14 @@ export class PlanckAdapter {
       const record = this.bodies.get(id);
       if (!record) continue;
       record.body.applyForceToCenter(planck.Vec2(f.x, f.y), true);
+    }
+  }
+
+  applyTorques(torques: Map<Id, number>): void {
+    for (const [id, t] of torques) {
+      const record = this.bodies.get(id);
+      if (!record) continue;
+      record.body.applyTorque(t, true);
     }
   }
 
@@ -317,6 +328,7 @@ export class PlanckAdapter {
             id,
             position: Object.freeze({ x: p.x, y: p.y }),
             dipole: record.spec.dipole,
+            angle: record.body.getAngle(),
           }),
         );
       }

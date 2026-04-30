@@ -43,7 +43,11 @@ export interface BoxSpec extends BaseBodySpec {
 export interface MagnetSpec extends BaseBodySpec {
   readonly kind: "magnet";
   readonly radius: number;
-  /** Signed scalar dipole moment. + is "north" by convention. */
+  /**
+   * Signed dipole magnitude (A·m²). Direction follows the body’s +x axis
+   * (`angle`): moment = dipole × (cos θ, sin θ). Sign flips “north” vs “south”
+   * along that axis.
+   */
   readonly dipole: number;
 }
 
@@ -174,6 +178,8 @@ export interface MagneticSourceView {
   readonly id: Id;
   readonly position: Vec2;
   readonly dipole: number;
+  /** Radians; dipole direction is `dipole × (cos(angle), sin(angle))`. */
+  readonly angle: number;
 }
 
 export interface Snapshot {

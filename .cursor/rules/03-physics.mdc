@@ -29,7 +29,7 @@ The single source of truth is [`PHYSICS_GUIDELINES.md`](../../PHYSICS_GUIDELINES
 
 Allowed:
 - Coulomb force between charged bodies.
-- Static or kinematic magnets carrying a 2D scalar dipole moment.
+- Static or kinematic magnets: signed dipole strength with moment in the plane along body heading.
 - Lorentz force `F = q (v × B)` on charged bodies.
 - Dipole-on-dipole forces and torques (M7 only).
 

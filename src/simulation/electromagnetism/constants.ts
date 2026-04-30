@@ -10,6 +10,7 @@ export interface EmConstants {
   readonly mu0Eff: number;
   readonly epsilon: number;
   readonly maxEmForce: number;
+  readonly maxEmTorque: number;
 }
 
 export function emConstants(config: SimulationConfig): EmConstants {
@@ -18,5 +19,6 @@ export function emConstants(config: SimulationConfig): EmConstants {
     mu0Eff: config.mu0Eff,
     epsilon: config.epsilon,
     maxEmForce: config.maxEmForce,
+    maxEmTorque: config.maxEmTorque,
   };
 }

@@ -11,6 +11,7 @@ import { sampleE } from "../electromagnetism/field";
 import {
   computeLorentzForces,
   computeMagnetPairForces,
+  computeMagnetPairTorques,
 } from "../electromagnetism/lorentz";
 import { sampleB } from "../electromagnetism/magnetism";
 
@@ -59,6 +60,8 @@ export class World {
       if (magnets.length >= 2) {
         const f = computeMagnetPairForces(magnets, ec);
         if (f.size > 0) this._adapter.applyForces(f);
+        const tau = computeMagnetPairTorques(magnets, ec);
+        if (tau.size > 0) this._adapter.applyTorques(tau);
       }
     });
   }

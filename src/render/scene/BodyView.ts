@@ -389,21 +389,25 @@ function drawMagnet(
   lineWidth: number,
   style: { fill: number; edge: number },
 ): void {
-  const top = dipole >= 0 ? palette.magnetN : palette.magnetS;
-  const bot = dipole >= 0 ? palette.magnetS : palette.magnetN;
+  const north = dipole >= 0 ? palette.magnetN : palette.magnetS;
+  const south = dipole >= 0 ? palette.magnetS : palette.magnetN;
+  const rr = radius * 0.78;
   g.circle(0, 0, radius);
   g.fill({ color: style.fill, alpha: 1 });
   g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+  /* North along local +x (Planck); S on −x — matches moment direction. */
   g.beginPath();
-  g.arc(0, 0, radius * 0.78, 0, Math.PI, false);
-  g.lineTo(-radius * 0.78, 0);
-  g.fill({ color: top, alpha: 0.9 });
+  g.arc(0, 0, rr, -Math.PI / 2, Math.PI / 2, false);
+  g.lineTo(0, -rr);
+  g.closePath();
+  g.fill({ color: north, alpha: 0.9 });
   g.beginPath();
-  g.arc(0, 0, radius * 0.78, Math.PI, Math.PI * 2, false);
-  g.lineTo(radius * 0.78, 0);
-  g.fill({ color: bot, alpha: 0.9 });
-  g.moveTo(-radius * 0.78, 0);
-  g.lineTo(radius * 0.78, 0);
+  g.arc(0, 0, rr, Math.PI / 2, -Math.PI / 2, false);
+  g.lineTo(0, rr);
+  g.closePath();
+  g.fill({ color: south, alpha: 0.9 });
+  g.moveTo(0, -rr);
+  g.lineTo(0, rr);
   g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.6 });
 }
 

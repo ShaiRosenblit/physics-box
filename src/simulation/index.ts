@@ -56,11 +56,15 @@ export { sampleE } from "./electromagnetism/field";
 export {
   sampleB,
   sampleGradB,
+  dipoleMomentXY,
+  bFieldFromOffset,
+  magneticFieldAt,
   type MagneticBodyState,
 } from "./electromagnetism/magnetism";
 export {
   computeLorentzForces,
   computeMagnetPairForces,
+  computeMagnetPairTorques,
 } from "./electromagnetism/lorentz";
 export { emConstants, type EmConstants } from "./electromagnetism/constants";
 export type {

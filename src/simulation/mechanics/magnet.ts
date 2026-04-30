@@ -16,10 +16,9 @@ export interface MagnetInput {
 }
 
 /**
- * Factory for a magnet body. The dipole moment is signed; positive
- * dipoles project a "north" pole at the body's center, negative ones
- * a "south". Geometry is a small disc, mass and contacts behave like
- * a metal ball.
+ * Factory for a magnet body. `dipole` is a signed magnitude; the moment
+ * points along the body’s local +x axis: **m** = dipole × (cos θ, sin θ)
+ * with θ = `angle` / Planck rotation. Contacts behave like a metal disc.
  */
 export function magnet(input: MagnetInput): MagnetSpec {
   if (input.radius <= 0) {
