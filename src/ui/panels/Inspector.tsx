@@ -469,7 +469,8 @@ function BodyDetails({ view }: { view: BodyView }) {
       {(view.kind === "ball" ||
         view.kind === "balloon" ||
         view.kind === "box" ||
-        view.kind === "engine") && (
+        view.kind === "engine" ||
+        view.kind === "engine_rotor") && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Charge</span>
           <input
@@ -515,7 +516,7 @@ function BodyDetails({ view }: { view: BodyView }) {
         </div>
       )}
 
-      {view.kind === "engine" && (
+      {(view.kind === "engine" || view.kind === "engine_rotor") && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Torque</span>
           <input
@@ -531,6 +532,28 @@ function BodyDetails({ view }: { view: BodyView }) {
               if (Number.isFinite(v)) {
                 patchBody(view.id, {
                   torque: Math.max(-maxMotorTorque, Math.min(maxMotorTorque, v)),
+                });
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {(view.kind === "engine" || view.kind === "engine_rotor") && (
+        <div style={editRowStyle}>
+          <span style={editLabelStyle}>Flywheel r</span>
+          <input
+            aria-label="Flywheel radius"
+            type="number"
+            min={0.05}
+            step={0.02}
+            style={ctl}
+            value={view.kind === "engine" ? view.rotorRadius : view.radius}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v)) {
+                patchBody(view.id, {
+                  rotorRadius: Math.max(0.05, v),
                 });
               }
             }}
@@ -751,6 +774,8 @@ function labelOf(kind: BodyView["kind"]): string {
       return "Box";
     case "engine":
       return "Engine";
+    case "engine_rotor":
+      return "Rotor";
     case "magnet":
       return "Magnet";
   }

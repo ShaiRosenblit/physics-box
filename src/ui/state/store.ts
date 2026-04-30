@@ -61,6 +61,7 @@ export interface BalloonSpawnPreset {
 export interface EngineSpawnPreset {
   width: number;
   height: number;
+  flywheelRadius: number;
   /** Absolute torque before tool sign; clamped to maxMotorTorque at spawn. */
   torqueMagnitude: number;
   material: MaterialName;
@@ -118,6 +119,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
     enginePlus: {
       width: 0.42,
       height: 0.26,
+      flywheelRadius: 0.1,
       torqueMagnitude: 220,
       material: "metal",
       linearDamping: 0,
@@ -126,6 +128,7 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
     engineMinus: {
       width: 0.42,
       height: 0.26,
+      flywheelRadius: 0.1,
       torqueMagnitude: 220,
       material: "metal",
       linearDamping: 0,

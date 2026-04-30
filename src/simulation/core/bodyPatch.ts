@@ -55,10 +55,34 @@ export function sanitizeBodyGeometry(spec: BodySpec): BodySpec {
     const r = Math.max(MIN_BODY_RADIUS, spec.radius);
     return r === spec.radius ? spec : { ...spec, radius: r };
   }
-  const w = Math.max(MIN_BOX_EXTENT, spec.width);
-  const h = Math.max(MIN_BOX_EXTENT, spec.height);
-  if (w === spec.width && h === spec.height) return spec;
-  return { ...spec, width: w, height: h };
+  if (spec.kind === "engine_rotor") {
+    const r = Math.max(MIN_BODY_RADIUS, spec.radius);
+    return r === spec.radius ? spec : { ...spec, radius: r };
+  }
+  if (spec.kind === "engine") {
+    const w = Math.max(MIN_BOX_EXTENT, spec.width);
+    const h = Math.max(MIN_BOX_EXTENT, spec.height);
+    const maxR = Math.max(MIN_BODY_RADIUS, Math.min(w, h) / 2 - 0.02);
+    const r = Math.max(
+      MIN_BODY_RADIUS,
+      Math.min(spec.rotorRadius, maxR),
+    );
+    let next: BodySpec = spec;
+    if (w !== spec.width || h !== spec.height) {
+      next = { ...(next as Extract<BodySpec, { kind: "engine" }>), width: w, height: h };
+    }
+    const e = next as Extract<BodySpec, { kind: "engine" }>;
+    if (r !== e.rotorRadius) next = { ...e, rotorRadius: r };
+    return next;
+  }
+  if (spec.kind === "box") {
+    const w = Math.max(MIN_BOX_EXTENT, spec.width);
+    const h = Math.max(MIN_BOX_EXTENT, spec.height);
+    if (w === spec.width && h === spec.height) return spec;
+    return { ...spec, width: w, height: h };
+  }
+  const _: never = spec;
+  return _;
 }
 
 /**
@@ -123,7 +147,12 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
     let b = n;
     if (p.width !== undefined) b = { ...b, width: p.width };
     if (p.height !== undefined) b = { ...b, height: p.height };
+    if (p.rotorRadius !== undefined) b = { ...b, rotorRadius: p.rotorRadius };
     if (p.torque !== undefined) b = { ...b, torque: p.torque };
+    n = b;
+  } else if (n.kind === "engine_rotor") {
+    let b = n;
+    if (p.radius !== undefined) b = { ...b, radius: p.radius };
     n = b;
   } else {
     let m = n;

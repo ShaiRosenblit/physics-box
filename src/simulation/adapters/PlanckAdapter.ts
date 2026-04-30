@@ -7,6 +7,8 @@ import type {
   ChargedSourceView,
   ConstraintSpec,
   ConstraintView,
+  EngineRotorSpec,
+  EngineSpec,
   HingeSpec,
   Id,
   MagneticSourceView,
@@ -33,6 +35,13 @@ interface BodyRecord {
   readonly id: Id;
   readonly spec: BodySpec;
   readonly body: planck.Body;
+}
+
+interface EngineAssembly {
+  readonly housingId: Id;
+  readonly rotorId: Id;
+  readonly joint: planck.RevoluteJoint;
+  spec: EngineSpec;
 }
 
 type DragJoint = {
@@ -78,6 +87,9 @@ export class PlanckAdapter {
   private readonly world: planck.World;
   private readonly bodies = new Map<Id, BodyRecord>();
   private readonly constraints = new Map<Id, ConstraintRecord>();
+  private readonly engineAssemblies = new Map<Id, EngineAssembly>();
+  /** Maps any engine body id (housing or rotor) to housing (assembly key). */
+  private readonly engineHousingOf = new Map<Id, Id>();
   private readonly groundBody: planck.Body;
   private dragState: DragState | null = null;
 
@@ -93,6 +105,12 @@ export class PlanckAdapter {
   }
 
   add(id: Id, spec: BodySpec): void {
+    if (spec.kind === "engine") {
+      throw new Error("PlanckAdapter.add: use addEnginePair for engine specs");
+    }
+    if (spec.kind === "engine_rotor") {
+      throw new Error("PlanckAdapter.add: engine_rotor is created with addEnginePair only");
+    }
     const material = lookupMaterial(spec.material);
     const body = this.world.createBody({
       type: spec.fixed ? "static" : "dynamic",
@@ -121,7 +139,151 @@ export class PlanckAdapter {
     this.bodies.set(id, { id, spec, body });
   }
 
-  /** @internal — consumed by World.patchBody merge path. Mirrors live pose. */
+  addEnginePair(housingId: Id, rotorId: Id, spec: EngineSpec): void {
+    if (this.bodies.has(housingId) || this.bodies.has(rotorId)) {
+      throw new Error("PlanckAdapter.addEnginePair: body id already exists");
+    }
+    const material = lookupMaterial(spec.material);
+    const housingBody = this.world.createBody({
+      type: spec.fixed ? "static" : "dynamic",
+      position: planck.Vec2(spec.position.x, spec.position.y),
+      angle: spec.angle ?? 0,
+      linearVelocity: spec.velocity
+        ? planck.Vec2(spec.velocity.x, spec.velocity.y)
+        : planck.Vec2(0, 0),
+      angularVelocity: spec.angularVelocity ?? 0,
+      userData: housingId,
+      linearDamping: spec.linearDamping ?? 0,
+      angularDamping: spec.angularDamping ?? 0,
+    });
+    housingBody.createFixture({
+      shape: new planck.BoxShape(spec.width / 2, spec.height / 2),
+      density: material.density,
+      friction: spec.fixtureFriction ?? material.friction,
+      restitution: spec.fixtureRestitution ?? material.restitution,
+    });
+
+    const rotorBody = this.world.createBody({
+      type: "dynamic",
+      position: planck.Vec2(spec.position.x, spec.position.y),
+      angle: spec.angle ?? 0,
+      linearVelocity: spec.velocity
+        ? planck.Vec2(spec.velocity.x, spec.velocity.y)
+        : planck.Vec2(0, 0),
+      angularVelocity: spec.angularVelocity ?? 0,
+      userData: rotorId,
+      linearDamping: spec.linearDamping ?? 0,
+      angularDamping: spec.angularDamping ?? 0,
+    });
+    const rotorSpec: EngineRotorSpec = {
+      kind: "engine_rotor",
+      position: spec.position,
+      angle: spec.angle ?? 0,
+      velocity: spec.velocity,
+      angularVelocity: spec.angularVelocity,
+      fixed: false,
+      material: spec.material ?? "metal",
+      housingId,
+      radius: spec.rotorRadius,
+      linearDamping: spec.linearDamping ?? 0,
+      angularDamping: spec.angularDamping ?? 0,
+      buoyancyScale: spec.buoyancyScale ?? 1,
+      buoyancyLift: spec.buoyancyLift ?? 0,
+      charge: 0,
+      ...(spec.fixtureRestitution !== undefined
+        ? { fixtureRestitution: spec.fixtureRestitution }
+        : {}),
+      ...(spec.fixtureFriction !== undefined ? { fixtureFriction: spec.fixtureFriction } : {}),
+    };
+    rotorBody.createFixture({
+      shape: new planck.CircleShape(spec.rotorRadius),
+      density: material.density,
+      friction: spec.fixtureFriction ?? material.friction,
+      restitution: spec.fixtureRestitution ?? material.restitution,
+    });
+
+    const anchor = planck.Vec2(spec.position.x, spec.position.y);
+    const joint = new planck.RevoluteJoint(
+      { collideConnected: false },
+      housingBody,
+      rotorBody,
+      anchor,
+    );
+    this.world.createJoint(joint);
+
+    this.bodies.set(housingId, { id: housingId, spec, body: housingBody });
+    this.bodies.set(rotorId, { id: rotorId, spec: rotorSpec, body: rotorBody });
+    this.engineAssemblies.set(housingId, {
+      housingId,
+      rotorId,
+      joint,
+      spec,
+    });
+    this.engineHousingOf.set(housingId, housingId);
+    this.engineHousingOf.set(rotorId, housingId);
+  }
+
+  /** If `id` is an engine housing or its rotor, returns the housing id. */
+  resolveEngineHousingId(id: Id): Id | null {
+    return this.engineHousingOf.get(id) ?? null;
+  }
+
+  /** Removes revolute joint and both bodies. */
+  removeEngineAssembly(housingId: Id): Id[] {
+    const asm = this.engineAssemblies.get(housingId);
+    if (!asm) return [];
+    if (
+      this.dragState?.id === asm.housingId ||
+      this.dragState?.id === asm.rotorId
+    ) {
+      this.endDrag();
+    }
+    this.world.destroyJoint(asm.joint);
+    const hRec = this.bodies.get(asm.housingId);
+    const rRec = this.bodies.get(asm.rotorId);
+    if (hRec) this.world.destroyBody(hRec.body);
+    if (rRec) this.world.destroyBody(rRec.body);
+    this.bodies.delete(asm.housingId);
+    this.bodies.delete(asm.rotorId);
+    this.engineAssemblies.delete(housingId);
+    this.engineHousingOf.delete(asm.housingId);
+    this.engineHousingOf.delete(asm.rotorId);
+    return [asm.housingId, asm.rotorId];
+  }
+
+  private syncEngineRotorWithHousing(asm: EngineAssembly, housingSpec: EngineSpec): void {
+    const rRec = this.bodies.get(asm.rotorId);
+    if (!rRec || rRec.spec.kind !== "engine_rotor") return;
+    const oldR = rRec.spec;
+    const newR: EngineRotorSpec = {
+      ...oldR,
+      radius: housingSpec.rotorRadius,
+      material: housingSpec.material ?? "metal",
+      linearDamping: housingSpec.linearDamping ?? 0,
+      angularDamping: housingSpec.angularDamping ?? 0,
+      buoyancyScale: housingSpec.buoyancyScale ?? 1,
+      buoyancyLift: housingSpec.buoyancyLift ?? 0,
+      ...(housingSpec.fixtureRestitution !== undefined
+        ? { fixtureRestitution: housingSpec.fixtureRestitution }
+        : {}),
+      ...(housingSpec.fixtureFriction !== undefined
+        ? { fixtureFriction: housingSpec.fixtureFriction }
+        : {}),
+    };
+    const matOld = oldR.material ?? "wood";
+    const matNew = newR.material ?? "wood";
+    const needRebuild =
+      oldR.radius !== newR.radius ||
+      matOld !== matNew ||
+      (oldR.fixtureFriction ?? null) !== (newR.fixtureFriction ?? null) ||
+      (oldR.fixtureRestitution ?? null) !== (newR.fixtureRestitution ?? null);
+    if (needRebuild) {
+      rebuildBodyFixtures(rRec.body, newR);
+    }
+    rRec.body.setLinearDamping(newR.linearDamping ?? 0);
+    rRec.body.setAngularDamping(newR.angularDamping ?? 0);
+    this.bodies.set(asm.rotorId, { id: asm.rotorId, spec: newR, body: rRec.body });
+  }
   getBodySpec(id: Id): BodySpec | undefined {
     const record = this.bodies.get(id);
     if (!record) return undefined;
@@ -144,6 +306,7 @@ export class PlanckAdapter {
   applyBodySpec(id: Id, nextSpec: BodySpec): void {
     const record = this.bodies.get(id);
     if (!record) return;
+    if (record.spec.kind === "engine_rotor") return;
     const oldSpec = record.spec;
     if (oldSpec.kind !== nextSpec.kind) {
       throw new Error(`applyBodySpec: kind ${oldSpec.kind} cannot become ${nextSpec.kind}`);
@@ -194,12 +357,37 @@ export class PlanckAdapter {
         velocity: { x: 0, y: 0 },
         angularVelocity: 0,
       };
+      if (oldSpec.kind === "engine" && outSpec.kind === "engine") {
+        const asm = this.engineAssemblies.get(id);
+        if (asm) {
+          const rBody = this.bodies.get(asm.rotorId)!.body;
+          rBody.setTransform(
+            planck.Vec2(nextSpec.position.x, nextSpec.position.y),
+            wantA,
+          );
+          rBody.setLinearVelocity(planck.Vec2(0, 0));
+          rBody.setAngularVelocity(0);
+        }
+      }
     }
 
     this.bodies.set(id, { id, spec: outSpec, body });
+
+    if (outSpec.kind === "engine") {
+      const asm = this.engineAssemblies.get(id);
+      if (asm) {
+        asm.spec = outSpec;
+        this.syncEngineRotorWithHousing(asm, outSpec);
+      }
+    }
   }
 
   remove(id: Id): void {
+    const hid = this.engineHousingOf.get(id);
+    if (hid !== undefined) {
+      this.removeEngineAssembly(hid);
+      return;
+    }
     const record = this.bodies.get(id);
     if (!record) return;
     if (this.dragState?.id === id) this.endDrag();
@@ -431,6 +619,8 @@ export class PlanckAdapter {
       let displacedArea = 0;
       if (spec.kind === "ball" || spec.kind === "balloon" || spec.kind === "magnet") {
         displacedArea = Math.PI * spec.radius * spec.radius;
+      } else if (spec.kind === "engine_rotor") {
+        displacedArea = Math.PI * spec.radius * spec.radius;
       } else {
         displacedArea = spec.width * spec.height;
       }
@@ -474,13 +664,13 @@ export class PlanckAdapter {
   }> {
     const out: Array<{ readonly id: Id; readonly torque: number; readonly active: boolean }> =
       [];
-    for (const [id, record] of this.bodies) {
-      if (record.spec.kind !== "engine") continue;
-      const spec = record.spec;
+    for (const asm of this.engineAssemblies.values()) {
+      const rotorRec = this.bodies.get(asm.rotorId);
+      if (!rotorRec) continue;
       out.push({
-        id,
-        torque: spec.torque,
-        active: record.body.isDynamic() && !(spec.fixed ?? false),
+        id: asm.rotorId,
+        torque: asm.spec.torque,
+        active: rotorRec.body.isDynamic(),
       });
     }
     return out;
@@ -593,7 +783,7 @@ export class PlanckAdapter {
     const ids = Array.from(this.bodies.keys()).sort((a, b) => a - b);
     const bodies: BodyView[] = ids.map((id) => {
       const record = this.bodies.get(id)!;
-      return buildView(record);
+      return buildView(record, this.engineAssemblies);
     });
 
     const constraintIds = Array.from(this.constraints.keys()).sort(
@@ -859,7 +1049,13 @@ function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
     if (oldS.width !== newS.width || oldS.height !== oldS.height) return true;
   }
   if (oldS.kind === "engine" && newS.kind === "engine") {
-    if (oldS.width !== newS.width || oldS.height !== newS.height) return true;
+    if (
+      oldS.width !== newS.width ||
+      oldS.height !== newS.height ||
+      oldS.rotorRadius !== newS.rotorRadius
+    ) {
+      return true;
+    }
   }
   if (oldS.kind === "magnet" && newS.kind === "magnet") {
     if (oldS.radius !== newS.radius) return true;
@@ -906,6 +1102,12 @@ function makeShape(spec: BodySpec): planck.Shape {
   }
   if (spec.kind === "magnet") {
     return new planck.CircleShape(spec.radius);
+  }
+  if (spec.kind === "engine_rotor") {
+    return new planck.CircleShape(spec.radius);
+  }
+  if (spec.kind === "engine") {
+    return new planck.BoxShape(spec.width / 2, spec.height / 2);
   }
   return new planck.BoxShape(spec.width / 2, spec.height / 2);
 }
@@ -1001,7 +1203,10 @@ function buildConstraintView(record: ConstraintRecord): ConstraintView {
   );
 }
 
-function buildView(record: BodyRecord): BodyView {
+function buildView(
+  record: BodyRecord,
+  engineAssemblies: ReadonlyMap<Id, EngineAssembly>,
+): BodyView {
   const { id, spec, body } = record;
   const p = body.getPosition();
   const v = body.getLinearVelocity();
@@ -1045,12 +1250,27 @@ function buildView(record: BodyRecord): BodyView {
     });
   }
   if (spec.kind === "engine") {
+    const asm = engineAssemblies.get(record.id);
+    const rotorId = asm?.rotorId ?? record.id;
     return Object.freeze({
       ...base,
       kind: "engine" as const,
       width: spec.width,
       height: spec.height,
+      rotorRadius: spec.rotorRadius,
       torque: spec.torque,
+      rotorId,
+    });
+  }
+  if (spec.kind === "engine_rotor") {
+    const asm = engineAssemblies.get(spec.housingId);
+    const torque = asm?.spec.torque ?? 0;
+    return Object.freeze({
+      ...base,
+      kind: "engine_rotor" as const,
+      radius: spec.radius,
+      torque,
+      housingId: spec.housingId,
     });
   }
   return Object.freeze({

@@ -250,6 +250,16 @@ export class World {
 
   add(spec: BodySpec): Id {
     const finalSpec = clampBodySpecToConfig(spec, this._config);
+    if (finalSpec.kind === "engine") {
+      const housingId = this._nextId();
+      const rotorId = this._nextId();
+      this._adapter.addEnginePair(housingId, rotorId, finalSpec);
+      this._charges.register(housingId, finalSpec.charge ?? 0);
+      this._charges.register(rotorId, 0);
+      this._events.emit("add", { id: housingId });
+      this._events.emit("add", { id: rotorId });
+      return housingId;
+    }
     const id = this._nextId();
     this._adapter.add(id, finalSpec);
     this._charges.register(id, finalSpec.charge ?? 0);
@@ -262,15 +272,25 @@ export class World {
    * Clamps to the same limits as `add`. Pose and velocities stay as-is.
    */
   patchBody(id: Id, patch: BodyPatch): void {
-    if (!this._adapter.has(id)) return;
-    const prev = this._adapter.getBodySpec(id);
+    const housingId = this._adapter.resolveEngineHousingId(id) ?? id;
+    if (!this._adapter.has(housingId)) return;
+    const prev = this._adapter.getBodySpec(housingId);
     if (!prev) return;
     const next = clampBodySpecToConfig(mergeBodyPatch(prev, patch), this._config);
-    this._adapter.applyBodySpec(id, next);
-    this._charges.register(id, next.charge ?? 0);
+    this._adapter.applyBodySpec(housingId, next);
+    this._charges.register(housingId, next.charge ?? 0);
   }
 
   remove(id: Id): void {
+    const hid = this._adapter.resolveEngineHousingId(id);
+    if (hid !== null) {
+      const removed = this._adapter.removeEngineAssembly(hid);
+      for (const rid of removed) {
+        this._charges.unregister(rid);
+        this._events.emit("remove", { id: rid });
+      }
+      return;
+    }
     if (this._adapter.has(id)) {
       this._adapter.remove(id);
       this._charges.unregister(id);

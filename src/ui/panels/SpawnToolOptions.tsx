@@ -184,6 +184,21 @@ function EngineFields(props: {
         />
       </div>
       <div style={fieldStyle}>
+        <span style={labelStyle}>Flywheel</span>
+        <input
+          aria-label="Flywheel radius"
+          type="number"
+          min={0.05}
+          step={0.02}
+          style={inputStyle}
+          value={fmtInput(props.preset.flywheelRadius)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) props.onPatch({ flywheelRadius: Math.max(0.05, v) });
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
         <span style={labelStyle}>Torque</span>
         <input
           aria-label="Engine torque magnitude"

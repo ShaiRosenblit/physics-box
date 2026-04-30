@@ -108,7 +108,12 @@ function closestPointOnBodyHull(body: BodyView, p: { x: number; y: number }): {
   x: number;
   y: number;
 } {
-  if (body.kind === "ball" || body.kind === "balloon" || body.kind === "magnet") {
+  if (
+    body.kind === "ball" ||
+    body.kind === "balloon" ||
+    body.kind === "magnet" ||
+    body.kind === "engine_rotor"
+  ) {
     const dx = p.x - body.position.x;
     const dy = p.y - body.position.y;
     const len = Math.hypot(dx, dy);

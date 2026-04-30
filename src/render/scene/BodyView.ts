@@ -163,7 +163,10 @@ function woodBoxUseNineSlice(
 function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
   const sign = signOf(body.charge);
   const dSign = body.kind === "magnet" ? signOf(body.dipole) : 0;
-  const tSign = body.kind === "engine" ? signOf(body.torque) : 0;
+  const tSign =
+    body.kind === "engine" || body.kind === "engine_rotor"
+      ? signOf(body.torque)
+      : 0;
   const woodBox =
     body.kind === "box" && woodBoxUseNineSlice(body, raster);
   const woodBall =
@@ -275,7 +278,7 @@ function wrapRasterWoodBall(
   return c;
 }
 
-function drawEngineBody(
+function drawEngineHousing(
   g: Graphics,
   body: Extract<BodyView, { kind: "engine" }>,
   lineWidth: number,
@@ -288,26 +291,60 @@ function drawEngineBody(
   g.rect(-hw, -hh, body.width, body.height);
   g.fill({ color: style.fill, alpha: 1 });
   g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+  drawBoxGrain(g, body.material, hw, hh);
 
-  const tab = Math.min(hw, hh) * 0.22;
-  g.moveTo(hw, -tab);
-  g.lineTo(hw + tab * 0.85, -tab);
-  g.lineTo(hw + tab * 0.85, tab);
-  g.lineTo(hw, tab);
-  g.stroke({ width: lineWidth * 0.85, color: style.edge, alpha: 0.72 });
-
-  const rr = Math.min(hw, hh) * 0.5;
-  const ccw = body.torque >= 0;
-  const a0 = ccw ? 0.12 * Math.PI : -0.12 * Math.PI;
-  const a1 = ccw ? a0 - 1.1 * Math.PI : a0 + 1.1 * Math.PI;
-  g.arc(0, 0, rr, a0, a1, !ccw);
+  const bore = Math.min(body.rotorRadius, hw, hh) * 1.02;
+  g.circle(0, 0, bore);
   g.stroke({
-    width: lineWidth * 0.72,
+    width: lineWidth * 0.65,
     color: palette.inkMuted,
-    alpha: 0.52,
+    alpha: 0.42,
   });
 
+  const tab = Math.min(hw, hh) * 0.18;
+  g.moveTo(hw, -tab);
+  g.lineTo(hw + tab * 0.75, -tab);
+  g.lineTo(hw + tab * 0.75, tab);
+  g.lineTo(hw, tab);
+  g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.65 });
+
   drawChargeMark(g, body.charge, Math.min(hw, hh), lineWidth);
+}
+
+function drawEngineRotor(
+  g: Graphics,
+  body: Extract<BodyView, { kind: "engine_rotor" }>,
+  lineWidth: number,
+  style: { fill: number; edge: number },
+): void {
+  g.circle(0, -0.04, body.radius);
+  g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+  g.circle(0, 0, body.radius);
+  g.fill({ color: style.fill, alpha: 1 });
+  g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+
+  const hubR = body.radius * 0.18;
+  g.circle(0, 0, hubR);
+  g.fill({ color: palette.inkMuted, alpha: 0.35 });
+  g.stroke({ width: lineWidth * 0.65, color: style.edge, alpha: 0.55 });
+
+  const tickLen = body.radius * 0.55;
+  g.moveTo(0, 0);
+  g.lineTo(tickLen, 0);
+  g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.5 });
+
+  const rr = body.radius * 0.72;
+  const ccw = body.torque >= 0;
+  const a0 = ccw ? 0.12 * Math.PI : -0.12 * Math.PI;
+  const a1 = ccw ? a0 - 1.05 * Math.PI : a0 + 1.05 * Math.PI;
+  g.arc(0, 0, rr, a0, a1, !ccw);
+  g.stroke({
+    width: lineWidth * 0.7,
+    color: palette.inkMuted,
+    alpha: 0.48,
+  });
+
+  drawChargeMark(g, body.charge, body.radius, lineWidth);
 }
 
 function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
@@ -331,7 +368,9 @@ function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
     g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
     drawChargeMark(g, body.charge, body.radius, lineWidth);
   } else if (body.kind === "engine") {
-    drawEngineBody(g, body, lineWidth, style);
+    drawEngineHousing(g, body, lineWidth, style);
+  } else if (body.kind === "engine_rotor") {
+    drawEngineRotor(g, body, lineWidth, style);
   } else if (body.kind === "magnet") {
     g.circle(0, -0.04, body.radius);
     g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
@@ -381,7 +420,12 @@ export class SelectionView {
       this.node.position.set(body.position.x, body.position.y);
       this.node.rotation = body.angle;
 
-      if (body.kind === "ball" || body.kind === "balloon" || body.kind === "magnet") {
+      if (
+        body.kind === "ball" ||
+        body.kind === "balloon" ||
+        body.kind === "magnet" ||
+        body.kind === "engine_rotor"
+      ) {
         this.node.circle(0, 0, body.radius + inset);
         this.node.stroke({
           width: lineWidth,

@@ -150,6 +150,13 @@ function summarizeBody(view: BodyView): {
       tint: ui.fieldB,
     };
   }
+  if (view.kind === "engine_rotor") {
+    return {
+      label: `#${view.id} · Rotor`,
+      stats: `${speedStr} · τ ${fmt(view.torque)} N·m · ω ${fmt(view.angularVelocity)}`,
+      tint: ui.fieldB,
+    };
+  }
   if (view.kind === "engine") {
     return {
       label: `#${view.id} · Engine ${view.torque >= 0 ? "CCW" : "CW"}`,

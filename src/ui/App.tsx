@@ -301,6 +301,7 @@ export function App() {
           position: world,
           width: p.width,
           height: p.height,
+          rotorRadius: p.flywheelRadius,
           torque: sign * p.torqueMagnitude,
           material: p.material,
           linearDamping: p.linearDamping,

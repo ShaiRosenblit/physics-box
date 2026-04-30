@@ -320,7 +320,12 @@ function computeBounds(
   for (const body of snapshot.bodies) {
     let halfX: number;
     let halfY: number;
-    if (body.kind === "ball" || body.kind === "balloon" || body.kind === "magnet") {
+    if (
+      body.kind === "ball" ||
+      body.kind === "balloon" ||
+      body.kind === "magnet" ||
+      body.kind === "engine_rotor"
+    ) {
       halfX = body.radius;
       halfY = body.radius;
     } else {

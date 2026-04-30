@@ -67,6 +67,7 @@ export function welcome(world: World): void {
       position: { x: -3.8, y: 0.14 },
       width: 0.38,
       height: 0.24,
+      rotorRadius: 0.09,
       torque: 140,
       angularDamping: 0.12,
     }),

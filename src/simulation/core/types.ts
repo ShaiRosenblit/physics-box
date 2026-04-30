@@ -5,7 +5,13 @@ export interface Vec2 {
   readonly y: number;
 }
 
-export type BodyKind = "ball" | "balloon" | "box" | "engine" | "magnet";
+export type BodyKind =
+  | "ball"
+  | "balloon"
+  | "box"
+  | "engine"
+  | "engine_rotor"
+  | "magnet";
 
 export type MaterialName = "wood" | "metal" | "cork" | "felt" | "latex";
 
@@ -50,13 +56,22 @@ export interface BoxSpec extends BaseBodySpec {
   readonly height: number;
 }
 
-/** Rectangular motor: applies a constant torque to itself each substep while dynamic. */
+/** Rectangular housing; rotor is a separate body in a revolute joint. */
 export interface EngineSpec extends BaseBodySpec {
   readonly kind: "engine";
   readonly width: number;
   readonly height: number;
-  /** Drive torque (N·m, Planck z); CCW positive. */
+  /** Dynamic disc radius; must fit inside the housing (sanitized on add/patch). */
+  readonly rotorRadius: number;
+  /** Drive torque (N·m, Planck z) applied to the rotor each substep; CCW positive. */
   readonly torque: number;
+}
+
+/** Internal: flywheel driven by parent `EngineSpec` (same assembly). Not spawned via `World.add` alone. */
+export interface EngineRotorSpec extends BaseBodySpec {
+  readonly kind: "engine_rotor";
+  readonly radius: number;
+  readonly housingId: Id;
 }
 
 export interface MagnetSpec extends BaseBodySpec {
@@ -70,7 +85,13 @@ export interface MagnetSpec extends BaseBodySpec {
   readonly dipole: number;
 }
 
-export type BodySpec = BallSpec | BalloonSpec | BoxSpec | EngineSpec | MagnetSpec;
+export type BodySpec =
+  | BallSpec
+  | BalloonSpec
+  | BoxSpec
+  | EngineSpec
+  | EngineRotorSpec
+  | MagnetSpec;
 
 /** Sparse mutation payload for patchBody — ignored keys stay unchanged. */
 export interface BodyPatch {
@@ -92,6 +113,7 @@ export interface BodyPatch {
   readonly height?: number;
   readonly dipole?: number;
   readonly torque?: number;
+  readonly rotorRadius?: number;
 }
 
 export interface BaseBodyView {
@@ -128,11 +150,20 @@ export interface BoxView extends BaseBodyView {
   readonly height: number;
 }
 
-export interface EngineView extends BaseBodyView {
+export interface EngineHousingView extends BaseBodyView {
   readonly kind: "engine";
   readonly width: number;
   readonly height: number;
+  readonly rotorRadius: number;
   readonly torque: number;
+  readonly rotorId: Id;
+}
+
+export interface EngineRotorView extends BaseBodyView {
+  readonly kind: "engine_rotor";
+  readonly radius: number;
+  readonly torque: number;
+  readonly housingId: Id;
 }
 
 export interface MagnetView extends BaseBodyView {
@@ -141,7 +172,13 @@ export interface MagnetView extends BaseBodyView {
   readonly dipole: number;
 }
 
-export type BodyView = BallView | BalloonView | BoxView | EngineView | MagnetView;
+export type BodyView =
+  | BallView
+  | BalloonView
+  | BoxView
+  | EngineHousingView
+  | EngineRotorView
+  | MagnetView;
 
 export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }
