@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ball, box, defaultSceneName } from "../simulation";
+import { ball, box, defaultSceneName, magnet } from "../simulation";
 import { Renderer } from "../render";
 import { Toolbar } from "./panels/Toolbar";
 import { Inspector } from "./panels/Inspector";
@@ -15,8 +15,11 @@ export function App() {
 
   const showGrid = useUIStore((s) => s.showGrid);
   const showEField = useUIStore((s) => s.showEField);
+  const showBField = useUIStore((s) => s.showBField);
   const hasCharges = useUIStore((s) => s.hasCharges);
+  const hasMagnets = useUIStore((s) => s.hasMagnets);
   const setHasCharges = useUIStore((s) => s.setHasCharges);
+  const setHasMagnets = useUIStore((s) => s.setHasMagnets);
   const setRunning = useUIStore((s) => s.setRunning);
 
   useEffect(() => {
@@ -38,6 +41,7 @@ export function App() {
       const snap = sim.world.snapshot();
       renderer.render(snap);
       setHasCharges(snap.charges.length > 0);
+      setHasMagnets(snap.magnets.length > 0);
       raf = requestAnimationFrame(loop);
     };
 
@@ -63,6 +67,10 @@ export function App() {
   useEffect(() => {
     rendererRef.current?.setShowEField(showEField && hasCharges);
   }, [showEField, hasCharges]);
+
+  useEffect(() => {
+    rendererRef.current?.setShowBField(showBField && hasMagnets);
+  }, [showBField, hasMagnets]);
 
   const onPlay = () => {
     sim.resume();
@@ -113,6 +121,14 @@ export function App() {
       sim.add(
         ball({ position: world, radius: 0.32, material: "metal", charge: -4 }),
       );
+      return;
+    }
+    if (tool === "magnet+") {
+      sim.add(magnet({ position: world, radius: 0.32, dipole: 12 }));
+      return;
+    }
+    if (tool === "magnet-") {
+      sim.add(magnet({ position: world, radius: 0.32, dipole: -12 }));
       return;
     }
     if (tool === "box") {

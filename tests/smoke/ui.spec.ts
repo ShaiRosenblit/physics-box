@@ -39,6 +39,8 @@ test.describe("UI smoke", () => {
       "tool-box",
       "tool-ball+",
       "tool-ball-",
+      "tool-magnet+",
+      "tool-magnet-",
     ]) {
       await expect(page.getByTestId(id)).toBeVisible();
     }
@@ -46,12 +48,12 @@ test.describe("UI smoke", () => {
       await expect(page.getByTestId(id)).toBeVisible();
     }
 
-    // Welcome scene seeds two charged balls, so E-field is enabled.
+    // Welcome scene seeds charged balls and magnets, so both toggles are live.
     await expect(page.getByTestId("toggle-e-field")).not.toHaveAttribute(
       "aria-disabled",
       "true",
     );
-    await expect(page.getByTestId("toggle-b-field")).toHaveAttribute(
+    await expect(page.getByTestId("toggle-b-field")).not.toHaveAttribute(
       "aria-disabled",
       "true",
     );

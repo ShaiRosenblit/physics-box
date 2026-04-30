@@ -65,6 +65,11 @@ export class Renderer {
     this._lastFieldTick = -1;
   }
 
+  setShowBField(visible: boolean): void {
+    this.fieldView.setShowB(visible);
+    this._lastFieldTick = -1;
+  }
+
   /** Drop all body and constraint display objects. */
   reset(): void {
     this.bodyLayer.clear();
@@ -164,7 +169,7 @@ export class Renderer {
     this._lastFieldZoom = zoom;
     this._lastFieldCenterX = center.x;
     this._lastFieldCenterY = center.y;
-    this.fieldView.update(snapshot.charges, this._camera);
+    this.fieldView.update(snapshot.charges, snapshot.magnets, this._camera);
   }
 
   dispose(): void {

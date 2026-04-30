@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import type { Id, SceneName } from "../../simulation";
 
-export type Tool = "select" | "ball" | "box" | "ball+" | "ball-";
+export type Tool =
+  | "select"
+  | "ball"
+  | "box"
+  | "ball+"
+  | "ball-"
+  | "magnet+"
+  | "magnet-";
 
 export interface UIState {
   tool: Tool;

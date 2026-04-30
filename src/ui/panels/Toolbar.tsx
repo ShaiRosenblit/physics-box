@@ -12,6 +12,8 @@ const tools: readonly ToolDef[] = [
   { id: "box", label: "Box" },
   { id: "ball+", label: "Ball (+)" },
   { id: "ball-", label: "Ball (−)" },
+  { id: "magnet+", label: "Magnet N" },
+  { id: "magnet-", label: "Magnet S" },
 ];
 
 export function Toolbar() {

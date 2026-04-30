@@ -1,6 +1,7 @@
 import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
 import { box } from "../mechanics/box";
+import { magnet } from "../mechanics/magnet";
 import { rope } from "../mechanics/rope";
 import { hinge } from "../mechanics/hinge";
 import { spring } from "../mechanics/spring";
@@ -154,6 +155,32 @@ export function welcome(world: World): void {
       restLength: 2.0,
       frequencyHz: 3,
       dampingRatio: 0.9,
+    }),
+  );
+
+  const magN = world.add(
+    magnet({ position: { x: -2.0, y: 7.5 }, radius: 0.32, dipole: 10 }),
+  );
+  world.addConstraint(
+    spring({
+      a: worldAnchor({ x: -2.0, y: 9.0 }),
+      b: bodyAnchor(magN),
+      restLength: 1.5,
+      frequencyHz: 3,
+      dampingRatio: 0.95,
+    }),
+  );
+
+  const magS = world.add(
+    magnet({ position: { x: 2.0, y: 7.5 }, radius: 0.32, dipole: -10 }),
+  );
+  world.addConstraint(
+    spring({
+      a: worldAnchor({ x: 2.0, y: 9.0 }),
+      b: bodyAnchor(magS),
+      restLength: 1.5,
+      frequencyHz: 3,
+      dampingRatio: 0.95,
     }),
   );
 }

@@ -2,8 +2,11 @@ import { Container, Graphics } from "pixi.js";
 import {
   emConstants,
   sampleE,
+  sampleGradB,
   type ChargedBodyState,
   type ChargedSourceView,
+  type MagneticBodyState,
+  type MagneticSourceView,
   type SimulationConfig,
   type Vec2,
 } from "../../simulation";
@@ -21,12 +24,15 @@ import type { Camera } from "../camera/Camera";
 export class FieldView {
   readonly container = new Container();
   private readonly eGraphics = new Graphics();
+  private readonly bGraphics = new Graphics();
   private readonly config: SimulationConfig;
 
   private showE = true;
+  private showB = true;
 
   constructor(config: SimulationConfig) {
     this.config = config;
+    this.container.addChild(this.bGraphics);
     this.container.addChild(this.eGraphics);
   }
 
@@ -35,11 +41,25 @@ export class FieldView {
     this.eGraphics.visible = visible;
   }
 
+  setShowB(visible: boolean): void {
+    this.showB = visible;
+    this.bGraphics.visible = visible;
+  }
+
   /**
    * Redraw the field. Cheap to call but should be throttled by the
    * caller for performance.
    */
-  update(charges: readonly ChargedSourceView[], camera: Camera): void {
+  update(
+    charges: readonly ChargedSourceView[],
+    magnets: readonly MagneticSourceView[],
+    camera: Camera,
+  ): void {
+    this.drawEField(charges, camera);
+    this.drawBField(magnets, camera);
+  }
+
+  private drawEField(charges: readonly ChargedSourceView[], camera: Camera): void {
     this.eGraphics.clear();
     if (!this.showE) return;
     if (charges.length === 0) {
@@ -78,6 +98,119 @@ export class FieldView {
         this.traceStreamline(seed, direction, stepSize, maxSteps, states, ec, bounds, lineWidth);
       }
     }
+  }
+
+  private drawBField(
+    magnets: readonly MagneticSourceView[],
+    camera: Camera,
+  ): void {
+    this.bGraphics.clear();
+    if (!this.showB) return;
+    if (magnets.length === 0) {
+      this.bGraphics.visible = false;
+      return;
+    }
+    this.bGraphics.visible = true;
+
+    const states: MagneticBodyState[] = magnets.map((m) => ({
+      id: m.id,
+      position: m.position,
+      dipole: m.dipole,
+    }));
+    const ec = emConstants(this.config);
+    const bounds = camera.visibleBounds();
+    const diag = Math.hypot(
+      bounds.maxX - bounds.minX,
+      bounds.maxY - bounds.minY,
+    );
+    const stepSize = Math.max(0.05, diag / 240);
+    const maxSteps = 300;
+    const lineWidth = stroke.fieldLine / camera.zoom;
+
+    const seedCount = 8;
+
+    for (const m of states) {
+      for (let ring = 0; ring < 3; ring++) {
+        const r = 0.35 + ring * 0.6;
+        for (let i = 0; i < seedCount; i++) {
+          const theta = (i / seedCount) * Math.PI * 2 + ring * 0.18;
+          const seed: Vec2 = {
+            x: m.position.x + Math.cos(theta) * r,
+            y: m.position.y + Math.sin(theta) * r,
+          };
+          this.traceBStreamline(seed, stepSize, maxSteps, states, ec, bounds, lineWidth);
+        }
+      }
+    }
+  }
+
+  private traceBStreamline(
+    start: Vec2,
+    stepSize: number,
+    maxSteps: number,
+    magnets: readonly MagneticBodyState[],
+    ec: ReturnType<typeof emConstants>,
+    bounds: { minX: number; minY: number; maxX: number; maxY: number },
+    lineWidth: number,
+  ): void {
+    let x = start.x;
+    let y = start.y;
+    const points: number[] = [x, y];
+    const startX = x;
+    const startY = y;
+
+    for (let step = 0; step < maxSteps; step++) {
+      const g = sampleGradB({ x, y }, magnets, ec);
+      const m = Math.hypot(g.x, g.y);
+      if (m < 1e-6) break;
+      // Tangent to level curve = perpendicular to gradient, rotated 90°.
+      const tx = -g.y / m;
+      const ty = g.x / m;
+
+      const midX = x + tx * stepSize * 0.5;
+      const midY = y + ty * stepSize * 0.5;
+      const g2 = sampleGradB({ x: midX, y: midY }, magnets, ec);
+      const m2 = Math.hypot(g2.x, g2.y);
+      if (m2 < 1e-6) break;
+      const ux = -g2.y / m2;
+      const uy = g2.x / m2;
+
+      x += ux * stepSize;
+      y += uy * stepSize;
+
+      if (
+        x < bounds.minX ||
+        x > bounds.maxX ||
+        y < bounds.minY ||
+        y > bounds.maxY
+      ) {
+        points.push(x, y);
+        break;
+      }
+
+      points.push(x, y);
+
+      // Closed-loop early exit: returned near start after some travel.
+      if (
+        step > 16 &&
+        Math.hypot(x - startX, y - startY) < stepSize * 1.2
+      ) {
+        points.push(startX, startY);
+        break;
+      }
+    }
+
+    if (points.length < 4) return;
+
+    this.bGraphics.moveTo(points[0], points[1]);
+    for (let i = 2; i < points.length; i += 2) {
+      this.bGraphics.lineTo(points[i], points[i + 1]);
+    }
+    this.bGraphics.stroke({
+      color: palette.fieldB,
+      width: lineWidth,
+      alpha: 0.5,
+    });
   }
 
   private traceStreamline(
