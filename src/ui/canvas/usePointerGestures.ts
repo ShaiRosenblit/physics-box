@@ -146,6 +146,11 @@ function isSpawnTool(tool: string): SpawnMode | null {
   return null;
 }
 
+/** When the canvas tool id is a spawn tool, returns its spawn mode. */
+export function activeSpawnModeFromTool(tool: string): SpawnMode | null {
+  return isSpawnTool(tool);
+}
+
 /**
  * Centralized pointer-gesture handler for the canvas host.
  *

@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import { defaultSceneName, type Id, type SceneName } from "../../simulation";
+import {
+  defaultSceneName,
+  type Id,
+  type MaterialName,
+  type SceneName,
+} from "../../simulation";
 
 export type Tool =
   | "select"
@@ -13,6 +18,86 @@ export type Tool =
   | "hinge"
   | "spring"
   | "pulley";
+
+/** Default parameters used the next time a spawn tool places a body. */
+export interface NeutralBallSpawnPreset {
+  radius: number;
+  material: MaterialName;
+  linearDamping: number;
+  angularDamping: number;
+  collideDynamicBalls: boolean;
+}
+
+export interface ChargedBallSpawnPreset extends NeutralBallSpawnPreset {
+  charge: number;
+}
+
+export interface MagnetSpawnPreset {
+  radius: number;
+  dipoleMagnitude: number;
+}
+
+export interface BoxSpawnPreset {
+  width: number;
+  height: number;
+  material: MaterialName;
+  linearDamping: number;
+  angularDamping: number;
+}
+
+export type SpawnPresetsBundle = {
+  ball: NeutralBallSpawnPreset;
+  ballPlus: ChargedBallSpawnPreset;
+  ballMinus: ChargedBallSpawnPreset;
+  magnetPlus: MagnetSpawnPreset;
+  magnetMinus: MagnetSpawnPreset;
+  box: BoxSpawnPreset;
+};
+
+export type SpawnPresetKey = keyof SpawnPresetsBundle;
+
+export function createDefaultSpawnPresets(): SpawnPresetsBundle {
+  return {
+    ball: {
+      radius: 0.4,
+      material: "wood",
+      linearDamping: 0,
+      angularDamping: 0,
+      collideDynamicBalls: true,
+    },
+    ballPlus: {
+      radius: 0.32,
+      material: "metal",
+      linearDamping: 0,
+      angularDamping: 0,
+      collideDynamicBalls: true,
+      charge: 4,
+    },
+    ballMinus: {
+      radius: 0.32,
+      material: "metal",
+      linearDamping: 0,
+      angularDamping: 0,
+      collideDynamicBalls: true,
+      charge: -4,
+    },
+    magnetPlus: {
+      radius: 0.32,
+      dipoleMagnitude: 12,
+    },
+    magnetMinus: {
+      radius: 0.32,
+      dipoleMagnitude: 12,
+    },
+    box: {
+      width: 0.7,
+      height: 0.7,
+      material: "wood",
+      linearDamping: 0,
+      angularDamping: 0,
+    },
+  };
+}
 
 /** Connector tools place a constraint over two clicks rather than spawning a body. */
 export const CONNECTOR_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
@@ -47,6 +132,9 @@ export interface UIState {
   running: boolean;
   scene: SceneName;
 
+  /** Per-tool defaults merged into spawned `BodySpec`s (placement only). */
+  spawnPresets: SpawnPresetsBundle;
+
   setTool: (tool: Tool) => void;
   setSelectedId: (id: Id | null) => void;
   toggleGrid: () => void;
@@ -59,6 +147,10 @@ export interface UIState {
   setDragging: (dragging: boolean) => void;
   setRunning: (running: boolean) => void;
   setScene: (scene: SceneName) => void;
+  setSpawnPresetPartial: <K extends SpawnPresetKey>(
+    key: K,
+    partial: Partial<SpawnPresetsBundle[K]>,
+  ) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -79,6 +171,8 @@ export const useUIStore = create<UIState>((set) => ({
   running: true,
   scene: defaultSceneName,
 
+  spawnPresets: createDefaultSpawnPresets(),
+
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
@@ -94,4 +188,11 @@ export const useUIStore = create<UIState>((set) => ({
     set((s) => (s.dragging === dragging ? s : { dragging })),
   setRunning: (running) => set({ running }),
   setScene: (scene) => set({ scene }),
+  setSpawnPresetPartial: (key, partial) =>
+    set((state) => ({
+      spawnPresets: {
+        ...state.spawnPresets,
+        [key]: { ...state.spawnPresets[key], ...partial },
+      },
+    })),
 }));

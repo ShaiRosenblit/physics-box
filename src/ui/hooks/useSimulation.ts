@@ -4,6 +4,7 @@ import {
   scenes,
   defaultConfig,
   playbackTimeScale,
+  type BodyPatch,
   type BodySpec,
   type Id,
   type SceneName,
@@ -26,6 +27,8 @@ export interface SimulationApi {
   /** Reset the kernel and apply the named scene. Returns the loaded scene. */
   loadScene(name: SceneName): SceneName;
   setGravityEnabled(enabled: boolean): void;
+  /** Update body parameters without changing pose or velocities. */
+  patchBody(id: Id, patch: BodyPatch): void;
 }
 
 /**
@@ -79,6 +82,13 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
     [world],
   );
 
+  const patchBody = useCallback(
+    (id: Id, patch: BodyPatch) => {
+      world.patchBody(id, patch);
+    },
+    [world],
+  );
+
   return {
     world,
     tick,
@@ -90,5 +100,6 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
     stepOnce,
     loadScene,
     setGravityEnabled,
+    patchBody,
   };
 }

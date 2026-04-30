@@ -20,6 +20,7 @@ import {
 import { Renderer } from "../render";
 import type { ConnectorPreviewState } from "../render/scene/ConnectorPreviewView";
 import { Toolbar } from "./panels/Toolbar";
+import { SpawnToolOptions } from "./panels/SpawnToolOptions";
 import { Inspector } from "./panels/Inspector";
 import { InspectorPeek } from "./panels/InspectorPeek";
 import { PlaybackBar } from "./panels/PlaybackBar";
@@ -198,23 +199,66 @@ export function App() {
   };
 
   const handleSpawn = (kind: SpawnMode, world: Vec2) => {
+    const presets = useUIStore.getState().spawnPresets;
     if (kind === "ball") {
-      sim.add(ball({ position: world, radius: 0.4, material: "wood" }));
-    } else if (kind === "ball+") {
+      const p = presets.ball;
       sim.add(
-        ball({ position: world, radius: 0.32, material: "metal", charge: 4 }),
+        ball({
+          position: world,
+          radius: p.radius,
+          material: p.material,
+          linearDamping: p.linearDamping,
+          angularDamping: p.angularDamping,
+          ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+        }),
+      );
+    } else if (kind === "ball+") {
+      const p = presets.ballPlus;
+      sim.add(
+        ball({
+          position: world,
+          radius: p.radius,
+          material: p.material,
+          linearDamping: p.linearDamping,
+          angularDamping: p.angularDamping,
+          charge: p.charge,
+          ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+        }),
       );
     } else if (kind === "ball-") {
+      const p = presets.ballMinus;
       sim.add(
-        ball({ position: world, radius: 0.32, material: "metal", charge: -4 }),
+        ball({
+          position: world,
+          radius: p.radius,
+          material: p.material,
+          linearDamping: p.linearDamping,
+          angularDamping: p.angularDamping,
+          charge: p.charge,
+          ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+        }),
       );
-    } else if (kind === "magnet+") {
-      sim.add(magnet({ position: world, radius: 0.32, dipole: 12 }));
-    } else if (kind === "magnet-") {
-      sim.add(magnet({ position: world, radius: 0.32, dipole: -12 }));
-    } else if (kind === "box") {
+    } else if (kind === "magnet+" || kind === "magnet-") {
+      const p = kind === "magnet+" ? presets.magnetPlus : presets.magnetMinus;
+      const sign = kind === "magnet+" ? 1 : -1;
       sim.add(
-        box({ position: world, width: 0.7, height: 0.7, material: "wood" }),
+        magnet({
+          position: world,
+          radius: p.radius,
+          dipole: sign * p.dipoleMagnitude,
+        }),
+      );
+    } else if (kind === "box") {
+      const p = presets.box;
+      sim.add(
+        box({
+          position: world,
+          width: p.width,
+          height: p.height,
+          material: p.material,
+          linearDamping: p.linearDamping,
+          angularDamping: p.angularDamping,
+        }),
       );
     }
   };
@@ -326,7 +370,9 @@ export function App() {
           {isTablet && <Toolbar variant="rail" />}
           {isDesktop && <Toolbar variant="panel" />}
 
-          <main style={canvasArea}>
+          <main style={canvasColumn}>
+            <SpawnToolOptions />
+            <div style={canvasStage}>
             <div
               ref={hostRef}
               data-testid={testIds.canvasHost}
@@ -403,6 +449,7 @@ export function App() {
                 <Inspector variant="sheet" />
               </Drawer>
             )}
+            </div>
           </main>
 
           {isDesktop && <Inspector variant="panel" />}
@@ -533,12 +580,20 @@ const mainRow: React.CSSProperties = {
   minWidth: 0,
 };
 
-const canvasArea: React.CSSProperties = {
+const canvasColumn: React.CSSProperties = {
   flex: 1,
+  display: "flex",
+  flexDirection: "column",
   position: "relative",
   background: "#f5efe6",
-  overflow: "hidden",
   minWidth: 0,
+  minHeight: 0,
+};
+
+const canvasStage: React.CSSProperties = {
+  flex: 1,
+  position: "relative",
+  overflow: "hidden",
   minHeight: 0,
 };
 

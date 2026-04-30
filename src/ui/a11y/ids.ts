@@ -28,4 +28,5 @@ export const testIds = {
   drawerInspector: "drawer-inspector",
   inspectorPeek: "inspector-peek",
   buttonFitView: "button-fit-view",
+  spawnToolOptions: "spawn-tool-options",
 } as const;
