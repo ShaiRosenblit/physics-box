@@ -33,14 +33,21 @@ test.describe("UI smoke", () => {
   test("exposes tool buttons and view toggles", async ({ page }) => {
     await page.goto("/");
 
-    for (const id of ["tool-select", "tool-ball", "tool-box"]) {
+    for (const id of [
+      "tool-select",
+      "tool-ball",
+      "tool-box",
+      "tool-ball+",
+      "tool-ball-",
+    ]) {
       await expect(page.getByTestId(id)).toBeVisible();
     }
     for (const id of ["toggle-grid", "toggle-e-field", "toggle-b-field"]) {
       await expect(page.getByTestId(id)).toBeVisible();
     }
 
-    await expect(page.getByTestId("toggle-e-field")).toHaveAttribute(
+    // Welcome scene seeds two charged balls, so E-field is enabled.
+    await expect(page.getByTestId("toggle-e-field")).not.toHaveAttribute(
       "aria-disabled",
       "true",
     );
@@ -48,6 +55,36 @@ test.describe("UI smoke", () => {
       "aria-disabled",
       "true",
     );
+  });
+
+  test("first-milestone: spawning two like charges drives them apart", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByTestId("button-pause").click();
+    await page.getByTestId("button-reset").click();
+    await page.getByTestId("button-pause").click();
+
+    const canvas = page.getByTestId("canvas-host");
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("canvas not laid out");
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height * 0.4;
+
+    await page.getByTestId("tool-ball+").click();
+    await canvas.click({ position: { x: cx - box.x - 30, y: cy - box.y } });
+    await canvas.click({ position: { x: cx - box.x + 30, y: cy - box.y } });
+
+    // E-field toggle becomes enabled once charges exist
+    await expect(page.getByTestId("toggle-e-field")).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await page.getByTestId("button-play").click();
+    await page.waitForTimeout(800);
+    const tick = page.getByTestId("tick-counter");
+    expect(parseTick(await tick.textContent())).toBeGreaterThan(0);
   });
 
   test("tick counter advances when running and freezes when paused", async ({

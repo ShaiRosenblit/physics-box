@@ -103,6 +103,18 @@ export function App() {
       sim.add(ball({ position: world, radius: 0.4, material: "wood" }));
       return;
     }
+    if (tool === "ball+") {
+      sim.add(
+        ball({ position: world, radius: 0.32, material: "metal", charge: 4 }),
+      );
+      return;
+    }
+    if (tool === "ball-") {
+      sim.add(
+        ball({ position: world, radius: 0.32, material: "metal", charge: -4 }),
+      );
+      return;
+    }
     if (tool === "box") {
       sim.add(
         box({ position: world, width: 0.7, height: 0.7, material: "wood" }),

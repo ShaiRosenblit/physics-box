@@ -10,6 +10,8 @@ const tools: readonly ToolDef[] = [
   { id: "select", label: "Select" },
   { id: "ball", label: "Ball" },
   { id: "box", label: "Box" },
+  { id: "ball+", label: "Ball (+)" },
+  { id: "ball-", label: "Ball (−)" },
 ];
 
 export function Toolbar() {
