@@ -8,6 +8,11 @@ import { ChargeRegistry } from "../electromagnetism/ChargeRegistry";
 import { computeCoulombForces } from "../electromagnetism/coulomb";
 import { emConstants } from "../electromagnetism/constants";
 import { sampleE } from "../electromagnetism/field";
+import {
+  computeLorentzForces,
+  computeMagnetPairForces,
+} from "../electromagnetism/lorentz";
+import { sampleB } from "../electromagnetism/magnetism";
 
 /**
  * The simulation kernel facade.
@@ -37,28 +42,41 @@ export class World {
 
   private registerEmSolvers(): void {
     this._preStepHooks.push(() => {
-      if (this._charges.size() < 2) return;
-      const states = this._adapter
-        .collectChargedBodies()
-        .sort((a, b) => a.id - b.id);
-      if (states.length < 2) return;
-      const forces = computeCoulombForces(states, emConstants(this._config));
-      this._adapter.applyForces(forces);
+      const ec = emConstants(this._config);
+      const charges = this._charges.size() === 0
+        ? []
+        : this._adapter.collectChargedBodies().sort((a, b) => a.id - b.id);
+      const magnets = this._adapter.collectMagnets().sort((a, b) => a.id - b.id);
+
+      if (charges.length >= 2) {
+        const f = computeCoulombForces(charges, ec);
+        this._adapter.applyForces(f);
+      }
+      if (charges.length > 0 && magnets.length > 0) {
+        const f = computeLorentzForces(charges, magnets, ec);
+        if (f.size > 0) this._adapter.applyForces(f);
+      }
+      if (magnets.length >= 2) {
+        const f = computeMagnetPairForces(magnets, ec);
+        if (f.size > 0) this._adapter.applyForces(f);
+      }
     });
   }
 
   /**
-   * Sample the electric field at the given world point. Returns the
-   * zero vector if there are no charged bodies.
+   * Sample the electric and magnetic fields at the given world point.
+   * E is a 2D vector (V/m), B is a scalar (out-of-plane component).
    */
-  sampleField(p: Vec2): { readonly E: Vec2 } {
-    if (this._charges.size() === 0) {
-      return { E: { x: 0, y: 0 } };
-    }
-    const states = this._adapter
-      .collectChargedBodies()
-      .sort((a, b) => a.id - b.id);
-    return { E: sampleE(p, states, emConstants(this._config)) };
+  sampleField(p: Vec2): { readonly E: Vec2; readonly B: number } {
+    const ec = emConstants(this._config);
+    const charges = this._charges.size() === 0
+      ? []
+      : this._adapter.collectChargedBodies().sort((a, b) => a.id - b.id);
+    const magnets = this._adapter.collectMagnets().sort((a, b) => a.id - b.id);
+    return {
+      E: charges.length === 0 ? { x: 0, y: 0 } : sampleE(p, charges, ec),
+      B: magnets.length === 0 ? 0 : sampleB(p, magnets, ec),
+    };
   }
 
   /**
@@ -117,12 +135,19 @@ export class World {
   }
 
   add(spec: BodySpec): Id {
+    let finalSpec = spec;
     const charge = spec.charge ?? 0;
-    const clamped = clampToCap(charge, this._config.maxCharge);
-    const finalSpec = clamped === charge ? spec : { ...spec, charge: clamped };
+    const clampedQ = clampToCap(charge, this._config.maxCharge);
+    if (clampedQ !== charge) finalSpec = { ...finalSpec, charge: clampedQ };
+    if (finalSpec.kind === "magnet") {
+      const clampedM = clampToCap(finalSpec.dipole, this._config.maxDipole);
+      if (clampedM !== finalSpec.dipole) {
+        finalSpec = { ...finalSpec, dipole: clampedM };
+      }
+    }
     const id = this._nextId();
     this._adapter.add(id, finalSpec);
-    if (clamped !== 0) this._charges.register(id, clamped);
+    if (clampedQ !== 0) this._charges.register(id, clampedQ);
     this._events.emit("add", { id });
     return id;
   }

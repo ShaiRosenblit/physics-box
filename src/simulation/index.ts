@@ -49,6 +49,15 @@ export {
 export { ChargeRegistry } from "./electromagnetism/ChargeRegistry";
 export { computeCoulombForces, type ChargedBodyState } from "./electromagnetism/coulomb";
 export { sampleE } from "./electromagnetism/field";
+export {
+  sampleB,
+  sampleGradB,
+  type MagneticBodyState,
+} from "./electromagnetism/magnetism";
+export {
+  computeLorentzForces,
+  computeMagnetPairForces,
+} from "./electromagnetism/lorentz";
 export { emConstants, type EmConstants } from "./electromagnetism/constants";
 export type {
   BallInput,
