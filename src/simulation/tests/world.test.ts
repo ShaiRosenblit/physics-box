@@ -1,0 +1,105 @@
+import { describe, expect, it } from "vitest";
+import { World, ball, box, defaultConfig } from "..";
+
+const TICK = defaultConfig.dt;
+
+function stepFor(world: World, ticks: number): void {
+  for (let i = 0; i < ticks; i++) world.stepOnce();
+}
+
+describe("World", () => {
+  it("starts at tick 0 with no bodies", () => {
+    const world = new World();
+    const snap = world.snapshot();
+    expect(snap.tick).toBe(0);
+    expect(snap.time).toBe(0);
+    expect(snap.bodies.length).toBe(0);
+  });
+
+  it("issues stable, monotonically increasing ids", () => {
+    const world = new World();
+    const a = world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    const b = world.add(ball({ position: { x: 1, y: 5 }, radius: 0.5 }));
+    const c = world.add(box({ position: { x: 2, y: 5 }, width: 1, height: 1 }));
+    expect(b).toBeGreaterThan(a);
+    expect(c).toBeGreaterThan(b);
+  });
+
+  it("returns frozen snapshots that the caller cannot mutate", () => {
+    const world = new World();
+    world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    const snap = world.snapshot();
+    expect(Object.isFrozen(snap)).toBe(true);
+    expect(Object.isFrozen(snap.bodies)).toBe(true);
+    expect(Object.isFrozen(snap.bodies[0])).toBe(true);
+  });
+
+  it("advances the tick counter once per fixed substep", () => {
+    const world = new World();
+    expect(world.tick).toBe(0);
+    world.step(TICK * 5 + TICK * 0.1);
+    expect(world.tick).toBe(5);
+  });
+
+  it("does not advance when paused", () => {
+    const world = new World();
+    world.pause();
+    world.step(TICK * 10);
+    expect(world.tick).toBe(0);
+  });
+
+  it("removes bodies cleanly", () => {
+    const world = new World();
+    const id = world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));
+    expect(world.snapshot().bodies.length).toBe(1);
+    world.remove(id);
+    expect(world.snapshot().bodies.length).toBe(0);
+    world.remove(id);
+    expect(world.snapshot().bodies.length).toBe(0);
+  });
+
+  it("emits add/remove/step events", () => {
+    const world = new World();
+    const adds: number[] = [];
+    const removes: number[] = [];
+    const steps: number[] = [];
+    world.on("add", ({ id }) => adds.push(id));
+    world.on("remove", ({ id }) => removes.push(id));
+    world.on("step", ({ tick }) => steps.push(tick));
+    const id = world.add(ball({ position: { x: 0, y: 1 }, radius: 0.5 }));
+    world.stepOnce();
+    world.remove(id);
+    expect(adds).toEqual([id]);
+    expect(removes).toEqual([id]);
+    expect(steps).toEqual([1]);
+  });
+
+  it("falls under gravity and rests on a static box (collision)", () => {
+    const world = new World();
+    const groundTopY = 0;
+    const groundHeight = 0.5;
+    const groundCenterY = groundTopY - groundHeight / 2;
+    world.add(
+      box({
+        position: { x: 0, y: groundCenterY },
+        width: 20,
+        height: groundHeight,
+        fixed: true,
+      }),
+    );
+    const radius = 0.5;
+    const ballId = world.add(
+      ball({ position: { x: 0, y: 5 }, radius, material: "metal" }),
+    );
+
+    stepFor(world, 600);
+
+    const view = world
+      .snapshot()
+      .bodies.find((b) => b.id === ballId)!;
+    expect(view.kind).toBe("ball");
+    expect(view.position.y).toBeGreaterThan(groundTopY);
+    expect(view.position.y).toBeLessThan(groundTopY + radius * 1.5);
+    expect(Math.abs(view.velocity.y)).toBeLessThan(0.05);
+  });
+});
