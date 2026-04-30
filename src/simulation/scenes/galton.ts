@@ -17,7 +17,7 @@ function halton1d(index: number, base: 2 | 3): number {
 
 /**
  * Galton board (bean machine): staggered fixed pegs and a hopper of neutral balls
- * that cascade through random-looking left/right deflections into bottom bins.
+ * on a tall narrow strip above the apex so drops read as a thin vertical curtain.
  */
 export function galton(world: World): void {
   const groundHeight = 0.5;
@@ -100,15 +100,18 @@ export function galton(world: World): void {
 
   const dropBallRadius = 0.042;
   const numDropBalls = 42;
+  /** Bottom of hopper strip — clear of top peg row. */
   const hopperY0 = pegArenaTop + pegRadius + dropBallRadius + 0.42;
-  const hopperY1 = hopperY0 + 1.05;
-  const hopperHalfX = Math.min(outerHalf - 0.28, 0.92);
+  /** Tall vertical span; X stays in a slit around x = 0. */
+  const hopperYSpan = 3.25;
+  /** Narrow band around x = 0 (half-width ~ few cm). */
+  const hopperHalfX = 0.052;
 
   for (let i = 0; i < numDropBalls; i++) {
     const u = halton1d(i, 2);
     const v = halton1d(i, 3);
     const x = (u - 0.5) * 2 * hopperHalfX;
-    const y = hopperY0 + v * (hopperY1 - hopperY0);
+    const y = hopperY0 + v * hopperYSpan;
     world.add(
       ball({
         position: { x, y },
