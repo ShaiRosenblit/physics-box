@@ -207,7 +207,8 @@ export class World {
   }
 
   snapshot(): Snapshot {
-    return this._adapter.buildSnapshot(this._tick, this._tick * this._config.dt);
+    const dtSim = this._config.dt * this._config.timeScale;
+    return this._adapter.buildSnapshot(this._tick, this._tick * dtSim);
   }
 
   on<E extends EventName>(event: E, listener: Listener<E>): Unsubscribe {
@@ -230,8 +231,9 @@ export class World {
 
   private advance(): void {
     for (const hook of this._preStepHooks) hook();
+    const dtSim = this._config.dt * this._config.timeScale;
     this._adapter.stepOnce(
-      this._config.dt,
+      dtSim,
       this._config.velIters,
       this._config.posIters,
     );

@@ -12,9 +12,10 @@ This is not a research tool. Tuning beats fidelity when they conflict.
 
 ## Time
 
-- **Fixed timestep**: `dt = 1/120 s`.
+- **Fixed timestep**: `dt = 1/120 s` for accumulator pacing (real-time pump vs logical ticks).
 - The kernel uses an accumulator: callers pass real elapsed time to `world.step(dtReal)`, the kernel pumps as many fixed substeps as fit, capped at 8.
-- `tick: number` advances by 1 per substep. `time = tick * dt`.
+- **Simulation rate**: optional `timeScale` on `SimulationConfig` multiplies Planck integration (`dt * timeScale` per substep). `defaultConfig` uses **`timeScale = 1`** (nominal); the desktop shell builds the world with **`playbackTimeScale` (0.5)** so on-screen motion runs slower while tests stay on nominal integration.
+- Snapshot **`time = tick * dt * timeScale`** for that world’s config.
 
 ## Units
 

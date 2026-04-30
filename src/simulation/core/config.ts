@@ -3,6 +3,8 @@ import type { Vec2 } from "./types";
 export interface SimulationConfig {
   readonly gravity: Vec2;
   readonly dt: number;
+  /** Multiplier on integration timestep (`Planck.step(dt * timeScale)`). 1 = nominal speed; below 1 slows physics. */
+  readonly timeScale: number;
   readonly velIters: number;
   readonly posIters: number;
   readonly maxSubsteps: number;
@@ -22,6 +24,7 @@ export interface SimulationConfig {
 export const defaultConfig: SimulationConfig = {
   gravity: { x: 0, y: -9.81 },
   dt: 1 / 120,
+  timeScale: 1,
   velIters: 8,
   posIters: 3,
   maxSubsteps: 8,
@@ -37,3 +40,6 @@ export const defaultConfig: SimulationConfig = {
   maxDipole: 50,
   maxChargedBodies: 64,
 };
+
+/** Passed by the UI shell so playback feels calmer; kernel tests use `defaultConfig` (timeScale 1). */
+export const playbackTimeScale = 0.5;

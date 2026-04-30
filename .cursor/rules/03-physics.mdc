@@ -11,7 +11,7 @@ The single source of truth is [`PHYSICS_GUIDELINES.md`](../../PHYSICS_GUIDELINES
 
 - Fixed timestep `dt = 1/120 s`.
 - Accumulator pattern in `Stepper`. Max 8 substeps per outer `step()` call to avoid spiral-of-death.
-- `tick` is a monotonic integer; `time = tick * dt`.
+- `tick` is a monotonic integer; snapshot `time = tick * dt * timeScale`. Default kernel config uses `timeScale = 1`; the UI shell uses `playbackTimeScale` (0.5) for slower motion.
 
 ## Units
 

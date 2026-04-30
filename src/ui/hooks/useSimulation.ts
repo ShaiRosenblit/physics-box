@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   World,
   scenes,
+  defaultConfig,
+  playbackTimeScale,
   type BodySpec,
   type Id,
   type SceneName,
@@ -32,7 +34,7 @@ export interface SimulationApi {
 export function useSimulation(initialScene: SceneName): SimulationApi {
   const worldRef = useRef<World | null>(null);
   if (worldRef.current === null) {
-    const w = new World();
+    const w = new World({ ...defaultConfig, timeScale: playbackTimeScale });
     scenes[initialScene](w);
     worldRef.current = w;
   }
