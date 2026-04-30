@@ -1,4 +1,9 @@
-import { defaultConfig, type SimulationConfig } from "./config";
+import {
+  defaultConfig,
+  playbackTimeScaleMax,
+  playbackTimeScaleMin,
+  type SimulationConfig,
+} from "./config";
 import { EventBus, type EventName, type Listener, type Unsubscribe } from "./events";
 import { createIdFactory } from "./ids";
 import { Stepper } from "./Stepper";
@@ -49,12 +54,15 @@ export class World {
   private _tick = 0;
   private _running = true;
   private _gravityEnabled = true;
+  /** Planck timestep multiplier; may be adjusted at runtime (`setTimeScale`). Survives `reset()`. */
+  private _timeScale: number;
   /** Runtime overrides; re-seeded from `SimulationConfig` on `reset()`. */
   private _fluidDensity: number;
   private _fluidLinearDrag: number;
 
   constructor(config: SimulationConfig = defaultConfig) {
     this._config = config;
+    this._timeScale = config.timeScale;
     this._fluidDensity = config.fluidDensity;
     this._fluidLinearDrag = config.fluidLinearDrag;
     this._adapter = new PlanckAdapter(config);
@@ -155,9 +163,18 @@ export class World {
   get config(): SimulationConfig {
     return {
       ...this._config,
+      timeScale: this._timeScale,
       fluidDensity: this._fluidDensity,
       fluidLinearDrag: this._fluidLinearDrag,
     };
+  }
+
+  setTimeScale(value: number): void {
+    if (!Number.isFinite(value)) return;
+    this._timeScale = Math.max(
+      playbackTimeScaleMin,
+      Math.min(playbackTimeScaleMax, value),
+    );
   }
 
   setFluidDensity(value: number): void {
@@ -315,7 +332,7 @@ export class World {
   }
 
   snapshot(): Snapshot {
-    const dtSim = this._config.dt * this._config.timeScale;
+    const dtSim = this._config.dt * this._timeScale;
     return this._adapter.buildSnapshot(this._tick, this._tick * dtSim);
   }
 
@@ -339,7 +356,7 @@ export class World {
 
   private advance(): void {
     for (const hook of this._preStepHooks) hook();
-    const dtSim = this._config.dt * this._config.timeScale;
+    const dtSim = this._config.dt * this._timeScale;
     this._adapter.stepOnce(
       dtSim,
       this._config.velIters,

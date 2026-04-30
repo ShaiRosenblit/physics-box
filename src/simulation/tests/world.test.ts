@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { World, balloon, ball, box, defaultConfig, type BallView } from "..";
+import {
+  World,
+  balloon,
+  ball,
+  box,
+  defaultConfig,
+  playbackTimeScaleMax,
+  playbackTimeScaleMin,
+  type BallView,
+} from "..";
 
 const TICK = defaultConfig.dt;
 
@@ -300,5 +309,25 @@ describe("World", () => {
     expect(world.config.fluidDensity).toBeCloseTo(0.5, 5);
     world.reset();
     expect(world.config.fluidDensity).toBeCloseTo(0.2, 5);
+  });
+
+  it("preserves runtime timeScale across reset", () => {
+    const world = new World({ ...defaultConfig, timeScale: 0.5 });
+    world.setTimeScale(0.25);
+    world.reset();
+    expect(world.config.timeScale).toBe(0.25);
+  });
+
+  it("setTimeScale clamps and scales snapshot time", () => {
+    const world = new World({ ...defaultConfig, timeScale: 0.5 });
+    world.setTimeScale(99);
+    expect(world.config.timeScale).toBe(playbackTimeScaleMax);
+    world.setTimeScale(0);
+    expect(world.config.timeScale).toBe(playbackTimeScaleMin);
+
+    world.setTimeScale(0.25);
+    world.pause();
+    world.stepOnce();
+    expect(world.snapshot().time).toBeCloseTo(TICK * 0.25, 12);
   });
 });

@@ -1,5 +1,11 @@
 export { World } from "./core/World";
-export { defaultConfig, playbackTimeScale, type SimulationConfig } from "./core/config";
+export {
+  defaultConfig,
+  playbackTimeScale,
+  playbackTimeScaleMax,
+  playbackTimeScaleMin,
+  type SimulationConfig,
+} from "./core/config";
 export type {
   EventName,
   Listener,

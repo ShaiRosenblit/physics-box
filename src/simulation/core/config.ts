@@ -63,5 +63,9 @@ export const defaultConfig: SimulationConfig = {
   maxFluidLinearDrag: 25,
 };
 
-/** Passed by the UI shell so playback feels calmer; kernel tests use `defaultConfig` (timeScale 1). */
-export const playbackTimeScale = 0.125;
+/** Default multiplier for shell worlds; nominal integration is `timeScale === 1`. */
+export const playbackTimeScale = 0.5;
+
+/** Clamp range for UI `World.setTimeScale`; keeps substeps stable and readability sane. */
+export const playbackTimeScaleMin = 0.125;
+export const playbackTimeScaleMax = 1;
