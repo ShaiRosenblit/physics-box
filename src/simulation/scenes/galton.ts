@@ -1,7 +1,10 @@
 import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
 import { box } from "../mechanics/box";
-import { addWorkshopEnclosure } from "./workshopEnclosure";
+import {
+  addWorkshopEnclosure,
+  DEFAULT_WORKSHOP_INTERIOR_HEIGHT,
+} from "./workshopEnclosure";
 
 /** One coordinate of Halton sequence (deterministic, low-discrepancy; no RNG). */
 function halton1d(index: number, base: 2 | 3): number {
@@ -29,8 +32,6 @@ export function galton(world: World): void {
   /** Top surface of the floor plate (see `addWorkshopEnclosure`). */
   const groundTopY = 0;
 
-  addWorkshopEnclosure(world);
-
   const pegRadius = 0.038;
   /** Center-to-center peg pitch; peg and marble radii stay fixed (only spacing grows). */
   const pegDx = 0.3 * 4;
@@ -38,6 +39,22 @@ export function galton(world: World): void {
   const numRows = 10;
   /** Raised with larger `pegDy` so bottom row stays above bins (matched to old layout). */
   const pegArenaTop = 6.85 + (numRows - 1) * (pegDy - 0.31);
+
+  const dropBallRadius = 0.042;
+  /** Bottom / top of hopper strip — same vertical band as spawned marbles. */
+  const hopperY0 = pegArenaTop + pegRadius + dropBallRadius + 0.42;
+  const hopperYSpan = 3.25;
+  const hopperTopY = hopperY0 + hopperYSpan;
+  /** Space above tallest hopper marbles before the workshop ceiling shell. */
+  const hopperCeilingClearance = 0.75;
+  const workshopInteriorHeight = Math.max(
+    DEFAULT_WORKSHOP_INTERIOR_HEIGHT,
+    hopperTopY + dropBallRadius + hopperCeilingClearance,
+  );
+
+  addWorkshopEnclosure(world, {
+    interiorHeight: workshopInteriorHeight,
+  });
 
   for (let row = 0; row < numRows; row++) {
     const count = row + 1;
@@ -62,16 +79,10 @@ export function galton(world: World): void {
   /** Softer wall hits so beads do not rebound out of the board. */
   const wallRestitution = 0.06;
 
-  const dropBallRadius = 0.042;
   const numDropBalls = 42;
-  /** Bottom of hopper strip — clear of top peg row. */
-  const hopperY0 = pegArenaTop + pegRadius + dropBallRadius + 0.42;
-  /** Tall vertical span; X stays in a slit around x = 0. */
-  const hopperYSpan = 3.25;
   /** Narrow band around x = 0 (half-width ~ few cm). */
   const hopperHalfX = 0.052;
 
-  const hopperTopY = hopperY0 + hopperYSpan;
   const wallTopY = hopperTopY + 0.35;
   const wallHeight = wallTopY - groundTopY;
   const wallCenterY = wallHeight / 2;

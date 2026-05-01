@@ -6,13 +6,25 @@ export const WORKSHOP_FLOOR_HALF_WIDTH = 20;
 
 const GROUND_HEIGHT = 0.5;
 const WALL_THICKNESS = 0.5;
-/** From floor top (y = 0) to inner ceiling face; clears welcome-scene anchors. */
-const ROOM_INTERIOR_HEIGHT = 12;
+
+/** Default from floor top (y = 0) to inner ceiling face; clears legacy scene anchors. */
+export const DEFAULT_WORKSHOP_INTERIOR_HEIGHT = 12;
+
+export interface WorkshopEnclosureOptions {
+  /** Overrides {@link DEFAULT_WORKSHOP_INTERIOR_HEIGHT} when a scene needs more headroom. */
+  readonly interiorHeight?: number;
+}
 
 /**
  * Fixed workshop shell: floor, side walls, and ceiling.
  */
-export function addWorkshopEnclosure(world: World): void {
+export function addWorkshopEnclosure(
+  world: World,
+  options?: WorkshopEnclosureOptions,
+): void {
+  const interiorHeight =
+    options?.interiorHeight ?? DEFAULT_WORKSHOP_INTERIOR_HEIGHT;
+
   world.add(
     box({
       position: { x: 0, y: -GROUND_HEIGHT / 2 },
@@ -23,7 +35,7 @@ export function addWorkshopEnclosure(world: World): void {
     }),
   );
 
-  const wallCenterY = ROOM_INTERIOR_HEIGHT / 2;
+  const wallCenterY = interiorHeight / 2;
   world.add(
     box({
       position: {
@@ -31,7 +43,7 @@ export function addWorkshopEnclosure(world: World): void {
         y: wallCenterY,
       },
       width: WALL_THICKNESS,
-      height: ROOM_INTERIOR_HEIGHT,
+      height: interiorHeight,
       fixed: true,
       material: "wood",
     }),
@@ -43,7 +55,7 @@ export function addWorkshopEnclosure(world: World): void {
         y: wallCenterY,
       },
       width: WALL_THICKNESS,
-      height: ROOM_INTERIOR_HEIGHT,
+      height: interiorHeight,
       fixed: true,
       material: "wood",
     }),
@@ -52,7 +64,10 @@ export function addWorkshopEnclosure(world: World): void {
   const ceilingSpan = WORKSHOP_FLOOR_HALF_WIDTH * 2 + 2 * WALL_THICKNESS;
   world.add(
     box({
-      position: { x: 0, y: ROOM_INTERIOR_HEIGHT + WALL_THICKNESS / 2 },
+      position: {
+        x: 0,
+        y: interiorHeight + WALL_THICKNESS / 2,
+      },
       width: ceilingSpan,
       height: WALL_THICKNESS,
       fixed: true,
