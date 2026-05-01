@@ -144,7 +144,6 @@ export function galton(world: World): void {
         position: { x, y },
         radius: dropBallRadius,
         material: "wood",
-        collideWithBalls: false,
         fixtureRestitution: 0,
         fixtureFriction: marbleFriction,
         linearDamping: marbleLinearDamping,
