@@ -6,16 +6,21 @@ import { addWorkshopEnclosure } from "./workshopEnclosure";
 /**
  * Planar double pendulum: two rigid links, revolute at the ceiling and between links.
  *
- * Initial pose is built geometrically so joint anchors match link endpoints;
- * small offset angles from vertical seed chaotic motion under gravity.
+ * Uses extra interior height and a mid-room pivot so the chain can swing through
+ * full revolutions without grazing the workshop shell. Initial pose matches hinge
+ * anchors; small offset angles from vertical seed chaotic motion under gravity.
  */
 export function doublePendulum(world: World): void {
-  addWorkshopEnclosure(world);
+  /** Inner clearance from floor (y = 0) to ceiling; tall enough for L1+L2 tip travel. */
+  const interiorHeight = 18;
+  addWorkshopEnclosure(world, { interiorHeight });
 
-  const pivotY = 11.15;
   const thickness = 0.065;
   const L1 = 1.38;
   const L2 = 1.08;
+  /** Vertically centered: equal room for tip above and below the pivot. */
+  const pivotY = interiorHeight / 2;
+  const pivotX = 0;
   /** Swing angles from downward vertical toward +x (radians). */
   const phi1 = 0.14;
   const phi2 = 0.21;
@@ -31,11 +36,11 @@ export function doublePendulum(world: World): void {
   const bodyAngle = (phi: number) => phi;
 
   const c1 = {
-    x: (L1 / 2) * d1.x,
+    x: pivotX + (L1 / 2) * d1.x,
     y: pivotY + (L1 / 2) * d1.y,
   };
   const joint = {
-    x: L1 * d1.x,
+    x: pivotX + L1 * d1.x,
     y: pivotY + L1 * d1.y,
   };
   const c2 = {
@@ -68,7 +73,7 @@ export function doublePendulum(world: World): void {
   );
 
   world.addConstraint(
-    hinge({ bodyA: upperId, worldAnchor: { x: 0, y: pivotY } }),
+    hinge({ bodyA: upperId, worldAnchor: { x: pivotX, y: pivotY } }),
   );
   world.addConstraint(
     hinge({
