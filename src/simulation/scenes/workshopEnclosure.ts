@@ -9,10 +9,25 @@ const WALL_THICKNESS = 0.5;
 /** From floor top (y = 0) to inner ceiling face; clears welcome-scene anchors. */
 const ROOM_INTERIOR_HEIGHT = 12;
 
+export interface WorkshopEnclosureOptions {
+  /**
+   * Override restitution on all shell fixtures when set (floor, perimeter walls,
+   * ceiling). Scenes needing dead contacts (e.g. Galton) use `0`; Planck mixes
+   * contacts with max(restitutionA, restitutionB), so shells must stay low if
+   * dynamic beads use low restitution.
+   */
+  readonly shellFixtureRestitution?: number;
+}
+
 /**
  * Fixed workshop shell: floor, side walls, and ceiling.
  */
-export function addWorkshopEnclosure(world: World): void {
+export function addWorkshopEnclosure(
+  world: World,
+  options?: WorkshopEnclosureOptions,
+): void {
+  const shellRes = options?.shellFixtureRestitution;
+
   world.add(
     box({
       position: { x: 0, y: -GROUND_HEIGHT / 2 },
@@ -20,6 +35,7 @@ export function addWorkshopEnclosure(world: World): void {
       height: GROUND_HEIGHT,
       fixed: true,
       material: "wood",
+      ...(shellRes !== undefined ? { fixtureRestitution: shellRes } : {}),
     }),
   );
 
@@ -34,6 +50,7 @@ export function addWorkshopEnclosure(world: World): void {
       height: ROOM_INTERIOR_HEIGHT,
       fixed: true,
       material: "wood",
+      ...(shellRes !== undefined ? { fixtureRestitution: shellRes } : {}),
     }),
   );
   world.add(
@@ -46,6 +63,7 @@ export function addWorkshopEnclosure(world: World): void {
       height: ROOM_INTERIOR_HEIGHT,
       fixed: true,
       material: "wood",
+      ...(shellRes !== undefined ? { fixtureRestitution: shellRes } : {}),
     }),
   );
 
@@ -57,6 +75,7 @@ export function addWorkshopEnclosure(world: World): void {
       height: WALL_THICKNESS,
       fixed: true,
       material: "wood",
+      ...(shellRes !== undefined ? { fixtureRestitution: shellRes } : {}),
     }),
   );
 }
