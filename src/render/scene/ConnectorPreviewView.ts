@@ -1,5 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import { PULLEY_DEFAULT_HALF_SPREAD, type Vec2 } from "../../simulation";
+import { drawApproxCircle } from "../approxCircle";
 import { palette, stroke } from "../style/palette";
 
 /** Two-click connectors (rope / hinge / spring / belt). */
@@ -79,13 +80,13 @@ export class ConnectorPreviewView {
       this.g.stroke({ width: lineWidth, color: palette.inkPrimary, alpha: 0.55 });
 
       const rim = PULLEY_DEFAULT_HALF_SPREAD * 1.05;
-      this.g.circle(s.center.x, s.center.y, rim);
+      drawApproxCircle(this.g, s.center.x, s.center.y, rim, zoom);
       this.g.stroke({ width: lineWidth, color: palette.inkMuted, alpha: 0.65 });
 
-      this.g.circle(s.center.x, s.center.y, dotR * 0.9);
+      drawApproxCircle(this.g, s.center.x, s.center.y, dotR * 0.9, zoom);
       this.g.fill({ color: palette.inkPrimary, alpha: 0.75 });
 
-      this.g.circle(s.cursor.x, s.cursor.y, dotR * (s.snapping ? 1.2 : 0.9));
+      drawApproxCircle(this.g, s.cursor.x, s.cursor.y, dotR * (s.snapping ? 1.2 : 0.9), zoom);
       this.g.fill({
         color: palette.inkPrimary,
         alpha: s.snapping ? 0.85 : 0.55,
@@ -95,7 +96,7 @@ export class ConnectorPreviewView {
 
     if (s.kind === "pulley-body-a") {
       const rim = PULLEY_DEFAULT_HALF_SPREAD * 1.05;
-      this.g.circle(s.center.x, s.center.y, rim);
+      drawApproxCircle(this.g, s.center.x, s.center.y, rim, zoom);
       this.g.stroke({ width: lineWidth, color: palette.inkMuted, alpha: 0.65 });
 
       drawDashedSegment(this.g, s.center.x, s.center.y, s.anchorA.x, s.anchorA.y);
@@ -104,10 +105,16 @@ export class ConnectorPreviewView {
       drawDashedSegment(this.g, s.anchorA.x, s.anchorA.y, s.cursor.x, s.cursor.y);
       this.g.stroke({ width: lineWidth, color: palette.inkPrimary, alpha: 0.55 });
 
-      this.g.circle(s.anchorA.x, s.anchorA.y, dotR);
+      drawApproxCircle(this.g, s.anchorA.x, s.anchorA.y, dotR, zoom);
       this.g.fill({ color: palette.inkPrimary, alpha: 0.75 });
 
-      this.g.circle(s.cursor.x, s.cursor.y, dotR * (s.snapping ? 1.2 : 0.9));
+      drawApproxCircle(
+        this.g,
+        s.cursor.x,
+        s.cursor.y,
+        dotR * (s.snapping ? 1.2 : 0.9),
+        zoom,
+      );
       this.g.fill({
         color: palette.inkPrimary,
         alpha: s.snapping ? 0.85 : 0.55,
@@ -124,17 +131,23 @@ export class ConnectorPreviewView {
       this.g.stroke({ width: lineWidth, color: palette.inkPrimary, alpha: 0.55 });
     }
 
-    this.g.circle(s.a.x, s.a.y, dotR);
+    drawApproxCircle(this.g, s.a.x, s.a.y, dotR, zoom);
     this.g.fill({ color: palette.inkPrimary, alpha: 0.75 });
 
     if (len > 1e-4) {
-      this.g.circle(s.b.x, s.b.y, dotR * (s.snapping ? 1.2 : 0.9));
+      drawApproxCircle(
+        this.g,
+        s.b.x,
+        s.b.y,
+        dotR * (s.snapping ? 1.2 : 0.9),
+        zoom,
+      );
       this.g.fill({
         color: palette.inkPrimary,
         alpha: s.snapping ? 0.85 : 0.55,
       });
       if (s.snapping) {
-        this.g.circle(s.b.x, s.b.y, dotR * 1.9);
+        drawApproxCircle(this.g, s.b.x, s.b.y, dotR * 1.9, zoom);
         this.g.stroke({
           width: lineWidth,
           color: palette.inkPrimary,

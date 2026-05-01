@@ -1,5 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import type { BodyView, ConstraintView, Id, Snapshot } from "../../simulation";
+import { drawApproxCircle } from "../approxCircle";
 import { materialStyles, palette, stroke } from "../style/palette";
 
 interface ConstraintEntry {
@@ -179,10 +180,12 @@ function drawHinge(
 
   const r = 6 / zoom;
   const hubW = stroke.bodyOutline / zoom;
-  g.circle(ax, ay, r)
-    .fill({ color: palette.metal, alpha: 1 })
-    .stroke({ width: hubW, color: palette.metalEdge, alpha: 0.9 });
-  g.circle(ax, ay, r * 0.35).fill({ color: palette.inkPrimary, alpha: 0.6 });
+  drawApproxCircle(g, ax, ay, r, zoom);
+  g.fill({ color: palette.metal, alpha: 1 });
+  drawApproxCircle(g, ax, ay, r, zoom);
+  g.stroke({ width: hubW, color: palette.metalEdge, alpha: 0.9 });
+  drawApproxCircle(g, ax, ay, r * 0.35, zoom);
+  g.fill({ color: palette.inkPrimary, alpha: 0.6 });
 }
 
 function drawBelt(
@@ -221,12 +224,13 @@ function drawPulley(
   const cx = view.wheelCenter.x;
   const cy = view.wheelCenter.y;
   const rim = Math.max(view.halfSpread * 1.05, 0.06);
-  g.circle(cx, cy, rim);
+  drawApproxCircle(g, cx, cy, rim, zoom);
   g.stroke({ width: stroke.bodyOutline / zoom, color: palette.metalEdge, alpha: 0.88 });
+  drawApproxCircle(g, cx, cy, rim, zoom);
   g.fill({ color: palette.metal, alpha: 0.35 });
 
   const hub = rim * 0.35;
-  g.circle(cx, cy, hub);
+  drawApproxCircle(g, cx, cy, hub, zoom);
   g.fill({ color: palette.inkPrimary, alpha: 0.45 });
 }
 
