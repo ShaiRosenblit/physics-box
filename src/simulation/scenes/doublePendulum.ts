@@ -6,15 +6,17 @@ import { addWorkshopEnclosure } from "./workshopEnclosure";
 
 /**
  * Planar double pendulum: two uniform rigid bars connected by revolute joints
- * at the ceiling and at the elbow. No separate bob bodies — concentrating mass
- * at the tip in Box2D requires a compound body (multiple fixtures on one Planck
- * body), which is a separate architectural feature. Uniform rods exhibit the
- * same famous chaotic behavior and avoid the inter-body collision issues that
- * arise when welding separate ball bodies at the joint location.
+ * at the ceiling and at the elbow. Shell and links use zero friction/restitution
+ * so contact with the workshop loses minimal energy to tangential slip or bounce.
+ * Initial pose uses large swing angles and opposing spins for a high-energy start.
  */
 export function doublePendulum(world: World): void {
   const interiorHeight = 18;
-  addWorkshopEnclosure(world, { interiorHeight });
+  addWorkshopEnclosure(world, {
+    interiorHeight,
+    fixtureFriction: 0,
+    fixtureRestitution: 0,
+  });
 
   const pivotY = interiorHeight / 2;
   const pivotX = 0;
@@ -26,9 +28,15 @@ export function doublePendulum(world: World): void {
   /** 10× nominal metal density — heavier rods feel more pendulum-like. */
   const density = lookupMaterial("metal").density * 10;
 
-  /** Swing angles from downward vertical toward +x (radians). */
-  const phi1 = 0.14;
-  const phi2 = 0.21;
+  /**
+   * Large swing + spin: high initial potential from pose and extra kinetic
+   * energy so motion engages the full room quickly.
+   */
+  const phi1 = 1.15;
+  const phi2 = 1.45;
+  /** rad/s, Planck CCW positive. */
+  const spinUpper = 2.8;
+  const spinLower = -3.6;
 
   const dir = (phi: number) => ({ x: Math.sin(phi), y: -Math.cos(phi) });
   const d1 = dir(phi1);
@@ -51,8 +59,10 @@ export function doublePendulum(world: World): void {
       material: "metal",
       density,
       fixtureFriction: 0,
+      fixtureRestitution: 0,
       linearDamping: 0,
       angularDamping: 0,
+      angularVelocity: spinUpper,
     }),
   );
 
@@ -65,8 +75,10 @@ export function doublePendulum(world: World): void {
       material: "metal",
       density,
       fixtureFriction: 0,
+      fixtureRestitution: 0,
       linearDamping: 0,
       angularDamping: 0,
+      angularVelocity: spinLower,
     }),
   );
 

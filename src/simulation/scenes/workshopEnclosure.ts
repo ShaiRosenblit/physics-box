@@ -13,6 +13,10 @@ export const DEFAULT_WORKSHOP_INTERIOR_HEIGHT = 12;
 export interface WorkshopEnclosureOptions {
   /** Overrides {@link DEFAULT_WORKSHOP_INTERIOR_HEIGHT} when a scene needs more headroom. */
   readonly interiorHeight?: number;
+  /** Shell fixture friction; omit to use material default (e.g. wood). */
+  readonly fixtureFriction?: number;
+  /** Shell fixture restitution; omit to use material default. */
+  readonly fixtureRestitution?: number;
 }
 
 /**
@@ -24,6 +28,18 @@ export function addWorkshopEnclosure(
 ): void {
   const interiorHeight =
     options?.interiorHeight ?? DEFAULT_WORKSHOP_INTERIOR_HEIGHT;
+  const shellContact =
+    options?.fixtureFriction !== undefined ||
+    options?.fixtureRestitution !== undefined
+      ? {
+          ...(options.fixtureFriction !== undefined
+            ? { fixtureFriction: options.fixtureFriction }
+            : {}),
+          ...(options.fixtureRestitution !== undefined
+            ? { fixtureRestitution: options.fixtureRestitution }
+            : {}),
+        }
+      : {};
 
   world.add(
     box({
@@ -32,6 +48,7 @@ export function addWorkshopEnclosure(
       height: GROUND_HEIGHT,
       fixed: true,
       material: "wood",
+      ...shellContact,
     }),
   );
 
@@ -46,6 +63,7 @@ export function addWorkshopEnclosure(
       height: interiorHeight,
       fixed: true,
       material: "wood",
+      ...shellContact,
     }),
   );
   world.add(
@@ -58,6 +76,7 @@ export function addWorkshopEnclosure(
       height: interiorHeight,
       fixed: true,
       material: "wood",
+      ...shellContact,
     }),
   );
 
@@ -72,6 +91,7 @@ export function addWorkshopEnclosure(
       height: WALL_THICKNESS,
       fixed: true,
       material: "wood",
+      ...shellContact,
     }),
   );
 }
