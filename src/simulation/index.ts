@@ -111,6 +111,7 @@ export {
   empty,
   engines,
   galton,
+  newtonsCradle,
   random,
   welcome,
 } from "./scenes";

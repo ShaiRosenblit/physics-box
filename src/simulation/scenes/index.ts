@@ -3,6 +3,7 @@ import { doublePendulum } from "./doublePendulum";
 import { empty } from "./empty";
 import { engines } from "./engines";
 import { galton } from "./galton";
+import { newtonsCradle } from "./newtonsCradle";
 import { random } from "./random";
 import { welcome } from "./welcome";
 
@@ -13,6 +14,7 @@ export type SceneName =
   | "engines"
   | "galton"
   | "doublePendulum"
+  | "newtonsCradle"
   | "random";
 
 export const scenes: Readonly<Record<SceneName, SceneFn>> = {
@@ -21,10 +23,19 @@ export const scenes: Readonly<Record<SceneName, SceneFn>> = {
   engines,
   galton,
   doublePendulum,
+  newtonsCradle,
   random,
 };
 
-export { doublePendulum, empty, engines, galton, random, welcome };
+export {
+  doublePendulum,
+  empty,
+  engines,
+  galton,
+  newtonsCradle,
+  random,
+  welcome,
+};
 
 /** Default sandbox load-out: blank canvas until the user builds or picks a preset. */
 export const defaultSceneName: SceneName = "empty";
@@ -36,5 +47,6 @@ export const sceneIds: readonly SceneName[] = [
   "engines",
   "galton",
   "doublePendulum",
+  "newtonsCradle",
   "random",
 ];
