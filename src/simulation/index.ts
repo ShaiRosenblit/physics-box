@@ -107,6 +107,7 @@ export {
   scenes,
   defaultSceneName,
   sceneIds,
+  doublePendulum,
   empty,
   engines,
   galton,
