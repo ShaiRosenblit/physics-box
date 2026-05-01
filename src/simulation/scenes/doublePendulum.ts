@@ -8,8 +8,8 @@ import { addWorkshopEnclosure } from "./workshopEnclosure";
  * Planar double pendulum: two uniform rigid bars connected by revolute joints
  * at the ceiling and at the elbow. Shell and links use zero friction/restitution
  * so contact with the workshop loses minimal energy to tangential slip or bounce.
- * Initial pose uses a folded elbow (arms not collinear) plus very large
- * angular speeds for a high-energy start.
+ * Initial pose uses a folded elbow plus matched linear + angular velocity so
+ * each rod moves coherently with its hinge (no huge solver shock at t = 0).
  */
 export function doublePendulum(world: World): void {
   const interiorHeight = 18;
@@ -36,9 +36,12 @@ export function doublePendulum(world: World): void {
    */
   const phi1 = 1.38;
   const phi2 = -0.72;
-  /** rad/s, Planck CCW positive — high magnitude for a violent start. */
-  const spinUpper = 7.2;
-  const spinLower = -8.5;
+  /**
+   * rad/s, Planck CCW positive. Magnitudes chosen so total mechanical energy
+   * readily supports full rotations over the room height.
+   */
+  const spinUpper = 14;
+  const spinLower = -16.5;
 
   const dir = (phi: number) => ({ x: Math.sin(phi), y: -Math.cos(phi) });
   const d1 = dir(phi1);
@@ -52,6 +55,27 @@ export function doublePendulum(world: World): void {
   const elbow = { x: pivotX + L1 * d1.x, y: pivotY + L1 * d1.y };
   const c2 = { x: elbow.x + (L2 / 2) * d2.x, y: elbow.y + (L2 / 2) * d2.y };
 
+  /**
+   * Linear velocity consistent with rigid rotation about each hinge at t = 0:
+   * upper COM about ceiling, lower COM = elbow velocity + spin about elbow.
+   * v = ω × r in 2D ⇒ v_x = −ω r_y, v_y = ω r_x (r from hinge to point).
+   */
+  const rU = { x: c1.x - pivotX, y: c1.y - pivotY };
+  const velUpper = {
+    x: -spinUpper * rU.y,
+    y: spinUpper * rU.x,
+  };
+  const rElbowFromPivot = { x: elbow.x - pivotX, y: elbow.y - pivotY };
+  const velElbow = {
+    x: -spinUpper * rElbowFromPivot.y,
+    y: spinUpper * rElbowFromPivot.x,
+  };
+  const rLowerFromElbow = { x: c2.x - elbow.x, y: c2.y - elbow.y };
+  const velLower = {
+    x: velElbow.x - spinLower * rLowerFromElbow.y,
+    y: velElbow.y + spinLower * rLowerFromElbow.x,
+  };
+
   const upperId = world.add(
     box({
       position: c1,
@@ -64,6 +88,7 @@ export function doublePendulum(world: World): void {
       fixtureRestitution: 0,
       linearDamping: 0,
       angularDamping: 0,
+      velocity: velUpper,
       angularVelocity: spinUpper,
     }),
   );
@@ -80,6 +105,7 @@ export function doublePendulum(world: World): void {
       fixtureRestitution: 0,
       linearDamping: 0,
       angularDamping: 0,
+      velocity: velLower,
       angularVelocity: spinLower,
     }),
   );
