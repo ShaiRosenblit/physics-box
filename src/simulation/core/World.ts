@@ -333,12 +333,13 @@ export class World {
   }
 
   /**
-   * Read-only hit-test: returns the id of the dynamic body whose fixtures
-   * contain `p`, or null. Used by UI gestures (selection, connector
-   * anchor placement) where mutating drag state would be wrong.
+   * Read-only hit-test for UI: dynamic body under `p` if any, otherwise a
+   * fixed (static) body. Dragging still uses only dynamics via `startDragAt`.
    */
   bodyAt(p: Vec2): Id | null {
-    return this._adapter.findDynamicBodyAt(p);
+    return (
+      this._adapter.findDynamicBodyAt(p) ?? this._adapter.findNonDynamicBodyAt(p)
+    );
   }
 
   /**

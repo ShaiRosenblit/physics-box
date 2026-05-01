@@ -538,6 +538,33 @@ export class PlanckAdapter {
     return foundId;
   }
 
+  /**
+   * Static / kinematic bodies whose fixtures contain `p`. Used after
+   * `findDynamicBodyAt` for selection and connector anchors; not draggable.
+   */
+  findNonDynamicBodyAt(p: Vec2): Id | null {
+    const eps = 1e-3;
+    const aabb = new planck.AABB(
+      planck.Vec2(p.x - eps, p.y - eps),
+      planck.Vec2(p.x + eps, p.y + eps),
+    );
+    let foundId: Id | null = null;
+    const target = planck.Vec2(p.x, p.y);
+    this.world.queryAABB(aabb, (fixture) => {
+      const body = fixture.getBody();
+      if (body.isDynamic()) return true;
+      if (body === this.groundBody) return true;
+      if (!fixture.testPoint(target)) return true;
+      const data = body.getUserData();
+      if (typeof data === "number" && this.bodies.has(data as Id)) {
+        foundId = data as Id;
+        return false;
+      }
+      return true;
+    });
+    return foundId;
+  }
+
   startDrag(id: Id, target: Vec2, opts: { teleport: boolean; rotate: boolean }): boolean {
     const record = this.bodies.get(id);
     if (!record) return false;

@@ -52,6 +52,34 @@ describe("World", () => {
     expect(c).toBeGreaterThan(b);
   });
 
+  it("bodyAt hits fixed bodies for selection", () => {
+    const world = new World();
+    const id = world.add(
+      box({ position: { x: 0, y: 0 }, width: 1, height: 1, fixed: true }),
+    );
+    expect(world.bodyAt({ x: 0, y: 0 })).toBe(id);
+  });
+
+  it("bodyAt prefers dynamic over fixed when both contain the point", () => {
+    const world = new World();
+    world.add(
+      box({ position: { x: 0, y: 0 }, width: 2, height: 2, fixed: true }),
+    );
+    const dynId = world.add(
+      ball({ position: { x: 0, y: 0 }, radius: 0.35 }),
+    );
+    expect(world.bodyAt({ x: 0, y: 0 })).toBe(dynId);
+  });
+
+  it("startDragAt ignores fixed bodies", () => {
+    const world = new World();
+    world.add(
+      box({ position: { x: 0, y: 0 }, width: 1, height: 1, fixed: true }),
+    );
+    world.pause();
+    expect(world.startDragAt({ x: 0, y: 0 })).toBe(null);
+  });
+
   it("returns frozen snapshots that the caller cannot mutate", () => {
     const world = new World();
     world.add(ball({ position: { x: 0, y: 5 }, radius: 0.5 }));

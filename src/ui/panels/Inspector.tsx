@@ -418,7 +418,14 @@ function BodyDetails({ view }: { view: BodyView }) {
       <ReadRow label="Body" value={`#${view.id} · ${labelOf(view.kind)}`} />
 
       {!world.running ? (
-        <ReadRow label="Pause" value="Drag to reposition · Shift+drag turns" />
+        <ReadRow
+          label="Pause"
+          value={
+            view.fixed
+              ? "Edit below · clear Fixed to drag on canvas"
+              : "Drag to reposition · Shift+drag turns"
+          }
+        />
       ) : null}
 
       <div style={editRowStyle}>
