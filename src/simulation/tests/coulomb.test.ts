@@ -5,6 +5,7 @@ import {
   emConstants,
   sampleE,
   World,
+  type BallView,
   type ChargedBodyState,
   type Id,
 } from "../index";
@@ -126,18 +127,16 @@ describe("World with charged bodies", () => {
     expect(bx1 - ax1).toBeGreaterThan(bx0 - ax0);
   });
 
-  it("two opposite charges drift toward each other", () => {
-    const w = new World();
+  it("two opposite charges accelerate toward each other", () => {
+    const w = new World({ ...defaultConfig, gravity: { x: 0, y: 0 } });
     const a = w.add(ball({ position: { x: -0.5, y: 5 }, radius: 0.1, charge: 5 }));
     const b = w.add(ball({ position: { x: 0.5, y: 5 }, radius: 0.1, charge: -5 }));
-    const before = w.snapshot();
-    for (let i = 0; i < 60; i++) w.stepOnce();
-    const after = w.snapshot();
-    const ax0 = (before.bodies.find((x) => x.id === a)! as any).position.x;
-    const bx0 = (before.bodies.find((x) => x.id === b)! as any).position.x;
-    const ax1 = (after.bodies.find((x) => x.id === a)! as any).position.x;
-    const bx1 = (after.bodies.find((x) => x.id === b)! as any).position.x;
-    expect(bx1 - ax1).toBeLessThan(bx0 - ax0);
+    w.stepOnce();
+    const snap = w.snapshot();
+    const va = snap.bodies.find((x) => x.id === a)! as BallView;
+    const vb = snap.bodies.find((x) => x.id === b)! as BallView;
+    expect(va.velocity.x).toBeGreaterThan(0);
+    expect(vb.velocity.x).toBeLessThan(0);
   });
 
   it("sampleField returns zero when no charged bodies exist", () => {
