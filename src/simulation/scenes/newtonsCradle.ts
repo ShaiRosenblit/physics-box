@@ -19,7 +19,16 @@ export function newtonsCradle(world: World): void {
   const beamCenterY = 10.55;
   const beamH = 0.14;
   const anchorY = beamCenterY - beamH / 2;
-  const beamHalfW = n * bobR + 0.38;
+
+  // A small gap keeps resting balls from forming a pre-existing contact chain.
+  // Without it, all four ball-ball contacts are active simultaneously when the
+  // first bob arrives, and Box2D's sequential-impulse solver distributes the
+  // impulse across the whole chain instead of propagating it cleanly end-to-end.
+  // 0.008 > Planck linearSlop (~0.005) so no pre-contact is created at rest,
+  // yet the gap is < 3 % of ball diameter and visually imperceptible.
+  const bobGap = 0.008;
+  const spacing = 2 * bobR + bobGap;
+  const beamHalfW = ((n - 1) / 2) * spacing + bobR + 0.38;
 
   world.add(
     box({
@@ -39,7 +48,7 @@ export function newtonsCradle(world: World): void {
   const bobDensity = lookupMaterial("metal").density * 10;
 
   for (let i = 0; i < n; i++) {
-    const ax = (i - (n - 1) / 2) * (2 * bobR);
+    const ax = (i - (n - 1) / 2) * spacing;
     const pull = i === 0;
     const sinA = pull ? Math.sin(pullAngle) : 0;
     const cosA = pull ? Math.cos(pullAngle) : 1;
