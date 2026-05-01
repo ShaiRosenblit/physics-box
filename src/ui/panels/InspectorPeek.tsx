@@ -157,14 +157,14 @@ function summarizeBody(view: BodyView): {
   if (view.kind === "engine_rotor") {
     return {
       label: `#${view.id} · Rotor`,
-      stats: `${speedStr} · τ ${fmt(view.torque)} N·m · ω ${fmt(view.angularVelocity)}`,
+      stats: `${speedStr} · ${fmt(view.rpm)} rpm · max τ ${fmt(view.maxTorque)} N·m · ω ${fmt(view.angularVelocity)}`,
       tint: ui.fieldB,
     };
   }
   if (view.kind === "engine") {
     return {
-      label: `#${view.id} · Engine ${view.torque >= 0 ? "CCW" : "CW"}`,
-      stats: `${speedStr} · τ ${fmt(view.torque)} N·m`,
+      label: `#${view.id} · Engine ${view.rpm >= 0 ? "CCW" : "CW"}`,
+      stats: `${speedStr} · ${fmt(view.rpm)} rpm · max τ ${fmt(view.maxTorque)} N·m`,
       tint: ui.fieldB,
     };
   }

@@ -69,8 +69,10 @@ export interface EngineSpawnPreset {
   width: number;
   height: number;
   flywheelRadius: number;
-  /** Absolute torque before tool sign; clamped to maxMotorTorque at spawn. */
-  torqueMagnitude: number;
+  /** Unsigned rpm before tool sign; clamped to maxRpm at spawn. */
+  rpm: number;
+  /** Stall torque magnitude (N·m); clamped to maxMotorTorque at spawn. */
+  maxTorque: number;
   material: MaterialName;
   linearDamping: number;
   angularDamping: number;
@@ -145,20 +147,22 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
       width: 0.42,
       height: 0.26,
       flywheelRadius: 0.1,
-      torqueMagnitude: 220,
+      rpm: 120,
+      maxTorque: 500,
       material: "metal",
       linearDamping: 0,
-      angularDamping: 0.08,
+      angularDamping: 0,
       fixed: false,
     },
     engineMinus: {
       width: 0.42,
       height: 0.26,
       flywheelRadius: 0.1,
-      torqueMagnitude: 220,
+      rpm: 120,
+      maxTorque: 500,
       material: "metal",
       linearDamping: 0,
-      angularDamping: 0.08,
+      angularDamping: 0,
       fixed: false,
     },
     box: {

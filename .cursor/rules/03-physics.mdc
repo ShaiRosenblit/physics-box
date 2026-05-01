@@ -22,7 +22,7 @@ The single source of truth is [`PHYSICS_GUIDELINES.md`](../../PHYSICS_GUIDELINES
 
 - All EM forces have softening: `1/(r^2 + eps^2)`.
 - Per-body EM force magnitude is clamped (`maxEmForce` in config).
-- Per-body velocity is clamped (`maxSpeed` in config).
+- Per-body linear velocity magnitude is clamped (`maxSpeed` in config) after each Planck substep.
 - Charges and dipole moments have configured maxima (clamped on `add` / `update`).
 
 ## EM scope (MVP)

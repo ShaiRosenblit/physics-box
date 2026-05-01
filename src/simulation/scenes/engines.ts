@@ -12,8 +12,8 @@ import { addWorkshopEnclosure } from "./workshopEnclosure";
 /**
  * Engines demo scene — two stations: windmill arm + belt-driven spring oscillator.
  *
- * Box2D caps angular velocity per step; torques and damping are tuned so
- * flywheels stay in a perceivable speed band (~0.5–2 rev/s) on a 60 Hz display.
+ * Joint motors hold flywheel rpm; belts couple loads so speeds stay in a
+ * perceivable band (~0.5–2 rev/s) on a 60 Hz display.
  */
 export function engines(world: World): void {
   addWorkshopEnclosure(world);
@@ -71,9 +71,10 @@ export function engines(world: World): void {
       width: 0.40,
       height: 0.24,
       rotorRadius: 0.09,
-      torque: 1.2,
+      rpm: 60,
+      maxTorque: 8,
       fixed: true,
-      angularDamping: 0.6,
+      angularDamping: 0,
     }),
   );
   let snap = world.snapshot();
@@ -110,9 +111,10 @@ export function engines(world: World): void {
       width: 0.36,
       height: 0.22,
       rotorRadius: 0.09,
-      torque: 0.040,
+      rpm: 120,
+      maxTorque: 3,
       fixed: true,
-      angularDamping: 2.5,
+      angularDamping: 0,
     }),
   );
   snap = world.snapshot();

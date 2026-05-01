@@ -15,6 +15,8 @@ export interface SimulationConfig {
   readonly maxEmTorque: number;
   /** Absolute motor torque clamp per engine body per substep (Planck torque units). */
   readonly maxMotorTorque: number;
+  /** Absolute rpm clamp on engine targets (planning-space rpm). */
+  readonly maxRpm: number;
 
   readonly epsilon: number;
   readonly kE: number;
@@ -49,6 +51,7 @@ export const defaultConfig: SimulationConfig = {
   maxEmForce: 5_000,
   maxEmTorque: 4_000,
   maxMotorTorque: 2_500,
+  maxRpm: 3_000,
 
   epsilon: 0.05,
   kE: 50,

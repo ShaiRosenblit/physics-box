@@ -6,8 +6,10 @@ export interface EngineInput {
   height: number;
   /** Flywheel radius; when omitted, ~28% of the shorter housing side. */
   rotorRadius?: number;
-  /** Motor torque (N·m); CCW positive in Planck. Clamped by `maxMotorTorque` on add/patch. */
-  torque: number;
+  /** Target rotor speed (rpm); CCW positive. Clamped to `maxRpm` on add/patch. */
+  rpm: number;
+  /** Motor stall torque limit (N·m); clamped to `maxMotorTorque` on add/patch. */
+  maxTorque: number;
   charge?: number;
   material?: MaterialName;
   velocity?: Vec2;
@@ -26,8 +28,11 @@ export function engine(input: EngineInput): EngineSpec {
       `engine: width and height must be > 0 (got ${input.width}, ${input.height})`,
     );
   }
-  if (!Number.isFinite(input.torque)) {
-    throw new Error("engine: torque must be a finite number");
+  if (!Number.isFinite(input.rpm)) {
+    throw new Error("engine: rpm must be a finite number");
+  }
+  if (!Number.isFinite(input.maxTorque)) {
+    throw new Error("engine: maxTorque must be a finite number");
   }
   const rr =
     input.rotorRadius !== undefined ?
@@ -42,7 +47,8 @@ export function engine(input: EngineInput): EngineSpec {
     width: input.width,
     height: input.height,
     rotorRadius: rr,
-    torque: input.torque,
+    rpm: input.rpm,
+    maxTorque: input.maxTorque,
     angle: input.angle ?? 0,
     velocity: input.velocity,
     angularVelocity: input.angularVelocity,

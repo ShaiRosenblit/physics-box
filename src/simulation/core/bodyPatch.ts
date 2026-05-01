@@ -26,8 +26,9 @@ export function clampBodySpecToConfig(spec: BodySpec, cfg: SimulationConfig): Bo
 
   if (next.kind === "engine") {
     const e = next as Extract<BodySpec, { kind: "engine" }>;
-    const t = clampToSymmetricCap(e.torque, cfg.maxMotorTorque);
-    if (t !== e.torque) next = { ...e, torque: t };
+    const rpm = clampToSymmetricCap(e.rpm, cfg.maxRpm);
+    const maxTorque = clampToSymmetricCap(e.maxTorque, cfg.maxMotorTorque);
+    if (rpm !== e.rpm || maxTorque !== e.maxTorque) next = { ...e, rpm, maxTorque };
   }
 
   const bs0 = next.buoyancyScale ?? 1;
@@ -166,7 +167,8 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
     if (p.width !== undefined) b = { ...b, width: p.width };
     if (p.height !== undefined) b = { ...b, height: p.height };
     if (p.rotorRadius !== undefined) b = { ...b, rotorRadius: p.rotorRadius };
-    if (p.torque !== undefined) b = { ...b, torque: p.torque };
+    if (p.rpm !== undefined) b = { ...b, rpm: p.rpm };
+    if (p.maxTorque !== undefined) b = { ...b, maxTorque: p.maxTorque };
     n = b;
   } else if (n.kind === "engine_rotor") {
     let b = n;

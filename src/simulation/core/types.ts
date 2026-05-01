@@ -78,8 +78,10 @@ export interface EngineSpec extends BaseBodySpec {
   readonly height: number;
   /** Dynamic disc radius; must fit inside the housing (sanitized on add/patch). */
   readonly rotorRadius: number;
-  /** Drive torque (N·m, Planck z) applied to the rotor each substep; CCW positive. */
-  readonly torque: number;
+  /** Target rotor speed (rpm); CCW positive. Planck RevoluteJoint motor. */
+  readonly rpm: number;
+  /** Motor stall torque limit (N·m); solver clamps magnitude to config maxMotorTorque. */
+  readonly maxTorque: number;
 }
 
 /** Internal: flywheel driven by parent `EngineSpec` (same assembly). Not spawned via `World.add` alone. */
@@ -128,7 +130,8 @@ export interface BodyPatch {
   readonly width?: number;
   readonly height?: number;
   readonly dipole?: number;
-  readonly torque?: number;
+  readonly rpm?: number;
+  readonly maxTorque?: number;
   readonly rotorRadius?: number;
   /** Crank pin offset in body-local coordinates (m). */
   readonly pinLocal?: Vec2;
@@ -173,14 +176,16 @@ export interface EngineHousingView extends BaseBodyView {
   readonly width: number;
   readonly height: number;
   readonly rotorRadius: number;
-  readonly torque: number;
+  readonly rpm: number;
+  readonly maxTorque: number;
   readonly rotorId: Id;
 }
 
 export interface EngineRotorView extends BaseBodyView {
   readonly kind: "engine_rotor";
   readonly radius: number;
-  readonly torque: number;
+  readonly rpm: number;
+  readonly maxTorque: number;
   readonly housingId: Id;
 }
 

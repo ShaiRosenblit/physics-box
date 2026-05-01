@@ -35,6 +35,11 @@ const PULLEY_MIN_HALF_SPREAD = 0.05;
 
 const ORIENTED_BOX_MINY_EPS = 1e-12;
 
+/** Signed rpm (rev/min, CCW+) → Planck `motorSpeed` (rad/s). */
+function engineRpmToMotorSpeedRadPerSec(rpm: number): number {
+  return rpm * Math.PI / 30;
+}
+
 /** Minimum world Y over box corners (horizontal floor: keep this when width/height change). */
 function orientedBoxMinWorldY(
   cy: number,
@@ -236,7 +241,12 @@ export class PlanckAdapter {
 
     const anchor = planck.Vec2(spec.position.x, spec.position.y);
     const joint = new planck.RevoluteJoint(
-      { collideConnected: false },
+      {
+        collideConnected: false,
+        enableMotor: true,
+        motorSpeed: engineRpmToMotorSpeedRadPerSec(spec.rpm),
+        maxMotorTorque: Math.abs(spec.maxTorque),
+      },
       housingBody,
       rotorBody,
       anchor,
@@ -318,6 +328,15 @@ export class PlanckAdapter {
     rRec.body.setLinearDamping(newR.linearDamping ?? 0);
     rRec.body.setAngularDamping(newR.angularDamping ?? 0);
     this.bodies.set(asm.rotorId, { id: asm.rotorId, spec: newR, body: rRec.body });
+    this.syncEngineMotorJoint(asm);
+  }
+
+  /** Keeps housing–rotor RevoluteJoint motor in sync with `EngineSpec`. */
+  private syncEngineMotorJoint(asm: EngineAssembly): void {
+    const { joint, spec } = asm;
+    joint.enableMotor(true);
+    joint.setMotorSpeed(engineRpmToMotorSpeedRadPerSec(spec.rpm));
+    joint.setMaxMotorTorque(Math.abs(spec.maxTorque));
   }
   getBodySpec(id: Id): BodySpec | undefined {
     const record = this.bodies.get(id);
@@ -691,6 +710,26 @@ export class PlanckAdapter {
   }
 
   /**
+   * Clamp linear speed of each dynamic body (world XY velocity magnitude).
+   * Call once per fixed substep after `world.step`.
+   */
+  clampBodySpeeds(maxSpeed: number): void {
+    if (!Number.isFinite(maxSpeed) || maxSpeed <= 0) return;
+    const maxSq = maxSpeed * maxSpeed;
+    for (const record of this.bodies.values()) {
+      const b = record.body;
+      if (!b.isDynamic()) continue;
+      const v = b.getLinearVelocity();
+      const vx = v.x;
+      const vy = v.y;
+      const lenSq = vx * vx + vy * vy;
+      if (lenSq <= maxSq) continue;
+      const len = Math.sqrt(lenSq);
+      b.setLinearVelocity(planck.Vec2((vx * maxSpeed) / len, (vy * maxSpeed) / len));
+    }
+  }
+
+  /**
    * Live state of all magnets. Used by EM solvers to compute B fields
    * and dipole-on-dipole forces.
    */
@@ -794,29 +833,6 @@ export class PlanckAdapter {
       if (!record) continue;
       record.body.applyTorque(t, true);
     }
-  }
-
-  /**
-   * Motor bodies eligible for per-substep drive torque. `active` is false for
-   * static/kinematic bodies and when `fixed` is true.
-   */
-  engineTorqueInputs(): ReadonlyArray<{
-    readonly id: Id;
-    readonly torque: number;
-    readonly active: boolean;
-  }> {
-    const out: Array<{ readonly id: Id; readonly torque: number; readonly active: boolean }> =
-      [];
-    for (const asm of this.engineAssemblies.values()) {
-      const rotorRec = this.bodies.get(asm.rotorId);
-      if (!rotorRec) continue;
-      out.push({
-        id: asm.rotorId,
-        torque: asm.spec.torque,
-        active: rotorRec.body.isDynamic(),
-      });
-    }
-    return out;
   }
 
   private constraintReferencesAnyId(spec: ConstraintSpec, ids: Set<Id>): boolean {
@@ -1314,7 +1330,7 @@ export class PlanckAdapter {
 
     // Box2D auto-sleeps idle bodies, but it does not propagate wake through
     // a GearJoint. Without this, the driven body sleeps a few frames after
-    // creation and the engine's torque can no longer move it. Both ends of
+    // creation and the joint motor can no longer move it. Both ends of
     // the belt must therefore stay awake while the assembly exists.
     rotorRec.body.setSleepingAllowed(false);
     rotorRec.body.setAwake(true);
@@ -1638,18 +1654,21 @@ function buildView(
       width: spec.width,
       height: spec.height,
       rotorRadius: spec.rotorRadius,
-      torque: spec.torque,
+      rpm: spec.rpm,
+      maxTorque: spec.maxTorque,
       rotorId,
     });
   }
   if (spec.kind === "engine_rotor") {
     const asm = engineAssemblies.get(spec.housingId);
-    const torque = asm?.spec.torque ?? 0;
+    const rpm = asm?.spec.rpm ?? 0;
+    const maxTorque = asm?.spec.maxTorque ?? 0;
     return Object.freeze({
       ...base,
       kind: "engine_rotor" as const,
       radius: spec.radius,
-      torque,
+      rpm,
+      maxTorque,
       housingId: spec.housingId,
     });
   }

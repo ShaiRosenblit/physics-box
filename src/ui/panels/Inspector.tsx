@@ -456,7 +456,7 @@ function constraintKindShort(kind: ConstraintView["kind"]): string {
 
 function BodyDetails({ view }: { view: BodyView }) {
   const { patchBody, world } = useSimulationContext();
-  const { maxCharge, maxDipole, maxBuoyancyLift, maxMotorTorque } = world.config;
+  const { maxCharge, maxDipole, maxBuoyancyLift, maxMotorTorque, maxRpm } = world.config;
   const speed = Math.hypot(view.velocity.x, view.velocity.y);
 
   const ctl = inspectorControlStyle;
@@ -577,16 +577,32 @@ function BodyDetails({ view }: { view: BodyView }) {
 
       {(view.kind === "engine" || view.kind === "engine_rotor") && (
         <div style={editRowStyle}>
-          <span style={editLabelStyle}>Torque</span>
+          <span style={editLabelStyle}>RPM</span>
           <InspectorNumberInput
-            aria-label="Motor torque"
+            aria-label="Motor target rpm"
+            min={-maxRpm}
+            max={maxRpm}
+            step={10}
+            style={ctl}
+            value={view.rpm}
+            clamp={(v) => Math.max(-maxRpm, Math.min(maxRpm, Math.round(v)))}
+            onCommit={(v) => patchBody(view.id, { rpm: v })}
+          />
+        </div>
+      )}
+
+      {(view.kind === "engine" || view.kind === "engine_rotor") && (
+        <div style={editRowStyle}>
+          <span style={editLabelStyle}>Max torque</span>
+          <InspectorNumberInput
+            aria-label="Motor max torque"
             min={-maxMotorTorque}
             max={maxMotorTorque}
             step={1}
             style={ctl}
-            value={view.torque}
+            value={view.maxTorque}
             clamp={(v) => Math.max(-maxMotorTorque, Math.min(maxMotorTorque, v))}
-            onCommit={(v) => patchBody(view.id, { torque: v })}
+            onCommit={(v) => patchBody(view.id, { maxTorque: v })}
           />
         </div>
       )}

@@ -37,7 +37,6 @@ import {
 } from "../electromagnetism/lorentz";
 import { sampleB } from "../electromagnetism/magnetism";
 import { computeBuoyancyForces } from "../mechanics/buoyancy";
-import { buildEngineTorqueMap } from "../mechanics/motor";
 
 /**
  * The simulation kernel facade.
@@ -73,7 +72,6 @@ export class World {
     this._stepper = new Stepper(config.dt, config.maxSubsteps);
     this.registerEmSolvers();
     this.registerBuoyancySolver();
-    this.registerEngineSolver();
   }
 
   private registerEmSolvers(): void {
@@ -119,15 +117,6 @@ export class World {
 
       const f = computeBuoyancyForces(sorted, gVec, cfg);
       if (f.size > 0) this._adapter.applyForces(f);
-    });
-  }
-
-  private registerEngineSolver(): void {
-    this._preStepHooks.push(() => {
-      const inputs = this._adapter.engineTorqueInputs();
-      if (inputs.length === 0) return;
-      const tau = buildEngineTorqueMap(inputs, this._config.maxMotorTorque);
-      if (tau.size > 0) this._adapter.applyTorques(tau);
     });
   }
 
@@ -400,6 +389,7 @@ export class World {
       this._config.velIters,
       this._config.posIters,
     );
+    this._adapter.clampBodySpeeds(this._config.maxSpeed);
     this._tick += 1;
     this._events.emit("step", { tick: this._tick });
   }

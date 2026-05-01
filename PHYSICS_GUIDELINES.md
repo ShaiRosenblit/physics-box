@@ -95,7 +95,7 @@ Magnets feel a **translational** force from the standard point-dipole–dipole i
 
 - **Force cap** per body per substep: clamp EM force magnitude to `maxEmForce`.
 - **Torque cap** per body per substep: clamp |τ| to `maxEmTorque`.
-- **Speed cap**: clamp body speed to `maxSpeed`.
+- **Speed cap**: after each Planck substep, clamp each dynamic body’s **linear** velocity magnitude (world XY) to `maxSpeed`.
 - **Charge cap** and **dipole cap**: enforced on `add` / `update`.
 - **Softening length** `ε` in dipole separation and near-field regularization.
 

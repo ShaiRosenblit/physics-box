@@ -78,7 +78,7 @@ export function SpawnToolOptions() {
   const setSpawnPresetPartial = useUIStore((s) => s.setSpawnPresetPartial);
 
   const mode = activeSpawnModeFromTool(tool);
-  const { maxCharge, maxDipole, maxBuoyancyLift, maxMotorTorque } =
+  const { maxCharge, maxDipole, maxBuoyancyLift, maxMotorTorque, maxRpm } =
     useSimulationContext().world.config;
 
   if (mode === null) return null;
@@ -157,6 +157,7 @@ export function SpawnToolOptions() {
             bump(mode === "engine+" ? "enginePlus" : "engineMinus", p)
           }
           maxMotorTorque={maxMotorTorque}
+          maxRpm={maxRpm}
         />
       )}
       {mode === "box" && (
@@ -183,6 +184,7 @@ function EngineFields(props: {
   preset: EngineSpawnPreset;
   onPatch: (p: Partial<EngineSpawnPreset>) => void;
   maxMotorTorque: number;
+  maxRpm: number;
 }) {
   return (
     <>
@@ -232,20 +234,40 @@ function EngineFields(props: {
         />
       </div>
       <div style={fieldStyle}>
-        <span style={labelStyle}>Torque</span>
+        <span style={labelStyle}>RPM</span>
         <input
-          aria-label="Engine torque magnitude"
+          aria-label="Engine rpm magnitude"
+          type="number"
+          min={0}
+          max={props.maxRpm}
+          step={10}
+          style={inputStyle}
+          value={fmtInput(props.preset.rpm)}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (Number.isFinite(v)) {
+              props.onPatch({
+                rpm: Math.max(0, Math.min(props.maxRpm, Math.round(v))),
+              });
+            }
+          }}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span style={labelStyle}>Max τ</span>
+        <input
+          aria-label="Engine max motor torque"
           type="number"
           min={0}
           max={props.maxMotorTorque}
           step={5}
           style={inputStyle}
-          value={fmtInput(props.preset.torqueMagnitude)}
+          value={fmtInput(props.preset.maxTorque)}
           onChange={(e) => {
             const v = parseFloat(e.target.value);
             if (Number.isFinite(v)) {
               props.onPatch({
-                torqueMagnitude: Math.max(
+                maxTorque: Math.max(
                   0,
                   Math.min(props.maxMotorTorque, v),
                 ),

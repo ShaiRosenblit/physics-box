@@ -189,7 +189,7 @@ function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
   const dSign = body.kind === "magnet" ? signOf(body.dipole) : 0;
   const tSign =
     body.kind === "engine" || body.kind === "engine_rotor"
-      ? signOf(body.torque)
+      ? signOf(body.rpm)
       : 0;
   const woodBox =
     body.kind === "box" && woodBoxUseNineSlice(body, raster);
@@ -359,7 +359,7 @@ function drawEngineRotor(
   g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.5 });
 
   const rr = body.radius * 0.72;
-  const ccw = body.torque >= 0;
+  const ccw = body.rpm >= 0;
   const a0 = ccw ? 0.12 * Math.PI : -0.12 * Math.PI;
   const a1 = ccw ? a0 - 1.05 * Math.PI : a0 + 1.05 * Math.PI;
   g.arc(0, 0, rr, a0, a1, !ccw);
