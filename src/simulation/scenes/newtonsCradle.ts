@@ -1,6 +1,7 @@
 import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
 import { box } from "../mechanics/box";
+import { lookupMaterial } from "../mechanics/materials";
 import { rope } from "../mechanics/rope";
 import { worldAnchor, bodyAnchor } from "../mechanics/anchors";
 import { addWorkshopEnclosure } from "./workshopEnclosure";
@@ -33,6 +34,8 @@ export function newtonsCradle(world: World): void {
   /** First bob only: angle from vertical toward −x (rad). */
   const pullAngle = 0.5;
 
+  const bobDensity = lookupMaterial("metal").density * 10;
+
   for (let i = 0; i < n; i++) {
     const ax = (i - (n - 1) / 2) * (2 * bobR);
     const pull = i === 0;
@@ -46,6 +49,7 @@ export function newtonsCradle(world: World): void {
         position: { x: bx, y: by },
         radius: bobR,
         material: "metal",
+        density: bobDensity,
         fixtureRestitution: 0.9,
         fixtureFriction: 0.06,
         linearDamping: 0.004,
