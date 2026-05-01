@@ -28,6 +28,8 @@ export function newtonsCradle(world: World): void {
       height: beamH,
       fixed: true,
       material: "metal",
+      fixtureFriction: 0,
+      fixtureRestitution: 1,
     }),
   );
 
@@ -50,10 +52,10 @@ export function newtonsCradle(world: World): void {
         radius: bobR,
         material: "metal",
         density: bobDensity,
-        fixtureRestitution: 0.9,
-        fixtureFriction: 0.06,
-        linearDamping: 0.004,
-        angularDamping: 0.02,
+        fixtureRestitution: 1,
+        fixtureFriction: 0,
+        linearDamping: 0,
+        angularDamping: 0,
       }),
     );
 
