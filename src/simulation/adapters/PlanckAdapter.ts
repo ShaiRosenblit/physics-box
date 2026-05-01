@@ -1401,7 +1401,7 @@ function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
     if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
   }
   if (oldS.kind === "box" && newS.kind === "box") {
-    if (oldS.width !== newS.width || oldS.height !== oldS.height) return true;
+    if (oldS.width !== newS.width || oldS.height !== newS.height) return true;
   }
   if (oldS.kind === "engine" && newS.kind === "engine") {
     if (

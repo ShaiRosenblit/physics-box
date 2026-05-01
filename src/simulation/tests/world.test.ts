@@ -326,6 +326,36 @@ describe("World", () => {
     expect(orientedBoxMinY(after)).toBeCloseTo(bottomBefore, 2);
   });
 
+  it("patchBody height on floor stays anchored after physics steps (fixture rebuild)", () => {
+    const world = new World();
+    world.add(
+      box({
+        position: { x: 0, y: -0.25 },
+        width: 40,
+        height: 0.5,
+        fixed: true,
+        material: "wood",
+      }),
+    );
+    const id = world.add(
+      box({
+        position: { x: 0, y: 0.45 },
+        width: 0.9,
+        height: 0.9,
+        material: "wood",
+      }),
+    );
+    stepFor(world, 400);
+    const settled = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
+    const bottomBefore = orientedBoxMinY(settled);
+    expect(Math.abs(bottomBefore)).toBeLessThan(0.02);
+    world.patchBody(id, { height: 1.5 });
+    stepFor(world, 120);
+    const after = world.snapshot().bodies.find((b) => b.id === id)! as BoxView;
+    expect(orientedBoxMinY(after)).toBeCloseTo(bottomBefore, 2);
+    expect(after.height).toBe(1.5);
+  });
+
   it("patchBody widen 90° box on floor keeps lowest corner Y", () => {
     const world = new World();
     world.add(
