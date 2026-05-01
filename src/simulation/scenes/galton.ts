@@ -79,7 +79,7 @@ export function galton(world: World): void {
   /** Softer wall hits so beads do not rebound out of the board. */
   const wallRestitution = 0.06;
 
-  const numDropBalls = 42;
+  const numDropBalls = 1000;
   /** Narrow band around x = 0 (half-width ~ few cm). */
   const hopperHalfX = 0.052;
 
