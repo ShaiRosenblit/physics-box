@@ -32,10 +32,12 @@ export function galton(world: World): void {
   addWorkshopEnclosure(world);
 
   const pegRadius = 0.038;
-  const pegDx = 0.3;
-  const pegDy = 0.31;
+  /** Center-to-center peg pitch; peg and marble radii stay fixed (only spacing grows). */
+  const pegDx = 0.3 * 4;
+  const pegDy = 0.31 * 4;
   const numRows = 10;
-  const pegArenaTop = 6.85;
+  /** Raised with larger `pegDy` so bottom row stays above bins (matched to old layout). */
+  const pegArenaTop = 6.85 + (numRows - 1) * (pegDy - 0.31);
 
   for (let row = 0; row < numRows; row++) {
     const count = row + 1;
