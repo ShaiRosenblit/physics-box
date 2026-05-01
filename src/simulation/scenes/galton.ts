@@ -32,8 +32,8 @@ export function galton(world: World): void {
   /** Top surface of the floor plate (see `addWorkshopEnclosure`). */
   const groundTopY = 0;
 
-  const pegRadius = 0.038;
-  /** Center-to-center peg pitch; peg and marble radii stay fixed (only spacing grows). */
+  const pegRadius = 0.038 * 8;
+  /** Center-to-center peg pitch (marble radius is `dropBallRadius` below). */
   const pegDx = 0.3 * 4;
   const pegDy = 0.31 * 4;
   const numRows = 10;
