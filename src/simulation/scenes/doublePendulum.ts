@@ -2,13 +2,15 @@ import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
 import { box } from "../mechanics/box";
 import { hinge } from "../mechanics/hinge";
+import { weld } from "../mechanics/weld";
 import { lookupMaterial } from "../mechanics/materials";
 import { addWorkshopEnclosure } from "./workshopEnclosure";
 
 /**
  * Planar double pendulum: near-massless rigid links with lumped masses at the
- * distal end of each bar (elbow and lower tip). Frictionless contacts; rods use
- * negligible density so almost all inertia sits in the bobs.
+ * distal end of each bar (elbow and lower tip). Balls are rigidly fused to
+ * their rod ends via weld joints; only the ceiling pivot and the elbow are
+ * revolutes. Frictionless, zero damping so motion is essentially conservative.
  */
 export function doublePendulum(world: World): void {
   /** Inner clearance from floor (y = 0) to ceiling; tall enough for L1+L2 tip travel. */
@@ -54,7 +56,7 @@ export function doublePendulum(world: World): void {
 
   /** ~0.1% of nominal metal areal density — rods are visual/spatial only. */
   const linkDensity = lookupMaterial("metal").density * 0.001;
-  /** Most system mass in the balls (kg/m²). */
+  /** Most system mass in the bobs (kg/m²). */
   const bobDensity = lookupMaterial("metal").density * 28;
   const bobR1 = 0.11;
   const bobR2 = 0.125;
@@ -108,9 +110,11 @@ export function doublePendulum(world: World): void {
     }),
   );
 
+  // Ceiling pivot — upper bar can rotate freely here
   world.addConstraint(
     hinge({ bodyA: upperId, worldAnchor: { x: pivotX, y: pivotY } }),
   );
+  // Elbow pivot — lower bar swings freely relative to upper bar
   world.addConstraint(
     hinge({
       bodyA: upperId,
@@ -118,15 +122,17 @@ export function doublePendulum(world: World): void {
       worldAnchor: joint,
     }),
   );
+  // Elbow bob rigidly fused to the bottom of the upper bar
   world.addConstraint(
-    hinge({
+    weld({
       bodyA: upperId,
       bodyB: elbowBobId,
       worldAnchor: joint,
     }),
   );
+  // Tip bob rigidly fused to the bottom of the lower bar
   world.addConstraint(
-    hinge({
+    weld({
       bodyA: lowerId,
       bodyB: tipBobId,
       worldAnchor: tip,

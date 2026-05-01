@@ -451,6 +451,8 @@ function constraintKindShort(kind: ConstraintView["kind"]): string {
       return "Pulley";
     case "belt":
       return "Belt";
+    case "weld":
+      return "Weld";
   }
 }
 

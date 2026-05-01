@@ -88,6 +88,10 @@ function distToConstraint(c: ConstraintView, p: Vec2): number {
   if (c.kind === "belt") {
     return minDistAlongPolyline(p, c.path);
   }
+  if (c.kind === "weld") {
+    // welds are invisible; not user-selectable
+    return Number.POSITIVE_INFINITY;
+  }
   return Number.POSITIVE_INFINITY;
 }
 

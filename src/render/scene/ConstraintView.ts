@@ -91,7 +91,9 @@ function drawConstraint(
   }
   if (view.kind === "belt") {
     drawBelt(g, view, zoom);
+    return;
   }
+  // weld joints are invisible — no geometry to draw
 }
 
 function drawRope(

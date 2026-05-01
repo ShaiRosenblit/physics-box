@@ -49,6 +49,8 @@ export type {
   SpringView,
   PulleySpec,
   PulleyView,
+  WeldSpec,
+  WeldView,
   Snapshot,
   Vec2,
 } from "./core/types";
@@ -65,11 +67,13 @@ export {
   spring,
   pulley,
   belt,
+  weld,
   PULLEY_DEFAULT_HALF_SPREAD,
   materials,
   worldAnchor,
   bodyAnchor,
 } from "./mechanics";
+export type { WeldInput } from "./mechanics";
 
 export { ChargeRegistry } from "./electromagnetism/ChargeRegistry";
 export { computeCoulombForces, type ChargedBodyState } from "./electromagnetism/coulomb";

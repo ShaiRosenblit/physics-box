@@ -18,6 +18,7 @@ import type {
   Snapshot,
   SpringSpec,
   Vec2,
+  WeldSpec,
 } from "../core/types";
 import {
   ropeRebuildNeeded,
@@ -860,6 +861,9 @@ export class PlanckAdapter {
       return ids.has(spec.bodyA) ||
         (spec.bodyB !== undefined && ids.has(spec.bodyB));
     }
+    if (spec.kind === "weld") {
+      return ids.has(spec.bodyA) || ids.has(spec.bodyB);
+    }
     if (spec.kind === "rope" || spec.kind === "spring") {
       const hit = (a: Anchor) => a.kind === "body" && ids.has(a.id);
       return hit(spec.a) || hit(spec.b);
@@ -908,6 +912,10 @@ export class PlanckAdapter {
     }
     if (spec.kind === "hinge") {
       this.constraints.set(id, this.buildHinge(id, spec));
+      return;
+    }
+    if (spec.kind === "weld") {
+      this.constraints.set(id, this.buildWeld(id, spec));
       return;
     }
     if (spec.kind === "spring") {
@@ -1022,6 +1030,20 @@ export class PlanckAdapter {
         return;
       }
       this.replaceConstraintKeepingId(id, pb);
+      return;
+    }
+    if (next.kind === "weld") {
+      const wa = prev as WeldSpec;
+      const wb = next;
+      if (
+        wa.bodyA === wb.bodyA &&
+        wa.bodyB === wb.bodyB &&
+        wa.worldAnchor.x === wb.worldAnchor.x &&
+        wa.worldAnchor.y === wb.worldAnchor.y
+      ) {
+        return;
+      }
+      this.replaceConstraintKeepingId(id, next);
       return;
     }
   }
@@ -1207,6 +1229,26 @@ export class PlanckAdapter {
       {},
       first,
       second,
+      anchor,
+    );
+    this.world.createJoint(joint);
+    return { id, spec, internalBodies: [], joints: [joint] };
+  }
+
+  private buildWeld(id: Id, spec: WeldSpec): ConstraintRecord {
+    const recordA = this.bodies.get(spec.bodyA);
+    if (!recordA) {
+      throw new Error(`weld: bodyA id ${spec.bodyA} not found`);
+    }
+    const recordB = this.bodies.get(spec.bodyB);
+    if (!recordB) {
+      throw new Error(`weld: bodyB id ${spec.bodyB} not found`);
+    }
+    const anchor = planck.Vec2(spec.worldAnchor.x, spec.worldAnchor.y);
+    const joint = new planck.WeldJoint(
+      {},
+      recordA.body,
+      recordB.body,
       anchor,
     );
     this.world.createJoint(joint);
@@ -1618,6 +1660,18 @@ function buildConstraintView(
       driverRotorId: spec.driverRotorId,
       drivenBodyId: spec.drivenBodyId,
       ratio,
+    });
+  }
+
+  if (spec.kind === "weld") {
+    const joint = record.joints[0];
+    const anchorVec = joint.getAnchorA();
+    return Object.freeze({
+      id,
+      kind: "weld" as const,
+      anchor: Object.freeze({ x: anchorVec.x, y: anchorVec.y }),
+      bodyA: spec.bodyA,
+      bodyB: spec.bodyB,
     });
   }
 

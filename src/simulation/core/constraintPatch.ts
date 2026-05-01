@@ -7,6 +7,7 @@ import type {
   PulleySpec,
   RopeSpec,
   SpringSpec,
+  WeldSpec,
 } from "./types";
 
 export const MIN_CONNECTOR_REST = 0.05;
@@ -59,6 +60,13 @@ export function mergeConstraintPatch(spec: ConstraintSpec, patch: ConstraintPatc
       if (patch.ratio !== undefined) n = { ...n, ratio: patch.ratio };
       return n;
     }
+    case "weld": {
+      let n: WeldSpec = { ...spec };
+      if (patch.worldAnchor !== undefined) {
+        n = { ...n, worldAnchor: { ...patch.worldAnchor } };
+      }
+      return n;
+    }
     default: {
       const _e: never = spec;
       return _e;
@@ -100,6 +108,7 @@ export function sanitizeConstraintSpec(spec: ConstraintSpec): ConstraintSpec {
     }
     return spec;
   }
+  if (spec.kind === "weld") return spec;
   return spec;
 }
 

@@ -221,7 +221,7 @@ export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }
   | { readonly kind: "body"; readonly id: Id; readonly localPoint?: Vec2 };
 
-export type ConstraintKind = "rope" | "hinge" | "spring" | "pulley" | "belt";
+export type ConstraintKind = "rope" | "hinge" | "spring" | "pulley" | "belt" | "weld";
 
 export interface RopeSpec {
   readonly kind: "rope";
@@ -273,12 +273,26 @@ export interface BeltSpec {
   readonly ratio?: number;
 }
 
+/**
+ * Rigid attachment: constrains two bodies to have a fixed relative position
+ * and angle — equivalent to gluing them at `worldAnchor`. Uses Planck
+ * `WeldJoint`. Both bodies must be dynamic.
+ */
+export interface WeldSpec {
+  readonly kind: "weld";
+  readonly bodyA: Id;
+  readonly bodyB: Id;
+  /** World-space point used as the anchor when the weld is created. */
+  readonly worldAnchor: Vec2;
+}
+
 export type ConstraintSpec =
   | RopeSpec
   | HingeSpec
   | SpringSpec
   | PulleySpec
-  | BeltSpec;
+  | BeltSpec
+  | WeldSpec;
 
 /** Sparse updates for patchConstraint — only fields valid for this kind apply. */
 export interface ConstraintPatch {
@@ -348,12 +362,21 @@ export interface BeltView {
   readonly ratio: number;
 }
 
+export interface WeldView {
+  readonly id: Id;
+  readonly kind: "weld";
+  readonly anchor: Vec2;
+  readonly bodyA: Id;
+  readonly bodyB: Id;
+}
+
 export type ConstraintView =
   | RopeView
   | HingeView
   | SpringView
   | PulleyView
-  | BeltView;
+  | BeltView
+  | WeldView;
 
 export interface ChargedSourceView {
   readonly id: Id;

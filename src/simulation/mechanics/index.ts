@@ -13,5 +13,6 @@ export {
   type PulleyInput,
 } from "./pulley";
 export { belt, type BeltInput } from "./belt";
+export { weld, type WeldInput } from "./weld";
 export { worldAnchor, bodyAnchor } from "./anchors";
 export { materials, lookupMaterial, type MaterialProps } from "./materials";
