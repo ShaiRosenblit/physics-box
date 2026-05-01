@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { World, defaultConfig, doublePendulum } from "..";
 
 describe("double pendulum scene", () => {
-  it("exposes two hinges and both links move under gravity", () => {
+  it("exposes four hinges (ceiling, elbow, elbow bob, tip bob) and links move", () => {
     const world = new World({ ...defaultConfig });
     doublePendulum(world);
     const snap0 = world.snapshot();
     const hinges = snap0.constraints.filter((c) => c.kind === "hinge");
-    expect(hinges.length).toBe(2);
+    expect(hinges.length).toBe(4);
     expect(snap0.constraints.some((c) => c.kind === "hinge" && c.bodyB === undefined)).toBe(
       true,
     );
@@ -16,6 +16,8 @@ describe("double pendulum scene", () => {
       (b) => b.kind === "box" && b.material === "metal" && !b.fixed,
     );
     expect(links.length).toBe(2);
+    const bobs = snap0.bodies.filter((b) => b.kind === "ball" && !b.fixed);
+    expect(bobs.length).toBe(2);
 
     for (let i = 0; i < 360; i++) world.stepOnce();
     const snap1 = world.snapshot();

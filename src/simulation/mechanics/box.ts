@@ -14,6 +14,8 @@ export interface BoxInput {
   fixtureFriction?: number;
   linearDamping?: number;
   angularDamping?: number;
+  /** Overrides material density (2D kg/m²); mass ∝ density × width × height. */
+  density?: number;
 }
 
 export function box(input: BoxInput): BoxSpec {
@@ -39,5 +41,6 @@ export function box(input: BoxInput): BoxSpec {
     ...(input.fixtureFriction !== undefined ? { fixtureFriction: input.fixtureFriction } : {}),
     ...(input.linearDamping !== undefined ? { linearDamping: input.linearDamping } : {}),
     ...(input.angularDamping !== undefined ? { angularDamping: input.angularDamping } : {}),
+    ...(input.density !== undefined ? { density: input.density } : {}),
   };
 }
