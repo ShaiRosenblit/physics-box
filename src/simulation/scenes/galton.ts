@@ -17,16 +17,19 @@ function halton1d(index: number, base: 2 | 3): number {
 }
 
 /**
- * Galton board (bean machine): staggered fixed pegs (`felt` nails — high friction),
- * marbles tuned for dead-normal contacts. Planck mixes restitution as max(A,B);
- * without shell restitution pinned to zero, workshop wood floors (default 0.2) win
- * and beads rebound sharply in bins.
+ * Galton board (bean machine): staggered fixed pegs (`felt` nails — dead bounce,
+ * high friction) and hopper marbles tuned for slow sideways creep after each hit.
+ *
+ * Peg–marble normal bounce uses Planck `max(restitutionPeg, restitutionMarble)`.
+ * Felt alone (≈0.01) paired with marble `fixtureRestitution: 0.02` stayed slightly
+ * lively; both pegs and marbles pin `fixtureRestitution: 0` so paired contacts resolve
+ * with zero restitution (floor/walls still use material defaults vs this override).
  */
 export function galton(world: World): void {
   /** Top surface of the floor plate (see `addWorkshopEnclosure`). */
   const groundTopY = 0;
 
-  addWorkshopEnclosure(world, { shellFixtureRestitution: 0 });
+  addWorkshopEnclosure(world);
 
   const pegRadius = 0.038;
   const pegDx = 0.3;
@@ -54,8 +57,8 @@ export function galton(world: World): void {
   const outerHalf =
     ((numRows - 1) / 2) * pegDx + pegRadius + 0.12;
   const wallThickness = 0.22;
-  /** Zero restitution — Planck uses max(marble, obstacle); pin every obstacle to 0. */
-  const obstacleRestitution = 0;
+  /** Softer wall hits so beads do not rebound out of the board. */
+  const wallRestitution = 0.06;
 
   const dropBallRadius = 0.042;
   const numDropBalls = 42;
@@ -78,7 +81,7 @@ export function galton(world: World): void {
       height: wallHeight,
       fixed: true,
       material: "metal",
-      fixtureRestitution: obstacleRestitution,
+      fixtureRestitution: wallRestitution,
     }),
   );
   world.add(
@@ -88,7 +91,7 @@ export function galton(world: World): void {
       height: wallHeight,
       fixed: true,
       material: "metal",
-      fixtureRestitution: obstacleRestitution,
+      fixtureRestitution: wallRestitution,
     }),
   );
 
@@ -108,12 +111,12 @@ export function galton(world: World): void {
         height: binDividerHalfHeight * 2,
         fixed: true,
         material: "metal",
-        fixtureRestitution: obstacleRestitution,
+        fixtureRestitution: wallRestitution,
       }),
     );
   }
 
-  /** Bleed tangential creep; paired with zero restitution on all Galton solids. */
+  /** Bleed speed after peg contacts; high friction at peg wraps kills rebound and creep is slow. */
   const marbleLinearDamping = 0.62;
   const marbleAngularDamping = 0.56;
   const marbleFriction = 1.05;
