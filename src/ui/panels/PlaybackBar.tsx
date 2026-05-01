@@ -12,6 +12,7 @@ const SCENE_LABEL: Record<SceneName, string> = {
   empty: "Empty",
   welcome: "Welcome",
   engines: "Engines demo",
+  catapult: "Catapult",
   galton: "Galton board",
   doublePendulum: "Double pendulum",
   newtonsCradle: "Newton's cradle",

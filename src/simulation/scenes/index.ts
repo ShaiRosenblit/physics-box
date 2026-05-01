@@ -1,4 +1,5 @@
 import type { World } from "../core/World";
+import { catapult } from "./catapult";
 import { doublePendulum } from "./doublePendulum";
 import { empty } from "./empty";
 import { engines } from "./engines";
@@ -12,6 +13,7 @@ export type SceneName =
   | "empty"
   | "welcome"
   | "engines"
+  | "catapult"
   | "galton"
   | "doublePendulum"
   | "newtonsCradle"
@@ -21,6 +23,7 @@ export const scenes: Readonly<Record<SceneName, SceneFn>> = {
   empty,
   welcome,
   engines,
+  catapult,
   galton,
   doublePendulum,
   newtonsCradle,
@@ -28,6 +31,7 @@ export const scenes: Readonly<Record<SceneName, SceneFn>> = {
 };
 
 export {
+  catapult,
   doublePendulum,
   empty,
   engines,
@@ -45,6 +49,7 @@ export const sceneIds: readonly SceneName[] = [
   "empty",
   "welcome",
   "engines",
+  "catapult",
   "galton",
   "doublePendulum",
   "newtonsCradle",
