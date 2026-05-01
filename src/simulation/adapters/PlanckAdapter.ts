@@ -1108,6 +1108,19 @@ export class PlanckAdapter {
     const span = planck.Vec2.sub(end.worldPoint, start.worldPoint);
     const distance = span.length();
     const length = Math.max(spec.length, Math.max(distance, 0.05));
+
+    if (spec.segments === 0) {
+      const joint = new planck.DistanceJoint(
+        { frequencyHz: 0, dampingRatio: 0, length },
+        start.body,
+        end.body,
+        start.worldPoint,
+        end.worldPoint,
+      );
+      this.world.createJoint(joint);
+      return { id, spec, internalBodies: [], joints: [joint] };
+    }
+
     const segments = Math.max(2, spec.segments ?? Math.max(6, Math.round(length / 0.18)));
     const segLen = length / (segments + 1);
     const segRadius = Math.max(0.04, segLen * 0.2);

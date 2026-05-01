@@ -87,6 +87,34 @@ describe("Rope", () => {
     expect(pathLen).toBeLessThan(ropeLength * 1.15);
   });
 
+  it("rigid rope (segments: 0) keeps anchor–bob separation at rod length under gravity", () => {
+    const world = new World();
+    const bob = world.add(
+      ball({ position: { x: 0, y: 3 }, radius: 0.15, material: "metal" }),
+    );
+    const rodLength = 2;
+    const id = world.addConstraint(
+      rope({
+        a: worldAnchor({ x: 0, y: 5 }),
+        b: bodyAnchor(bob),
+        length: rodLength,
+        segments: 0,
+      }),
+    );
+    const snap0 = world.snapshot();
+    const view0 = snap0.constraints.find((c) => c.id === id);
+    expect(view0?.kind).toBe("rope");
+    if (view0?.kind !== "rope") return;
+    expect(view0.segmentLinks).toBe(0);
+    expect(view0.path.length).toBe(2);
+
+    for (let i = 0; i < 240; i++) world.stepOnce();
+    const bobEnd = world.snapshot().bodies.find((b) => b.id === bob)!;
+    const separation = dist({ x: 0, y: 5 }, bobEnd.position);
+    expect(separation).toBeGreaterThan(rodLength - 0.06);
+    expect(separation).toBeLessThan(rodLength + 0.06);
+  });
+
   it("removes its segments when the constraint is removed", () => {
     const world = new World();
     const id = world.addConstraint(

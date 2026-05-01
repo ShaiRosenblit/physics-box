@@ -62,7 +62,7 @@ export function newtonsCradle(world: World): void {
         a: worldAnchor({ x: ax, y: anchorY }),
         b: bodyAnchor(id),
         length: cordLength,
-        segments: 12,
+        segments: 0,
         material: "wood",
       }),
     );

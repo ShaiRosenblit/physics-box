@@ -12,9 +12,13 @@ export function rope(input: RopeInput): RopeSpec {
   if (input.length <= 0) {
     throw new Error(`rope: length must be > 0 (got ${input.length})`);
   }
-  if (input.segments !== undefined && input.segments < 2) {
+  if (
+    input.segments !== undefined &&
+    input.segments !== 0 &&
+    input.segments < 2
+  ) {
     throw new Error(
-      `rope: segments must be >= 2 (got ${input.segments})`,
+      `rope: segments must be 0 (rigid link) or >= 2 (got ${input.segments})`,
     );
   }
   return {

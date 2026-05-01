@@ -228,6 +228,7 @@ export interface RopeSpec {
   readonly a: Anchor;
   readonly b: Anchor;
   readonly length: number;
+  /** `0` = one rigid distance joint between endpoints; `undefined` = auto chain; else bead count ≥ 2. */
   readonly segments?: number;
   readonly material?: MaterialName;
 }
@@ -299,7 +300,7 @@ export interface RopeView {
   readonly material: MaterialName;
   /** Nominal constrained length (`RopeSpec.length`). */
   readonly nominalLength: number;
-  /** Segment count baked into this chain (`RopeSpec.segments` resolved at build time). */
+  /** Bead bodies along a segmented chain; `0` when `segments: 0` (rigid link). */
   readonly segmentLinks: number;
 }
 

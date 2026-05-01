@@ -11,7 +11,7 @@ import type {
 
 export const MIN_CONNECTOR_REST = 0.05;
 export const MIN_PULLEY_HALF_SPREAD = 0.05;
-/** Matches `rope` factory requirement (`segments >= 2`). */
+/** Minimum beaded-rope link count; `0` means a single rigid segment (see `RopeSpec.segments`). */
 export const MIN_ROPE_SEGMENTS = 2;
 /** @internal */
 export function anchorEqual(a: RopeSpec["a"], b: RopeSpec["a"]): boolean {
@@ -71,7 +71,8 @@ export function sanitizeConstraintSpec(spec: ConstraintSpec): ConstraintSpec {
     const len = Math.max(MIN_CONNECTOR_REST, spec.length);
     let seg = spec.segments;
     if (seg !== undefined) {
-      seg = Math.max(MIN_ROPE_SEGMENTS, Math.round(seg));
+      const r = Math.round(seg);
+      seg = r === 0 ? 0 : Math.max(MIN_ROPE_SEGMENTS, r);
     }
     const out: RopeSpec = { ...spec, length: len };
     return seg === undefined ? out : { ...out, segments: seg };
