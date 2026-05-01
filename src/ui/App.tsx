@@ -596,10 +596,9 @@ export function App() {
 function toAnchor(a: ResolvedAnchor, snap: Snapshot): Anchor {
   if (a.kind === "body") {
     const b = snap.bodies.find((x) => x.id === a.id);
-    if (b?.kind === "crank") {
-      return bodyAnchor(a.id, { x: b.pinLocal.x, y: b.pinLocal.y });
-    }
-    return bodyAnchor(a.id);
+    if (!b) return bodyAnchor(a.id);
+    const local = hitWorldToBodyLocal(b, a.hitPoint);
+    return bodyAnchor(a.id, local);
   }
   return worldAnchor(a.point);
 }
@@ -609,18 +608,8 @@ function resolveAnchorPosition(
   a: ResolvedAnchor,
 ): Vec2 | null {
   if (a.kind === "world") return a.point;
-  const body = snap.bodies.find((b) => b.id === a.id);
-  if (!body) return null;
-  if (body.kind === "crank") {
-    const pl = body.pinLocal;
-    const c = Math.cos(body.angle);
-    const s = Math.sin(body.angle);
-    return {
-      x: body.position.x + pl.x * c - pl.y * s,
-      y: body.position.y + pl.x * s + pl.y * c,
-    };
-  }
-  return body.position;
+  if (!snap.bodies.some((b) => b.id === a.id)) return null;
+  return a.hitPoint;
 }
 
 function hitWorldToBodyLocal(body: BodyView, hitWorld: Vec2): Vec2 {

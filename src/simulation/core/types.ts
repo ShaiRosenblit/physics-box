@@ -58,10 +58,10 @@ export interface BoxSpec extends BaseBodySpec {
 }
 
 /**
- * Circular flywheel with an off-center pin (local body space). Attach ropes or
- * springs to the pin via `bodyAnchor(id, pinLocal)` — the UI does this
- * automatically when the crank is clicked. The pin must lie on or inside the
- * wheel radius.
+ * Circular flywheel with an off-center pin (local body space). In the canvas,
+ * rope/spring taps convert the hit point to body-local anchors so you can tie
+ * off at the pin (or elsewhere on the wheel). The pin must lie on or inside
+ * the wheel radius.
  */
 export interface CrankSpec extends BaseBodySpec {
   readonly kind: "crank";

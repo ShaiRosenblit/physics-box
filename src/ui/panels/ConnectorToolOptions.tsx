@@ -39,6 +39,16 @@ const fieldStyle: CSSProperties = {
   alignItems: "stretch",
 };
 
+const ropeSpringHintStyle: CSSProperties = {
+  flex: "1 0 100%",
+  fontSize: 11,
+  lineHeight: 1.4,
+  color: ui.inkMuted,
+  margin: 0,
+  marginTop: -2,
+  maxWidth: 560,
+};
+
 /** Compact controls for rope / spring / pulley placement (before second click commits). */
 export function ConnectorToolOptions() {
   const tool = useUIStore((s) => s.tool);
@@ -73,6 +83,14 @@ export function ConnectorToolOptions() {
       <div style={{ ...labelStyle, flex: "1 0 100%", marginBottom: -4 }}>
         Next link
       </div>
+
+      {(key === "rope" || key === "spring") && (
+        <div style={ropeSpringHintStyle}>
+          Tap twice: empty space or any body. On a body, the attachment uses
+          exactly where you tapped — click the crank pin to pull a load in a
+          straight line as the wheel turns (belt motor → hinge crank → rope).
+        </div>
+      )}
 
       {key === "rope" && (
         <>
