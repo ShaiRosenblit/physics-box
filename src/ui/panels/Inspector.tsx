@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type InputHTMLAttributes } from "react";
 import { testIds } from "../a11y/ids";
 import { useUIStore } from "../state/store";
 import { useSimulationContext } from "../hooks/SimulationContext";
@@ -9,6 +9,102 @@ import { layout, ui } from "../style/tokens";
 const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt", "latex"];
 
 const MIN_ROPE_SEG_UI = 2;
+
+function formatFloatDraft(n: number): string {
+  if (!Number.isFinite(n)) return "";
+  return String(n);
+}
+
+function formatIntDraft(n: number): string {
+  if (!Number.isFinite(n)) return "";
+  return String(Math.trunc(n));
+}
+
+type InspectorNumberInputProps = {
+  "aria-label": string;
+  style: CSSProperties;
+  value: number;
+  onCommit: (n: number) => void;
+  mode?: "float" | "int";
+  /** When false, the value is committed only on blur (still shows raw text while typing). */
+  commitWhileTyping?: boolean;
+  /** If provided, only commit when this returns true (finite parsed value). */
+  allow?: (n: number) => boolean;
+  /** Applied to the value before onCommit whenever a commit happens. */
+  clamp?: (n: number) => number;
+} & Pick<InputHTMLAttributes<HTMLInputElement>, "min" | "max" | "step">;
+
+/**
+ * Controlled number fields tied to live simulation props fight the user: empty or partial
+ * input yields NaN, no patch runs, and the old value re-renders so digits cannot be deleted.
+ * This keeps a local string while focused and only syncs from `value` when not focused.
+ */
+function InspectorNumberInput(props: InspectorNumberInputProps) {
+  const {
+    value,
+    onCommit,
+    mode = "float",
+    commitWhileTyping = true,
+    allow = () => true,
+    clamp = (n) => n,
+    min,
+    max,
+    step,
+    style,
+    "aria-label": ariaLabel,
+  } = props;
+
+  const [focused, setFocused] = useState(false);
+  const [text, setText] = useState(() =>
+    mode === "int" ? formatIntDraft(value) : formatFloatDraft(value),
+  );
+
+  useEffect(() => {
+    if (!focused) {
+      setText(mode === "int" ? formatIntDraft(value) : formatFloatDraft(value));
+    }
+  }, [value, focused, mode]);
+
+  const parse = (s: string): number => {
+    if (mode === "int") {
+      const t = s.trim();
+      if (t === "" || t === "-" || t === "+") return NaN;
+      return parseInt(t, 10);
+    }
+    return parseFloat(s);
+  };
+
+  const tryCommit = (raw: string) => {
+    const v = parse(raw);
+    if (!Number.isFinite(v) || !allow(v)) return;
+    onCommit(clamp(v));
+  };
+
+  return (
+    <input
+      aria-label={ariaLabel}
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      style={style}
+      value={text}
+      onFocus={() => {
+        setFocused(true);
+        setText(mode === "int" ? formatIntDraft(value) : formatFloatDraft(value));
+      }}
+      onBlur={() => {
+        setFocused(false);
+        tryCommit(text);
+      }}
+      onChange={(e) => {
+        const t = e.target.value;
+        setText(t);
+        if (commitWhileTyping) tryCommit(t);
+      }}
+    />
+  );
+}
 
 type SelectionPanelTarget =
   | { kind: "body"; view: BodyView }
@@ -158,38 +254,27 @@ function ConstraintDetails({ view }: { view: ConstraintView }) {
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Nominal length</span>
-            <input
+            <InspectorNumberInput
               aria-label="Rope nominal length"
-              type="number"
               min={0.05}
               step={0.05}
               style={ctl}
               value={view.nominalLength}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v)) {
-                  patchConstraint(view.id, { length: Math.max(0.05, v) });
-                }
-              }}
+              clamp={(v) => Math.max(0.05, v)}
+              onCommit={(v) => patchConstraint(view.id, { length: v })}
             />
           </div>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Segments</span>
-            <input
+            <InspectorNumberInput
               aria-label="Rope segment links"
-              type="number"
+              mode="int"
               min={MIN_ROPE_SEG_UI}
               step={1}
               style={ctl}
               value={view.segmentLinks}
-              onChange={(e) => {
-                const iv = parseInt(e.target.value, 10);
-                if (Number.isFinite(iv)) {
-                  patchConstraint(view.id, {
-                    segments: Math.max(MIN_ROPE_SEG_UI, iv),
-                  });
-                }
-              }}
+              clamp={(v) => Math.max(MIN_ROPE_SEG_UI, v)}
+              onCommit={(v) => patchConstraint(view.id, { segments: v })}
             />
           </div>
           <div style={editRowStyle}>
@@ -218,55 +303,40 @@ function ConstraintDetails({ view }: { view: ConstraintView }) {
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Rest length</span>
-            <input
+            <InspectorNumberInput
               aria-label="Spring rest length"
-              type="number"
               min={0.05}
               step={0.05}
               style={ctl}
               value={view.restLength}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v)) {
-                  patchConstraint(view.id, { restLength: Math.max(0.05, v) });
-                }
-              }}
+              clamp={(v) => Math.max(0.05, v)}
+              onCommit={(v) => patchConstraint(view.id, { restLength: v })}
             />
           </div>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Stiffness (Hz)</span>
-            <input
+            <InspectorNumberInput
               aria-label="Spring frequency Hz"
-              type="number"
               min={0}
               max={120}
               step={0.5}
               style={ctl}
               value={view.frequencyHz}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v) && v >= 0) {
-                  patchConstraint(view.id, { frequencyHz: v });
-                }
-              }}
+              allow={(v) => v >= 0}
+              onCommit={(v) => patchConstraint(view.id, { frequencyHz: v })}
             />
           </div>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Damping</span>
-            <input
+            <InspectorNumberInput
               aria-label="Spring damping ratio"
-              type="number"
               min={0}
               max={5}
               step={0.05}
               style={ctl}
               value={view.dampingRatio}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v) && v >= 0) {
-                  patchConstraint(view.id, { dampingRatio: v });
-                }
-              }}
+              allow={(v) => v >= 0}
+              onCommit={(v) => patchConstraint(view.id, { dampingRatio: v })}
             />
           </div>
           <ReadRow label="Span" value={`${fmt(view.currentLength)} m`} />
@@ -277,36 +347,30 @@ function ConstraintDetails({ view }: { view: ConstraintView }) {
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Pivot X</span>
-            <input
+            <InspectorNumberInput
               aria-label="Hinge pivot X"
-              type="number"
               step={0.05}
               style={ctl}
               value={view.anchor.x}
-              onChange={(e) => {
-                const vx = parseFloat(e.target.value);
-                if (!Number.isFinite(vx)) return;
+              onCommit={(vx) =>
                 patchConstraint(view.id, {
                   worldAnchor: { x: vx, y: view.anchor.y },
-                });
-              }}
+                })
+              }
             />
           </div>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Pivot Y</span>
-            <input
+            <InspectorNumberInput
               aria-label="Hinge pivot Y"
-              type="number"
               step={0.05}
               style={ctl}
               value={view.anchor.y}
-              onChange={(e) => {
-                const vy = parseFloat(e.target.value);
-                if (!Number.isFinite(vy)) return;
+              onCommit={(vy) =>
                 patchConstraint(view.id, {
                   worldAnchor: { x: view.anchor.x, y: vy },
-                });
-              }}
+                })
+              }
             />
           </div>
           <ReadRow
@@ -320,38 +384,28 @@ function ConstraintDetails({ view }: { view: ConstraintView }) {
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Spread</span>
-            <input
+            <InspectorNumberInput
               aria-label="Pulley half spread"
-              type="number"
               min={0.05}
               max={2}
               step={0.01}
               style={ctl}
               value={view.halfSpread}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v) && v > 0) {
-                  patchConstraint(view.id, { halfSpread: v });
-                }
-              }}
+              allow={(v) => v > 0}
+              onCommit={(v) => patchConstraint(view.id, { halfSpread: v })}
             />
           </div>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Ratio</span>
-            <input
+            <InspectorNumberInput
               aria-label="Pulley ratio"
-              type="number"
               min={0.1}
               max={20}
               step={0.1}
               style={ctl}
               value={view.ratio}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v) && v > 0) {
-                  patchConstraint(view.id, { ratio: v });
-                }
-              }}
+              allow={(v) => v > 0}
+              onCommit={(v) => patchConstraint(view.id, { ratio: v })}
             />
           </div>
           <ReadRow
@@ -367,20 +421,15 @@ function ConstraintDetails({ view }: { view: ConstraintView }) {
           <ReadRow label="Driven body" value={`#${view.drivenBodyId}`} />
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Gear ratio</span>
-            <input
+            <InspectorNumberInput
               aria-label="Belt gear ratio"
-              type="number"
               min={-40}
               max={40}
               step={0.05}
               style={ctl}
               value={view.ratio}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v) && Math.abs(v) > 1e-6) {
-                  patchConstraint(view.id, { ratio: v });
-                }
-              }}
+              allow={(v) => Math.abs(v) > 1e-6}
+              onCommit={(v) => patchConstraint(view.id, { ratio: v })}
             />
           </div>
         </>
@@ -430,55 +479,44 @@ function BodyDetails({ view }: { view: BodyView }) {
 
       <div style={editRowStyle}>
         <span style={editLabelStyle}>Position X</span>
-        <input
+        <InspectorNumberInput
           aria-label="Body center X"
-          type="number"
           step={0.05}
           style={ctl}
           value={view.position.x}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) {
-              patchBody(view.id, {
-                position: { x: v, y: view.position.y },
-              });
-            }
-          }}
+          onCommit={(v) =>
+            patchBody(view.id, {
+              position: { x: v, y: view.position.y },
+            })
+          }
         />
       </div>
       <div style={editRowStyle}>
         <span style={editLabelStyle}>Position Y</span>
-        <input
+        <InspectorNumberInput
           aria-label="Body center Y"
-          type="number"
           step={0.05}
           style={ctl}
           value={view.position.y}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) {
-              patchBody(view.id, {
-                position: { x: view.position.x, y: v },
-              });
-            }
-          }}
+          onCommit={(v) =>
+            patchBody(view.id, {
+              position: { x: view.position.x, y: v },
+            })
+          }
         />
       </div>
       <div style={editRowStyle}>
         <span style={editLabelStyle}>Angle °</span>
-        <input
+        <InspectorNumberInput
           aria-label="Body angle degrees"
-          type="number"
           step={1}
           style={ctl}
           value={Number.isFinite(angleDeg) ? Math.round(angleDeg * 100) / 100 : 0}
-          onChange={(e) => {
-            const d = parseFloat(e.target.value);
-            if (!Number.isFinite(d)) return;
+          onCommit={(d) =>
             patchBody(view.id, {
               angle: (d * Math.PI) / 180,
-            });
-          }}
+            })
+          }
         />
       </div>
 
@@ -508,22 +546,15 @@ function BodyDetails({ view }: { view: BodyView }) {
         view.kind === "engine_rotor") && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Charge</span>
-          <input
+          <InspectorNumberInput
             aria-label="Charge"
-            type="number"
             min={-maxCharge}
             max={maxCharge}
             step={0.25}
             style={ctl}
             value={view.charge}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (Number.isFinite(v)) {
-                patchBody(view.id, {
-                  charge: Math.max(-maxCharge, Math.min(maxCharge, v)),
-                });
-              }
-            }}
+            clamp={(v) => Math.max(-maxCharge, Math.min(maxCharge, v))}
+            onCommit={(v) => patchBody(view.id, { charge: v })}
           />
         </div>
       )}
@@ -531,22 +562,15 @@ function BodyDetails({ view }: { view: BodyView }) {
       {view.kind === "magnet" && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Dipole</span>
-          <input
+          <InspectorNumberInput
             aria-label="Dipole moment"
-            type="number"
             min={-maxDipole}
             max={maxDipole}
             step={0.5}
             style={ctl}
             value={view.dipole}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (Number.isFinite(v)) {
-                patchBody(view.id, {
-                  dipole: Math.max(-maxDipole, Math.min(maxDipole, v)),
-                });
-              }
-            }}
+            clamp={(v) => Math.max(-maxDipole, Math.min(maxDipole, v))}
+            onCommit={(v) => patchBody(view.id, { dipole: v })}
           />
         </div>
       )}
@@ -554,22 +578,15 @@ function BodyDetails({ view }: { view: BodyView }) {
       {(view.kind === "engine" || view.kind === "engine_rotor") && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Torque</span>
-          <input
+          <InspectorNumberInput
             aria-label="Motor torque"
-            type="number"
             min={-maxMotorTorque}
             max={maxMotorTorque}
             step={1}
             style={ctl}
             value={view.torque}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (Number.isFinite(v)) {
-                patchBody(view.id, {
-                  torque: Math.max(-maxMotorTorque, Math.min(maxMotorTorque, v)),
-                });
-              }
-            }}
+            clamp={(v) => Math.max(-maxMotorTorque, Math.min(maxMotorTorque, v))}
+            onCommit={(v) => patchBody(view.id, { torque: v })}
           />
         </div>
       )}
@@ -577,21 +594,14 @@ function BodyDetails({ view }: { view: BodyView }) {
       {(view.kind === "engine" || view.kind === "engine_rotor") && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Flywheel r</span>
-          <input
+          <InspectorNumberInput
             aria-label="Flywheel radius"
-            type="number"
             min={0.05}
             step={0.02}
             style={ctl}
             value={view.kind === "engine" ? view.rotorRadius : view.radius}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (Number.isFinite(v)) {
-                patchBody(view.id, {
-                  rotorRadius: Math.max(0.05, v),
-                });
-              }
-            }}
+            clamp={(v) => Math.max(0.05, v)}
+            onCommit={(v) => patchBody(view.id, { rotorRadius: v })}
           />
         </div>
       )}
@@ -600,17 +610,14 @@ function BodyDetails({ view }: { view: BodyView }) {
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Radius</span>
-            <input
+            <InspectorNumberInput
               aria-label="Radius"
-              type="number"
               min={0.05}
               step={0.02}
               style={ctl}
               value={view.radius}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v)) patchBody(view.id, { radius: Math.max(0.05, v) });
-              }}
+              clamp={(v) => Math.max(0.05, v)}
+              onCommit={(v) => patchBody(view.id, { radius: v })}
             />
           </div>
           <label style={toggleRowStyle}>
@@ -631,53 +638,42 @@ function BodyDetails({ view }: { view: BodyView }) {
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Wheel r</span>
-            <input
+            <InspectorNumberInput
               aria-label="Crank wheel radius"
-              type="number"
               min={0.05}
               step={0.02}
               style={ctl}
               value={view.radius}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v)) patchBody(view.id, { radius: Math.max(0.05, v) });
-              }}
+              clamp={(v) => Math.max(0.05, v)}
+              onCommit={(v) => patchBody(view.id, { radius: v })}
             />
           </div>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Pin local X</span>
-            <input
+            <InspectorNumberInput
               aria-label="Pin offset local X"
-              type="number"
               step={0.01}
               style={ctl}
               value={view.pinLocal.x}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v)) {
-                  patchBody(view.id, {
-                    pinLocal: { x: v, y: view.pinLocal.y },
-                  });
-                }
-              }}
+              onCommit={(v) =>
+                patchBody(view.id, {
+                  pinLocal: { x: v, y: view.pinLocal.y },
+                })
+              }
             />
           </div>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Pin local Y</span>
-            <input
+            <InspectorNumberInput
               aria-label="Pin offset local Y"
-              type="number"
               step={0.01}
               style={ctl}
               value={view.pinLocal.y}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v)) {
-                  patchBody(view.id, {
-                    pinLocal: { x: view.pinLocal.x, y: v },
-                  });
-                }
-              }}
+              onCommit={(v) =>
+                patchBody(view.id, {
+                  pinLocal: { x: view.pinLocal.x, y: v },
+                })
+              }
             />
           </div>
           <label style={toggleRowStyle}>
@@ -698,32 +694,26 @@ function BodyDetails({ view }: { view: BodyView }) {
         <>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Width</span>
-            <input
+            <InspectorNumberInput
               aria-label="Width"
-              type="number"
               min={0.05}
               step={0.02}
               style={ctl}
               value={view.width}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v)) patchBody(view.id, { width: Math.max(0.05, v) });
-              }}
+              clamp={(v) => Math.max(0.05, v)}
+              onCommit={(v) => patchBody(view.id, { width: v })}
             />
           </div>
           <div style={editRowStyle}>
             <span style={editLabelStyle}>Height</span>
-            <input
+            <InspectorNumberInput
               aria-label="Height"
-              type="number"
               min={0.05}
               step={0.02}
               style={ctl}
               value={view.height}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                if (Number.isFinite(v)) patchBody(view.id, { height: Math.max(0.05, v) });
-              }}
+              clamp={(v) => Math.max(0.05, v)}
+              onCommit={(v) => patchBody(view.id, { height: v })}
             />
           </div>
         </>
@@ -732,17 +722,14 @@ function BodyDetails({ view }: { view: BodyView }) {
       {view.kind === "magnet" && (
         <div style={editRowStyle}>
           <span style={editLabelStyle}>Radius</span>
-          <input
+          <InspectorNumberInput
             aria-label="Radius"
-            type="number"
             min={0.05}
             step={0.02}
             style={ctl}
             value={view.radius}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (Number.isFinite(v)) patchBody(view.id, { radius: Math.max(0.05, v) });
-            }}
+            clamp={(v) => Math.max(0.05, v)}
+            onCommit={(v) => patchBody(view.id, { radius: v })}
           />
         </div>
       )}
@@ -759,74 +746,54 @@ function BodyDetails({ view }: { view: BodyView }) {
 
       <div style={editRowStyle}>
         <span style={editLabelStyle}>Lin. damp</span>
-        <input
+        <InspectorNumberInput
           aria-label="Linear damping"
-          type="number"
           min={0}
           max={50}
           step={0.05}
           style={ctl}
           value={view.linearDamping}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) patchBody(view.id, { linearDamping: Math.max(0, v) });
-          }}
+          clamp={(v) => Math.max(0, Math.min(50, v))}
+          onCommit={(v) => patchBody(view.id, { linearDamping: v })}
         />
       </div>
       <div style={editRowStyle}>
         <span style={editLabelStyle}>Ang. damp</span>
-        <input
+        <InspectorNumberInput
           aria-label="Angular damping"
-          type="number"
           min={0}
           max={50}
           step={0.05}
           style={ctl}
           value={view.angularDamping}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) patchBody(view.id, { angularDamping: Math.max(0, v) });
-          }}
+          clamp={(v) => Math.max(0, Math.min(50, v))}
+          onCommit={(v) => patchBody(view.id, { angularDamping: v })}
         />
       </div>
       <div style={editRowStyle}>
         <span style={editLabelStyle}>Buoy. scale</span>
-        <input
+        <InspectorNumberInput
           aria-label="Buoyancy scale"
-          type="number"
           min={0}
           max={1}
           step={0.05}
           style={ctl}
           value={view.buoyancyScale}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) {
-              patchBody(view.id, {
-                buoyancyScale: Math.max(0, Math.min(1, v)),
-              });
-            }
-          }}
+          clamp={(v) => Math.max(0, Math.min(1, v))}
+          onCommit={(v) => patchBody(view.id, { buoyancyScale: v })}
         />
       </div>
       <div style={editRowStyle}>
         <span style={editLabelStyle}>Lift (N)</span>
-        <input
+        <InspectorNumberInput
           aria-label="Buoyancy lift"
-          type="number"
           min={0}
           max={maxBuoyancyLift}
           step={0.5}
           style={ctl}
           value={view.buoyancyLift}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) {
-              patchBody(view.id, {
-                buoyancyLift: Math.max(0, Math.min(maxBuoyancyLift, v)),
-              });
-            }
-          }}
+          clamp={(v) => Math.max(0, Math.min(maxBuoyancyLift, v))}
+          onCommit={(v) => patchBody(view.id, { buoyancyLift: v })}
         />
       </div>
 
