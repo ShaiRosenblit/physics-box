@@ -8,7 +8,8 @@ import { addWorkshopEnclosure } from "./workshopEnclosure";
  * Planar double pendulum: two uniform rigid bars connected by revolute joints
  * at the ceiling and at the elbow. Shell and links use zero friction/restitution
  * so contact with the workshop loses minimal energy to tangential slip or bounce.
- * Initial pose uses large swing angles and opposing spins for a high-energy start.
+ * Initial pose uses a folded elbow (arms not collinear) plus very large
+ * angular speeds for a high-energy start.
  */
 export function doublePendulum(world: World): void {
   const interiorHeight = 18;
@@ -29,14 +30,15 @@ export function doublePendulum(world: World): void {
   const density = lookupMaterial("metal").density * 10;
 
   /**
-   * Large swing + spin: high initial potential from pose and extra kinetic
-   * energy so motion engages the full room quickly.
+   * Bent chain: ϕ₁ and ϕ₂ are both from vertical toward +x for the *rod axis*
+   * direction; choosing opposite signs yields a clear elbow instead of one long
+   * near-straight line. Large spins add kinetic energy on top of the raised pose.
    */
-  const phi1 = 1.15;
-  const phi2 = 1.45;
-  /** rad/s, Planck CCW positive. */
-  const spinUpper = 2.8;
-  const spinLower = -3.6;
+  const phi1 = 1.38;
+  const phi2 = -0.72;
+  /** rad/s, Planck CCW positive — high magnitude for a violent start. */
+  const spinUpper = 7.2;
+  const spinLower = -8.5;
 
   const dir = (phi: number) => ({ x: Math.sin(phi), y: -Math.cos(phi) });
   const d1 = dir(phi1);
