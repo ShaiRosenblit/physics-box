@@ -14,6 +14,8 @@ export interface BallInput {
   fixtureFriction?: number;
   linearDamping?: number;
   angularDamping?: number;
+  /** Overrides material density (2D kg/m²); mass ∝ density × π r². */
+  density?: number;
 }
 
 export function ball(input: BallInput): BallSpec {
@@ -40,5 +42,6 @@ export function ball(input: BallInput): BallSpec {
     ...(input.fixtureFriction !== undefined ? { fixtureFriction: input.fixtureFriction } : {}),
     ...(input.linearDamping !== undefined ? { linearDamping: input.linearDamping } : {}),
     ...(input.angularDamping !== undefined ? { angularDamping: input.angularDamping } : {}),
+    ...(input.density !== undefined ? { density: input.density } : {}),
   };
 }

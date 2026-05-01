@@ -1,6 +1,7 @@
 import type { World } from "../core/World";
 import { ball } from "../mechanics/ball";
 import { box } from "../mechanics/box";
+import { lookupMaterial } from "../mechanics/materials";
 import {
   addWorkshopEnclosure,
   DEFAULT_WORKSHOP_INTERIOR_HEIGHT,
@@ -133,6 +134,8 @@ export function galton(world: World): void {
   const marbleLinearDamping = 0.62;
   const marbleAngularDamping = 0.56;
   const marbleFriction = 1.05;
+  /** 10× nominal `wood` density; same radius ⇒ 10× mass. */
+  const marbleDensity = lookupMaterial("wood").density * 10;
 
   for (let i = 0; i < numDropBalls; i++) {
     const u = halton1d(i, 2);
@@ -144,6 +147,7 @@ export function galton(world: World): void {
         position: { x, y },
         radius: dropBallRadius,
         material: "wood",
+        density: marbleDensity,
         fixtureRestitution: 0,
         fixtureFriction: marbleFriction,
         linearDamping: marbleLinearDamping,

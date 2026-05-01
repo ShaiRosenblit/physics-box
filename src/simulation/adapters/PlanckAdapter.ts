@@ -110,6 +110,10 @@ interface ConstraintRecord {
   readonly beltOwnsDrivenPivot?: boolean;
 }
 
+function fixtureDensityFor(spec: BodySpec): number {
+  return spec.density ?? lookupMaterial(spec.material).density;
+}
+
 /**
  * The single point of contact with Planck.js.
  *
@@ -167,7 +171,7 @@ export class PlanckAdapter {
     const filter = collisionFilter(spec);
     body.createFixture({
       shape,
-      density: material.density,
+      density: fixtureDensityFor(spec),
       friction: spec.fixtureFriction ?? material.friction,
       restitution: spec.fixtureRestitution ?? material.restitution,
       ...(filter ?? {}),
@@ -195,7 +199,7 @@ export class PlanckAdapter {
     });
     housingBody.createFixture({
       shape: new planck.BoxShape(spec.width / 2, spec.height / 2),
-      density: material.density,
+      density: fixtureDensityFor(spec),
       friction: spec.fixtureFriction ?? material.friction,
       restitution: spec.fixtureRestitution ?? material.restitution,
     });
@@ -231,10 +235,11 @@ export class PlanckAdapter {
         ? { fixtureRestitution: spec.fixtureRestitution }
         : {}),
       ...(spec.fixtureFriction !== undefined ? { fixtureFriction: spec.fixtureFriction } : {}),
+      ...(spec.density !== undefined ? { density: spec.density } : {}),
     };
     rotorBody.createFixture({
       shape: new planck.CircleShape(spec.rotorRadius),
-      density: material.density,
+      density: fixtureDensityFor(spec),
       friction: spec.fixtureFriction ?? material.friction,
       restitution: spec.fixtureRestitution ?? material.restitution,
     });
@@ -300,7 +305,7 @@ export class PlanckAdapter {
     const rRec = this.bodies.get(asm.rotorId);
     if (!rRec || rRec.spec.kind !== "engine_rotor") return;
     const oldR = rRec.spec;
-    const newR: EngineRotorSpec = {
+    let newR: EngineRotorSpec = {
       ...oldR,
       radius: housingSpec.rotorRadius,
       material: housingSpec.material ?? "metal",
@@ -315,13 +320,22 @@ export class PlanckAdapter {
         ? { fixtureFriction: housingSpec.fixtureFriction }
         : {}),
     };
+    if (housingSpec.density !== undefined) {
+      newR = { ...newR, density: housingSpec.density };
+    } else {
+      const { density: _omit, ...rest } = newR as EngineRotorSpec & {
+        density?: number;
+      };
+      newR = rest as EngineRotorSpec;
+    }
     const matOld = oldR.material ?? "wood";
     const matNew = newR.material ?? "wood";
     const needRebuild =
       oldR.radius !== newR.radius ||
       matOld !== matNew ||
       (oldR.fixtureFriction ?? null) !== (newR.fixtureFriction ?? null) ||
-      (oldR.fixtureRestitution ?? null) !== (newR.fixtureRestitution ?? null);
+      (oldR.fixtureRestitution ?? null) !== (newR.fixtureRestitution ?? null) ||
+      (oldR.density ?? null) !== (newR.density ?? null);
     if (needRebuild) {
       rebuildBodyFixtures(rRec.body, newR);
     }
@@ -1388,6 +1402,7 @@ function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
   if (matOld !== matNew) return true;
   if ((oldS.fixtureFriction ?? null) !== (newS.fixtureFriction ?? null)) return true;
   if ((oldS.fixtureRestitution ?? null) !== (newS.fixtureRestitution ?? null)) return true;
+  if ((oldS.density ?? null) !== (newS.density ?? null)) return true;
   if (oldS.kind === "ball" && newS.kind === "ball") {
     if (oldS.radius !== newS.radius) return true;
     if ((oldS.collideWithBalls ?? true) !== (newS.collideWithBalls ?? true)) return true;
@@ -1430,7 +1445,7 @@ function rebuildBodyFixtures(body: planck.Body, spec: BodySpec): void {
   const filter = collisionFilter(spec);
   body.createFixture({
     shape,
-    density: material.density,
+    density: fixtureDensityFor(spec),
     friction: spec.fixtureFriction ?? material.friction,
     restitution: spec.fixtureRestitution ?? material.restitution,
     ...(filter ?? {}),

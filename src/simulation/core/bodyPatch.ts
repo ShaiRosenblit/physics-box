@@ -138,6 +138,10 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
     const base = { ...n, fixtureRestitution: p.fixtureRestitution };
     n = base as BodySpec;
   }
+  if (p.density !== undefined) {
+    const base = { ...n, density: p.density };
+    n = base as BodySpec;
+  }
   if (p.buoyancyScale !== undefined) {
     n = { ...n, buoyancyScale: p.buoyancyScale } as BodySpec;
   }

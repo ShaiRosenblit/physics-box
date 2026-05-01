@@ -36,6 +36,11 @@ export interface BaseBodySpec {
   readonly buoyancyScale?: number;
   /** Extra lift (N) along −gravity direction (helium-style); 0 = none. */
   readonly buoyancyLift?: number;
+  /**
+   * Overrides `material.density` for fixture mass (2D area density, kg/m²).
+   * Same radius ⇒ mass scales linearly with this value.
+   */
+  readonly density?: number;
 }
 
 export interface BallSpec extends BaseBodySpec {
@@ -122,6 +127,7 @@ export interface BodyPatch {
   readonly angularDamping?: number;
   readonly fixtureFriction?: number;
   readonly fixtureRestitution?: number;
+  readonly density?: number;
   /** When false, ball ghosts through other dynamic balls (fixture filter). */
   readonly collideWithBalls?: boolean;
   readonly buoyancyScale?: number;
