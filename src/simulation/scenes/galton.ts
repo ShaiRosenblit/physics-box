@@ -23,15 +23,15 @@ function halton1d(index: number, base: 2 | 3): number {
 /**
  * Galton board (bean machine): staggered fixed pegs and a vertical marble magazine.
  *
- * Marbles are stacked in a tight column (magazine) starting just above the first peg.
- * Each marble falls only one marble-diameter before reaching the peg, so entry
- * velocity is ~1.3 m/s instead of the ~8 m/s that a wide hopper produces. Low entry
- * speed is essential: a fast marble bounces off the peg with significant horizontal
- * velocity and skips rows, ruining the binomial distribution.
+ * Velocity is killed at every peg, not at entry. Pegs use fixtureRestitution: 0
+ * (inelastic in the normal direction) AND a very high fixtureFriction so the
+ * combined marble–peg friction is large enough to absorb the marble's tangential
+ * velocity on impact. After contact the marble is essentially at rest on the peg
+ * and is bumped off by the next marble in the column — leaving it with near-zero
+ * horizontal velocity and preserving the binomial distribution.
  *
- * A narrow chimney (two fixed walls) flanks the column to keep it aligned above the
- * entry point. Pegs and marbles both use fixtureRestitution: 0 so peg contacts are
- * fully inelastic in the normal direction.
+ * A narrow chimney (two fixed walls, frictionless so the column doesn't arch and
+ * hang on them) flanks the magazine to keep it aligned above the entry point.
  */
 export function galton(world: World): void {
   const groundTopY = 0;
@@ -66,6 +66,11 @@ export function galton(world: World): void {
   addWorkshopEnclosure(world, { interiorHeight: workshopInteriorHeight });
 
   // ── Pegs ─────────────────────────────────────────────────────────────────
+  // Combined marble–peg friction = sqrt(pegFriction * marbleFriction) ≈ sqrt(20*1.05)
+  // ≈ 4.6, large enough that arctan(μ) ≈ 78° covers any plausible impact angle —
+  // tangential velocity is fully absorbed on contact, so marbles don't ricochet
+  // sideways and skip rows.
+  const pegFriction = 20;
   for (let row = 0; row < numRows; row++) {
     const count = row + 1;
     for (let j = 0; j < count; j++) {
@@ -78,6 +83,7 @@ export function galton(world: World): void {
           fixed: true,
           material: "felt",
           fixtureRestitution: 0,
+          fixtureFriction: pegFriction,
         }),
       );
     }
@@ -143,7 +149,7 @@ export function galton(world: World): void {
   // and hang on the walls instead of feeding through the chimney bottom.
   const chimneyInnerHalfW = hopperHalfX + dropBallRadius + 0.02;
   const chimneyWallW = 0.12;
-  const chimneyBottom = pegArenaTop + pegRadius + dropBallRadius * 2 + 0.05;
+  const chimneyBottom = pegArenaTop + pegRadius + dropBallRadius * 2 + 0.12;
   const chimneyTop = columnTopY + 0.4;
   const chimneyH = chimneyTop - chimneyBottom;
   const chimneyCY = chimneyBottom + chimneyH / 2;
