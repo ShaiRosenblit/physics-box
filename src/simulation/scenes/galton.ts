@@ -21,42 +21,51 @@ function halton1d(index: number, base: 2 | 3): number {
 }
 
 /**
- * Galton board (bean machine): staggered fixed pegs (`felt` nails — dead bounce,
- * high friction) and hopper marbles tuned for slow sideways creep after each hit.
+ * Galton board (bean machine): staggered fixed pegs and a vertical marble magazine.
  *
- * Peg–marble normal bounce uses Planck `max(restitutionPeg, restitutionMarble)`.
- * Felt alone (≈0.01) paired with marble `fixtureRestitution: 0.02` stayed slightly
- * lively; both pegs and marbles pin `fixtureRestitution: 0` so paired contacts resolve
- * with zero restitution (floor/walls still use material defaults vs this override).
+ * Marbles are stacked in a tight column (magazine) starting just above the first peg.
+ * Each marble falls only one marble-diameter before reaching the peg, so entry
+ * velocity is ~1.3 m/s instead of the ~8 m/s that a wide hopper produces. Low entry
+ * speed is essential: a fast marble bounces off the peg with significant horizontal
+ * velocity and skips rows, ruining the binomial distribution.
+ *
+ * A narrow chimney (two fixed walls) flanks the column to keep it aligned above the
+ * entry point. Pegs and marbles both use fixtureRestitution: 0 so peg contacts are
+ * fully inelastic in the normal direction.
  */
 export function galton(world: World): void {
-  /** Top surface of the floor plate (see `addWorkshopEnclosure`). */
   const groundTopY = 0;
 
   const pegRadius = 0.038 * 8;
-  /** Center-to-center peg pitch (marble radius is `dropBallRadius` below). */
   const pegDx = 0.3 * 4;
   const pegDy = 0.31 * 4;
   const numRows = 10;
-  /** Raised with larger `pegDy` so bottom row stays above bins (matched to old layout). */
   const pegArenaTop = 6.85 + (numRows - 1) * (pegDy - 0.31);
 
   const dropBallRadius = 0.042;
-  /** Bottom / top of hopper strip — same vertical band as spawned marbles. */
-  const hopperY0 = pegArenaTop + pegRadius + dropBallRadius + 0.42;
-  const hopperYSpan = 3.25;
-  const hopperTopY = hopperY0 + hopperYSpan;
-  /** Space above tallest hopper marbles before the workshop ceiling shell. */
-  const hopperCeilingClearance = 0.75;
+  const numDropBalls = 100;
+  /** Narrow x band so each marble has a small, unique lateral offset at the first peg. */
+  const hopperHalfX = 0.052;
+
+  // ── Marble magazine (vertical column) ────────────────────────────────────
+  // Tiny gap prevents initial overlap while keeping marbles nearly touching.
+  // The column rests on the first peg; when the bottom marble slides off,
+  // the next drops ~one marble-diameter and arrives at low speed.
+  const marbleGap = 0.004;
+  const marbleSpacing = 2 * dropBallRadius + marbleGap;
+
+  /** Bottom marble sits just above the top of the first peg. */
+  const magazineY0 = pegArenaTop + pegRadius + dropBallRadius + marbleGap;
+  const columnTopY = magazineY0 + (numDropBalls - 1) * marbleSpacing;
+
   const workshopInteriorHeight = Math.max(
     DEFAULT_WORKSHOP_INTERIOR_HEIGHT,
-    hopperTopY + dropBallRadius + hopperCeilingClearance,
+    columnTopY + dropBallRadius + 0.8,
   );
 
-  addWorkshopEnclosure(world, {
-    interiorHeight: workshopInteriorHeight,
-  });
+  addWorkshopEnclosure(world, { interiorHeight: workshopInteriorHeight });
 
+  // ── Pegs ─────────────────────────────────────────────────────────────────
   for (let row = 0; row < numRows; row++) {
     const count = row + 1;
     for (let j = 0; j < count; j++) {
@@ -74,17 +83,12 @@ export function galton(world: World): void {
     }
   }
 
-  const outerHalf =
-    ((numRows - 1) / 2) * pegDx + pegRadius + 0.12;
+  // ── Outer side walls ─────────────────────────────────────────────────────
+  const outerHalf = ((numRows - 1) / 2) * pegDx + pegRadius + 0.12;
   const wallThickness = 0.22;
-  /** Softer wall hits so beads do not rebound out of the board. */
   const wallRestitution = 0.06;
 
-  const numDropBalls = 100;
-  /** Narrow band around x = 0 (half-width ~ few cm). */
-  const hopperHalfX = 0.052;
-
-  const wallTopY = hopperTopY + 0.35;
+  const wallTopY = columnTopY + 0.5;
   const wallHeight = wallTopY - groundTopY;
   const wallCenterY = wallHeight / 2;
 
@@ -109,6 +113,7 @@ export function galton(world: World): void {
     }),
   );
 
+  // ── Bin dividers ─────────────────────────────────────────────────────────
   const binCount = numRows + 1;
   const binSpanLeft = -outerHalf + pegDx * 0.35;
   const binSpanRight = outerHalf - pegDx * 0.35;
@@ -130,18 +135,50 @@ export function galton(world: World): void {
     );
   }
 
-  /** Bleed speed after peg contacts; high friction at peg wraps kills rebound and creep is slow. */
+  // ── Chimney walls ─────────────────────────────────────────────────────────
+  // Start above the first peg's top edge so the walls don't intersect the peg.
+  // Inner half-width clears the maximum marble lateral offset (hopperHalfX + r).
+  const chimneyInnerHalfW = hopperHalfX + dropBallRadius + 0.02;
+  const chimneyWallW = 0.12;
+  const chimneyBottom = pegArenaTop + pegRadius + dropBallRadius * 2 + 0.05;
+  const chimneyTop = columnTopY + 0.4;
+  const chimneyH = chimneyTop - chimneyBottom;
+  const chimneyCY = chimneyBottom + chimneyH / 2;
+
+  world.add(
+    box({
+      position: { x: -(chimneyInnerHalfW + chimneyWallW / 2), y: chimneyCY },
+      width: chimneyWallW,
+      height: chimneyH,
+      fixed: true,
+      material: "metal",
+      fixtureRestitution: 0,
+    }),
+  );
+  world.add(
+    box({
+      position: { x: chimneyInnerHalfW + chimneyWallW / 2, y: chimneyCY },
+      width: chimneyWallW,
+      height: chimneyH,
+      fixed: true,
+      material: "metal",
+      fixtureRestitution: 0,
+    }),
+  );
+
+  // ── Marbles ───────────────────────────────────────────────────────────────
   const marbleLinearDamping = 0.62;
   const marbleAngularDamping = 0.56;
   const marbleFriction = 1.05;
-  /** 10× nominal `wood` density; same radius ⇒ 10× mass. */
   const marbleDensity = lookupMaterial("wood").density * 10;
 
   for (let i = 0; i < numDropBalls; i++) {
-    const u = halton1d(i, 2);
-    const v = halton1d(i, 3);
+    // Halton base-2 for x gives each marble a unique small lateral offset that
+    // determines which side of the first peg it hits. y is linear so the
+    // column is tightly packed from bottom to top.
+    const u = halton1d(i + 1, 2); // offset by 1 to avoid u=0.5 (dead-centre hit)
     const x = (u - 0.5) * 2 * hopperHalfX;
-    const y = hopperY0 + v * hopperYSpan;
+    const y = magazineY0 + i * marbleSpacing;
     world.add(
       ball({
         position: { x, y },
