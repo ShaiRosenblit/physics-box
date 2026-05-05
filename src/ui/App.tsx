@@ -861,6 +861,14 @@ export function App() {
     world: sim.world,
     getCamera: () => rendererRef.current?.camera ?? null,
     getTool: () => useUIStore.getState().tool,
+    canDragBody:
+      gameMode === "puzzle"
+        ? (id) => {
+            // In puzzle mode, only allow dragging player-placed items
+            const placedByPlayer = useUIStore.getState().placedByPlayer;
+            return id in placedByPlayer;
+          }
+        : undefined,
     onSpawn: handleSpawn,
     onSelect: setSelectedId,
     onDragStateChange: setDragging,

@@ -46,6 +46,8 @@ export interface PointerGestureCallbacks {
   readonly world: World;
   /** Active camera; required for screen↔world conversion. */
   readonly getCamera: () => Camera | null;
+  /** Optional: returns true if the given body id can be dragged (e.g., only player-placed items in puzzle mode). */
+  readonly canDragBody?: (id: Id) => boolean;
   /** Spawn callback invoked on tap when a spawn tool is active. */
   readonly onSpawn: (mode: SpawnMode, worldPoint: Vec2) => void;
   /**
@@ -224,10 +226,17 @@ export function usePointerGestures(
         // Connector tools never drag bodies — a press on a body still
         // resolves to a tap that captures it as anchor A or B.
         const connector = isConnectorTool(tool);
-        const draggedId =
-          connector === null
-            ? cbRef.current.world.startDragAt(world, { rotate: e.shiftKey })
-            : null;
+        let draggedId: Id | null = null;
+        if (connector === null) {
+          const potentialId = cbRef.current.world.startDragAt(world, { rotate: e.shiftKey });
+          // Check if this body is allowed to be dragged (e.g., in puzzle mode, only player-placed items)
+          if (potentialId !== null && cbRef.current.canDragBody?.(potentialId) !== false) {
+            draggedId = potentialId;
+          } else if (potentialId !== null) {
+            // Body was started but can't be dragged - end the drag
+            cbRef.current.world.endDrag();
+          }
+        }
         if (draggedId !== null) {
           cbRef.current.onSelect(draggedId);
           cbRef.current.onDragStateChange?.(true);
