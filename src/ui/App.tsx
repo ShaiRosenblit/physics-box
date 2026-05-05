@@ -548,6 +548,14 @@ export function App() {
     if (!bounds) rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
+  // Load initial puzzle level if app starts in puzzle mode
+  useEffect(() => {
+    const s = useUIStore.getState();
+    if (gameMode === "puzzle" && s.currentLevelId && !s.levelHandles && rendererRef.current) {
+      loadPuzzleLevel(s.currentLevelId);
+    }
+  }, [gameMode, currentLevelId]);
+
   const onFitView = () => {
     rendererRef.current?.fitToContent(sim.world.snapshot());
   };
