@@ -59,7 +59,7 @@ export function Drawer(props: DrawerProps) {
           top: 0,
           bottom: 0,
           [side]: 0,
-          width: props.size ? `${props.size}px` : "minmax(220px, 78vw)",
+          width: props.size ? `${props.size}px` : "clamp(220px, 78vw, 320px)",
           maxWidth: "78vw",
           borderRight: side === "left" ? "1px solid #d8cfbe" : undefined,
           borderLeft: side === "right" ? "1px solid #d8cfbe" : undefined,

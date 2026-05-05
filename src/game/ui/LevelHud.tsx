@@ -69,6 +69,8 @@ export function LevelHud() {
 
 const hudStyle: React.CSSProperties = {
   position: "absolute",
+  // Push HUD below the FAB row on phones (FABs sit at top: 12 + 44 tall).
+  // Desktop has no FABs, so 12px is enough — but the larger inset is fine.
   top: "calc(12px + env(safe-area-inset-top))",
   left: "50%",
   transform: "translateX(-50%)",
@@ -78,7 +80,8 @@ const hudStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 6,
   zIndex: 12,
-  maxWidth: "min(560px, calc(100% - 96px))",
+  // Reserve room for the two FABs (each ~56px from screen edge incl. gutter).
+  maxWidth: "min(560px, calc(100% - 128px))",
   textAlign: "center",
 };
 

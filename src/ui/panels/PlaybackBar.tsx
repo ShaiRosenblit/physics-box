@@ -57,141 +57,208 @@ export interface PlaybackBarProps {
 export function PlaybackBar(props: PlaybackBarProps) {
   const running = useUIStore((s) => s.running);
 
+  const scenePicker =
+    props.mode === "puzzle" ? (
+      props.puzzlePicker
+    ) : (
+      <select
+        data-testid={testIds.sceneSelect}
+        aria-label="Scene"
+        title="Scene"
+        value={props.scene}
+        onChange={(e) => props.onSceneChange(e.target.value as SceneName)}
+        style={{
+          ...sceneSelectStyle,
+          ...(props.compact ? sceneSelectCompactStyle : {}),
+        }}
+      >
+        {sceneIds.map((id) => (
+          <option key={id} value={id}>
+            {SCENE_LABEL[id]}
+          </option>
+        ))}
+      </select>
+    );
+
+  const gravityControl = (
+    <label
+      style={{
+        ...gravityToggleStyle,
+        ...(props.compact ? gravityToggleCompactStyle : {}),
+      }}
+    >
+      <input
+        type="checkbox"
+        data-testid={testIds.toggleGravity}
+        checked={props.gravityEnabled}
+        onChange={(e) => props.onGravityChange(e.target.checked)}
+        aria-label="Gravity"
+        title="Gravity"
+        style={gravityCheckboxStyle}
+      />
+      <span style={{ fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
+        {props.compact ? "g" : "Gravity"}
+      </span>
+    </label>
+  );
+
+  const airControl = (
+    <label
+      style={{
+        ...gravityToggleStyle,
+        ...(props.compact ? gravityToggleCompactStyle : {}),
+        gap: 6,
+        flex: props.compact ? "1 1 0" : undefined,
+        minWidth: 0,
+      }}
+    >
+      <span style={{ fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
+        {props.compact ? "ρ" : "Air ρ"}
+      </span>
+      <input
+        type="range"
+        data-testid={testIds.airDensity}
+        aria-label="Ambient fluid density"
+        title="Ambient fluid density (Archimedes)"
+        min={0}
+        max={props.maxAirDensity}
+        step={0.02}
+        value={Math.min(props.airDensity, props.maxAirDensity)}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (Number.isFinite(v)) props.onAirDensityChange(v);
+        }}
+        style={{
+          width: props.compact ? "100%" : 100,
+          minWidth: 0,
+          accentColor: "#2a2520",
+        }}
+      />
+    </label>
+  );
+
+  const speedControl = (
+    <label
+      style={{
+        ...gravityToggleStyle,
+        ...(props.compact ? gravityToggleCompactStyle : {}),
+        gap: 6,
+        flex: props.compact ? "1 1 0" : undefined,
+        minWidth: 0,
+      }}
+    >
+      <span style={{ fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
+        {props.compact ? "×" : `Speed ×${speedLabel(props.timeScale)}`}
+      </span>
+      <input
+        type="range"
+        data-testid={testIds.playbackSpeed}
+        aria-label="Simulation speed"
+        title="Simulation speed (integration time scale)"
+        min={props.timeScaleMin}
+        max={props.timeScaleMax}
+        step={SPEED_SLIDER_STEP}
+        value={Math.min(
+          props.timeScaleMax,
+          Math.max(props.timeScaleMin, props.timeScale),
+        )}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (Number.isFinite(v)) props.onTimeScaleChange(v);
+        }}
+        style={{
+          width: props.compact ? "100%" : 100,
+          minWidth: 0,
+          accentColor: "#2a2520",
+        }}
+      />
+    </label>
+  );
+
+  const playButton = running ? (
+    <PlaybackButton
+      label="Pause"
+      testId={testIds.buttonPause}
+      onClick={props.onPause}
+      icon={<PauseIcon />}
+      compact={props.compact}
+    />
+  ) : (
+    <PlaybackButton
+      label="Play"
+      testId={testIds.buttonPlay}
+      onClick={props.onPlay}
+      primary
+      icon={<PlayIcon />}
+      compact={props.compact}
+    />
+  );
+  const stepButton = (
+    <PlaybackButton
+      label="Step"
+      testId={testIds.buttonStep}
+      onClick={props.onStep}
+      disabled={running}
+      icon={<StepIcon />}
+      compact={props.compact}
+    />
+  );
+  const resetButton = (
+    <PlaybackButton
+      label="Reset"
+      testId={testIds.buttonReset}
+      onClick={props.onReset}
+      icon={<ResetIcon />}
+      compact={props.compact}
+    />
+  );
+
+  if (props.compact) {
+    // Three-row layout on phone — each row has plenty of room and nothing
+    // gets cut off, even at 320px-wide (iPhone SE).
+    //   row 1: mode toggle (left) + scene/level picker (right)
+    //   row 2: gravity + air slider + speed slider (sliders flex)
+    //   row 3: play + step + reset (right-aligned)
+    // Tick counter is intentionally hidden — it's a dev/debug surface.
+    return (
+      <footer
+        data-testid={testIds.playbackBar}
+        aria-label="Playback"
+        style={{ ...barStyle, ...compactBarStyle }}
+      >
+        <div style={{ ...compactRowStyle, justifyContent: "space-between" }}>
+          {props.modeToggle}
+          {scenePicker}
+        </div>
+        <div style={compactRowStyle}>
+          {gravityControl}
+          {airControl}
+          {speedControl}
+        </div>
+        <div style={{ ...compactRowStyle, justifyContent: "flex-end" }}>
+          {playButton}
+          {stepButton}
+          {resetButton}
+        </div>
+      </footer>
+    );
+  }
+
   return (
     <footer
       data-testid={testIds.playbackBar}
       aria-label="Playback"
-      style={{ ...barStyle, ...(props.compact ? compactBarStyle : {}) }}
+      style={barStyle}
     >
-      <div style={{ ...controlsStyle, ...(props.compact ? compactControlsStyle : {}) }}>
+      <div style={controlsStyle}>
         {props.modeToggle}
-        {props.mode === "puzzle" ? (
-          props.puzzlePicker
-        ) : (
-          <select
-            data-testid={testIds.sceneSelect}
-            aria-label="Scene"
-            title="Scene"
-            value={props.scene}
-            onChange={(e) => props.onSceneChange(e.target.value as SceneName)}
-            style={{
-              ...sceneSelectStyle,
-              ...(props.compact ? sceneSelectCompactStyle : {}),
-            }}
-          >
-            {sceneIds.map((id) => (
-              <option key={id} value={id}>
-                {SCENE_LABEL[id]}
-              </option>
-            ))}
-          </select>
-        )}
-        <label style={{ ...gravityToggleStyle, ...(props.compact ? gravityToggleCompactStyle : {}) }}>
-          <input
-            type="checkbox"
-            data-testid={testIds.toggleGravity}
-            checked={props.gravityEnabled}
-            onChange={(e) => props.onGravityChange(e.target.checked)}
-            aria-label="Gravity"
-            title="Gravity"
-            style={gravityCheckboxStyle}
-          />
-          {!props.compact && <span>Gravity</span>}
-        </label>
-        <label
-          style={{
-            ...gravityToggleStyle,
-            ...(props.compact ? gravityToggleCompactStyle : {}),
-            gap: 8,
-          }}
-        >
-          <span style={{ fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
-            {!props.compact ? "Air" : ""} ρ
-          </span>
-          <input
-            type="range"
-            data-testid={testIds.airDensity}
-            aria-label="Ambient fluid density"
-            title="Ambient fluid density (Archimedes)"
-            min={0}
-            max={props.maxAirDensity}
-            step={0.02}
-            value={Math.min(props.airDensity, props.maxAirDensity)}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (Number.isFinite(v)) props.onAirDensityChange(v);
-            }}
-            style={{
-              width: props.compact ? 72 : 100,
-              accentColor: "#2a2520",
-            }}
-          />
-        </label>
-        <label
-          style={{
-            ...gravityToggleStyle,
-            ...(props.compact ? gravityToggleCompactStyle : {}),
-            gap: 8,
-          }}
-        >
-          <span style={{ fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
-            {!props.compact ? `Speed ×${speedLabel(props.timeScale)}` : "×"}
-          </span>
-          <input
-            type="range"
-            data-testid={testIds.playbackSpeed}
-            aria-label="Simulation speed"
-            title="Simulation speed (integration time scale)"
-            min={props.timeScaleMin}
-            max={props.timeScaleMax}
-            step={SPEED_SLIDER_STEP}
-            value={Math.min(
-              props.timeScaleMax,
-              Math.max(props.timeScaleMin, props.timeScale),
-            )}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (Number.isFinite(v)) props.onTimeScaleChange(v);
-            }}
-            style={{
-              width: props.compact ? 72 : 100,
-              accentColor: "#2a2520",
-            }}
-          />
-        </label>
-        {running ? (
-          <PlaybackButton
-            label="Pause"
-            testId={testIds.buttonPause}
-            onClick={props.onPause}
-            icon={<PauseIcon />}
-            compact={props.compact}
-          />
-        ) : (
-          <PlaybackButton
-            label="Play"
-            testId={testIds.buttonPlay}
-            onClick={props.onPlay}
-            primary
-            icon={<PlayIcon />}
-            compact={props.compact}
-          />
-        )}
-        <PlaybackButton
-          label="Step"
-          testId={testIds.buttonStep}
-          onClick={props.onStep}
-          disabled={running}
-          icon={<StepIcon />}
-          compact={props.compact}
-        />
-        <PlaybackButton
-          label="Reset"
-          testId={testIds.buttonReset}
-          onClick={props.onReset}
-          icon={<ResetIcon />}
-          compact={props.compact}
-        />
+        {scenePicker}
+        {gravityControl}
+        {airControl}
+        {speedControl}
+        {playButton}
+        {stepButton}
+        {resetButton}
       </div>
 
       <div
@@ -251,9 +318,15 @@ const barStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
+// Phone: two rows stacked vertically. Height auto-grows so the second row
+// stays on-screen instead of clipping behind the bottom edge.
 const compactBarStyle: React.CSSProperties = {
-  height: 56,
-  padding: "0 12px calc(env(safe-area-inset-bottom))",
+  height: "auto",
+  padding: "8px 12px calc(8px + env(safe-area-inset-bottom))",
+  flexDirection: "column",
+  alignItems: "stretch",
+  justifyContent: "flex-start",
+  gap: 8,
 };
 
 const controlsStyle: React.CSSProperties = {
@@ -262,8 +335,12 @@ const controlsStyle: React.CSSProperties = {
   alignItems: "center",
 };
 
-const compactControlsStyle: React.CSSProperties = {
+const compactRowStyle: React.CSSProperties = {
+  display: "flex",
   gap: 8,
+  alignItems: "center",
+  width: "100%",
+  minWidth: 0,
 };
 
 const sceneSelectStyle: React.CSSProperties = {
@@ -323,12 +400,13 @@ const buttonStyle: React.CSSProperties = {
 };
 
 const compactButtonStyle: React.CSSProperties = {
-  width: 44,
-  height: 44,
+  width: 40,
+  height: 40,
   padding: 0,
-  borderRadius: 22,
+  borderRadius: 20,
   justifyContent: "center",
   gap: 0,
+  flexShrink: 0,
 };
 
 const buttonPrimaryStyle: React.CSSProperties = {
