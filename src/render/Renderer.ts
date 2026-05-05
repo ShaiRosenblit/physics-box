@@ -15,8 +15,10 @@ import {
 } from "./scene/ConnectorPreviewView";
 import { ConstraintLayer } from "./scene/ConstraintView";
 import { FieldView } from "./scene/FieldView";
+import { GoalZoneView } from "./scene/GoalZoneView";
 import { Grid } from "./scene/Grid";
 import { palette } from "./style/palette";
+import type { GoalZone } from "../game/types";
 
 const GEOM_REFRESH_LOG_THRESHOLD = 0.4;
 
@@ -43,6 +45,7 @@ export class Renderer {
   private app: Application | null = null;
   private worldRoot = new Container();
   private grid = new Grid();
+  private goalZoneView = new GoalZoneView();
   private bodyLayer: BodyLayer;
   private constraintLayer: ConstraintLayer;
   private fieldView: FieldView;
@@ -74,6 +77,10 @@ export class Renderer {
 
   setConnectorPreview(state: ConnectorPreviewState | null): void {
     this.connectorPreview.set(state);
+  }
+
+  setGoalZones(zones: readonly GoalZone[]): void {
+    this.goalZoneView.setZones(zones);
   }
 
   setSelectedId(id: Id | null): void {
@@ -178,6 +185,7 @@ export class Renderer {
         });
 
         this.worldRoot.addChild(this.grid.node);
+        this.worldRoot.addChild(this.goalZoneView.node);
         this.worldRoot.addChild(this.fieldView.container);
         this.worldRoot.addChild(this.constraintLayer.behindBodies);
         this.worldRoot.addChild(this.bodyLayer.node);
@@ -222,6 +230,7 @@ export class Renderer {
 
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
+    this.goalZoneView.update(this._camera);
 
     if (
       this._geomDirty &&

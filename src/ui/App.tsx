@@ -51,6 +51,17 @@ import {
 import { useViewportMode } from "./hooks/useViewportMode";
 import { useUIStore } from "./state/store";
 import { testIds } from "./a11y/ids";
+import {
+  defaultLevelId,
+  evaluateGoal,
+  levelById,
+  levels,
+  type GameMode,
+  type GameTool,
+} from "../game";
+import { LevelHud } from "../game/ui/LevelHud";
+import { ModeToggle } from "../game/ui/ModeToggle";
+import { WinScreen } from "../game/ui/WinScreen";
 
 export function App() {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -81,6 +92,16 @@ export function App() {
   const setDragging = useUIStore((s) => s.setDragging);
   const scene = useUIStore((s) => s.scene);
   const setScene = useUIStore((s) => s.setScene);
+  const gameMode = useUIStore((s) => s.mode);
+  const currentLevelId = useUIStore((s) => s.currentLevelId);
+  const setMode = useUIStore((s) => s.setMode);
+  const setPhase = useUIStore((s) => s.setPhase);
+  const setCurrentLevelId = useUIStore((s) => s.setCurrentLevelId);
+  const setInventory = useUIStore((s) => s.setInventory);
+  const setLevelHandles = useUIStore((s) => s.setLevelHandles);
+  const consumeInventory = useUIStore((s) => s.consumeInventory);
+  const refundInventory = useUIStore((s) => s.refundInventory);
+  const setTool = useUIStore((s) => s.setTool);
   const [airDensity, setAirDensity] = useState(() => sim.world.config.fluidDensity);
   const [timeScale, setTimeScaleState] = useState(playbackTimeScale);
 
@@ -101,6 +122,25 @@ export function App() {
       last = now;
       sim.world.step(dt);
       const snap = sim.world.snapshot();
+
+      // Puzzle-mode goal evaluation. Reading from the store here is
+      // intentional — it avoids re-subscribing the loop on every state
+      // change.
+      const s = useUIStore.getState();
+      if (s.mode === "puzzle" && s.phase === "running") {
+        const handles = s.levelHandles;
+        const lvId = s.currentLevelId;
+        const lv = lvId ? levelById[lvId] : null;
+        if (handles && lv) {
+          const status = evaluateGoal(snap, lv.goal, handles);
+          if (status === "won") {
+            sim.world.pause();
+            s.setRunning(false);
+            s.setPhase("won");
+          }
+        }
+      }
+
       renderer.setConnectorPreview(
         computePreviewState(
           snap,
@@ -194,13 +234,72 @@ export function App() {
       if (id === null) return;
       e.preventDefault();
       sim.remove(id);
+      refundInventory(id);
       setSelectedId(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [sim, setSelectedId]);
+  }, [sim, setSelectedId, refundInventory]);
+
+  const loadPuzzleLevel = (id: string) => {
+    const level = levelById[id];
+    if (!level) return;
+    rendererRef.current?.reset();
+    sim.world.reset();
+    const handles = level.setupScene(sim.world);
+    setLevelHandles(handles);
+    setInventory({ ...level.palette });
+    setCurrentLevelId(id);
+    setPhase("design");
+    sim.pause();
+    setRunning(false);
+    setSelectedId(null);
+    setTool("select");
+    rendererRef.current?.setGoalZones(handles.goalZones);
+    setAirDensity(sim.world.config.fluidDensity);
+    rendererRef.current?.fitToContent(sim.world.snapshot());
+  };
+
+  const enterSandboxMode = () => {
+    setMode("sandbox");
+    setLevelHandles(null);
+    setInventory({});
+    setCurrentLevelId(null);
+    setPhase("design");
+    rendererRef.current?.reset();
+    rendererRef.current?.setGoalZones([]);
+    sim.loadScene(scene);
+    sim.resume();
+    setRunning(true);
+    setSelectedId(null);
+    setAirDensity(sim.world.config.fluidDensity);
+    rendererRef.current?.fitToContent(sim.world.snapshot());
+  };
+
+  const handleModeChange = (next: GameMode) => {
+    if (next === gameMode) return;
+    if (next === "puzzle") {
+      setMode("puzzle");
+      loadPuzzleLevel(currentLevelId ?? defaultLevelId);
+    } else {
+      enterSandboxMode();
+    }
+  };
+
+  const handleLevelChange = (id: string) => {
+    if (gameMode !== "puzzle") return;
+    loadPuzzleLevel(id);
+  };
 
   const onPlay = () => {
+    const s = useUIStore.getState();
+    if (s.mode === "puzzle") {
+      if (s.phase === "won" || s.phase === "lost") {
+        loadPuzzleLevel(s.currentLevelId ?? defaultLevelId);
+        return;
+      }
+      if (s.phase === "design") s.setPhase("running");
+    }
     sim.resume();
     setRunning(true);
   };
@@ -212,8 +311,13 @@ export function App() {
     sim.stepOnce();
   };
   const onReset = () => {
+    const s = useUIStore.getState();
+    if (s.mode === "puzzle") {
+      loadPuzzleLevel(s.currentLevelId ?? defaultLevelId);
+      return;
+    }
     rendererRef.current?.reset();
-    sim.loadScene(useUIStore.getState().scene);
+    sim.loadScene(s.scene);
     setSelectedId(null);
     setRunning(true);
     setAirDensity(sim.world.config.fluidDensity);
@@ -222,6 +326,7 @@ export function App() {
 
   const onSceneChange = (name: SceneName) => {
     setScene(name);
+    if (gameMode === "puzzle") return; // scene picker is hidden in puzzle mode
     rendererRef.current?.reset();
     sim.loadScene(name);
     setSelectedId(null);
@@ -234,10 +339,18 @@ export function App() {
   };
 
   const handleSpawn = (kind: SpawnMode, world: Vec2) => {
-    const presets = useUIStore.getState().spawnPresets;
+    const s = useUIStore.getState();
+    // Puzzle-mode inventory gate: reject spawns when the level didn't
+    // expose this tool or the count is exhausted. Sandbox is unrestricted.
+    if (s.mode === "puzzle") {
+      const remaining = s.inventory[kind as GameTool];
+      if (remaining === undefined || remaining <= 0) return;
+    }
+    const presets = s.spawnPresets;
+    let placedId: import("../simulation").Id | null = null;
     if (kind === "ball") {
       const p = presets.ball;
-      sim.add(
+      placedId = sim.add(
         ball({
           position: world,
           radius: p.radius,
@@ -250,7 +363,7 @@ export function App() {
       );
     } else if (kind === "ball+") {
       const p = presets.ballPlus;
-      sim.add(
+      placedId = sim.add(
         ball({
           position: world,
           radius: p.radius,
@@ -264,7 +377,7 @@ export function App() {
       );
     } else if (kind === "ball-") {
       const p = presets.ballMinus;
-      sim.add(
+      placedId = sim.add(
         ball({
           position: world,
           radius: p.radius,
@@ -278,7 +391,7 @@ export function App() {
       );
     } else if (kind === "balloon") {
       const p = presets.balloon;
-      sim.add(
+      placedId = sim.add(
         balloon({
           position: world,
           radius: p.radius,
@@ -293,7 +406,7 @@ export function App() {
     } else if (kind === "magnet+" || kind === "magnet-") {
       const p = kind === "magnet+" ? presets.magnetPlus : presets.magnetMinus;
       const sign = kind === "magnet+" ? 1 : -1;
-      sim.add(
+      placedId = sim.add(
         magnet({
           position: world,
           radius: p.radius,
@@ -304,7 +417,7 @@ export function App() {
     } else if (kind === "engine+" || kind === "engine-") {
       const p = kind === "engine+" ? presets.enginePlus : presets.engineMinus;
       const sign = kind === "engine+" ? 1 : -1;
-      sim.add(
+      placedId = sim.add(
         engine({
           position: world,
           width: p.width,
@@ -320,7 +433,7 @@ export function App() {
       );
     } else if (kind === "box") {
       const p = presets.box;
-      sim.add(
+      placedId = sim.add(
         box({
           position: world,
           width: p.width,
@@ -333,7 +446,7 @@ export function App() {
       );
     } else if (kind === "crank") {
       const p = presets.crank;
-      sim.add(
+      placedId = sim.add(
         crank({
           position: world,
           radius: p.radius,
@@ -346,6 +459,9 @@ export function App() {
         }),
       );
     }
+    if (placedId !== null && s.mode === "puzzle") {
+      consumeInventory(kind as GameTool, placedId);
+    }
   };
 
   const handleConnectorCommit = (
@@ -353,8 +469,14 @@ export function App() {
     a: ResolvedAnchor,
     b: ResolvedAnchor,
   ) => {
-    const presets = useUIStore.getState().connectorPresets;
+    const s = useUIStore.getState();
+    if (s.mode === "puzzle") {
+      const remaining = s.inventory[tool as GameTool];
+      if (remaining === undefined || remaining <= 0) return;
+    }
+    const presets = s.connectorPresets;
     const snapCommit = sim.world.snapshot();
+    let constraintId: import("../simulation").Id | null = null;
     if (tool === "belt") {
       if (a.kind !== "body" || b.kind !== "body") return;
       if (a.id === b.id) return;
@@ -363,16 +485,14 @@ export function App() {
       const db = snap.bodies.find((x) => x.id === b.id);
       if (!da || !db || da.kind !== "engine_rotor" || db.fixed) return;
       if (db.kind === "engine") return;
-      sim.world.addConstraint(
+      constraintId = sim.world.addConstraint(
         belt({ driverRotorId: a.id, drivenBodyId: b.id }),
       );
-      return;
-    }
-    if (tool === "rope") {
+    } else if (tool === "rope") {
       const pr = presets.rope;
       const length = anchorDistance(snapCommit, a, b);
       if (length < 0.05) return;
-      sim.world.addConstraint(
+      constraintId = sim.world.addConstraint(
         rope({
           a: toAnchor(a, snapCommit),
           b: toAnchor(b, snapCommit),
@@ -381,13 +501,11 @@ export function App() {
           segments: pr.segments,
         }),
       );
-      return;
-    }
-    if (tool === "spring") {
+    } else if (tool === "spring") {
       const ps = presets.spring;
       const restLength = anchorDistance(snapCommit, a, b);
       if (restLength < 0.05) return;
-      sim.world.addConstraint(
+      constraintId = sim.world.addConstraint(
         spring({
           a: toAnchor(a, snapCommit),
           b: toAnchor(b, snapCommit),
@@ -396,31 +514,31 @@ export function App() {
           dampingRatio: ps.dampingRatio,
         }),
       );
-      return;
-    }
-    if (tool === "hinge") {
+    } else if (tool === "hinge") {
       // Anchor A is enforced by the gesture to be a body. The hinge
       // pivot is placed at click 2 in world space; if click 2 also
       // hits a body, the hinge becomes a body-to-body revolute.
       if (a.kind !== "body") return;
-      sim.world.addConstraint(
+      constraintId = sim.world.addConstraint(
         hinge({
           bodyA: a.id,
           bodyB: b.kind === "body" ? b.id : undefined,
           worldAnchor: b.kind === "body" ? b.hitPoint : b.point,
         }),
       );
-    }
-    if (tool === "bar") {
+    } else if (tool === "bar") {
       const length = anchorDistance(snapCommit, a, b);
       if (length < 0.05) return;
-      sim.world.addConstraint(
+      constraintId = sim.world.addConstraint(
         bar({
           a: toAnchor(a, snapCommit),
           b: toAnchor(b, snapCommit),
           length,
         }),
       );
+    }
+    if (constraintId !== null && s.mode === "puzzle") {
+      consumeInventory(tool as GameTool, constraintId);
     }
   };
 
@@ -435,8 +553,13 @@ export function App() {
     const ba = snap.bodies.find((b) => b.id === bodyA.id);
     const bb = snap.bodies.find((b) => b.id === bodyB.id);
     if (!ba || !bb || ba.fixed || bb.fixed) return;
-    const pp = useUIStore.getState().connectorPresets.pulley;
-    sim.world.addConstraint(
+    const s = useUIStore.getState();
+    if (s.mode === "puzzle") {
+      const remaining = s.inventory.pulley;
+      if (remaining === undefined || remaining <= 0) return;
+    }
+    const pp = s.connectorPresets.pulley;
+    const constraintId = sim.world.addConstraint(
       pulley({
         wheelCenter: center,
         bodyA: bodyA.id,
@@ -447,6 +570,7 @@ export function App() {
         ratio: pp.ratio,
       }),
     );
+    if (s.mode === "puzzle") consumeInventory("pulley", constraintId);
   };
 
   const handleConnectorPendingChange = (pending: ConnectorPending | null) => {
@@ -575,6 +699,10 @@ export function App() {
           {isDesktop && <Inspector variant="panel" />}
         </div>
         {inspectorAsDrawer && <InspectorPeek />}
+        <LevelHud />
+        <WinScreen
+          onReplay={() => loadPuzzleLevel(currentLevelId ?? defaultLevelId)}
+        />
         <PlaybackBar
           tick={sim.tick}
           compact={isPhone}
@@ -599,6 +727,41 @@ export function App() {
           onPause={onPause}
           onStep={onStep}
           onReset={onReset}
+          mode={gameMode}
+          modeToggle={
+            <ModeToggle
+              mode={gameMode}
+              onChange={handleModeChange}
+              compact={isPhone}
+            />
+          }
+          puzzlePicker={
+            <select
+              data-testid="level-select"
+              aria-label="Level"
+              title="Level"
+              value={currentLevelId ?? defaultLevelId}
+              onChange={(e) => handleLevelChange(e.target.value)}
+              style={{
+                appearance: "none",
+                border: "1px solid #d8cfbe",
+                background: "#f5efe6",
+                color: "#2a2520",
+                padding: isPhone ? "6px 8px" : "3px 8px",
+                borderRadius: isPhone ? 4 : 3,
+                font: "inherit",
+                fontSize: 12,
+                cursor: "pointer",
+                minWidth: isPhone ? 92 : 108,
+              }}
+            >
+              {levels.map((lv) => (
+                <option key={lv.id} value={lv.id}>
+                  {lv.title}
+                </option>
+              ))}
+            </select>
+          }
         />
       </div>
     </SimulationProvider>

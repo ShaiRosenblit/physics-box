@@ -6,6 +6,12 @@ import {
   type MaterialName,
   type SceneName,
 } from "../../simulation";
+import type {
+  GameMode,
+  GamePhase,
+  GameTool,
+  LevelHandles,
+} from "../../game/types";
 
 export type Tool =
   | "select"
@@ -275,6 +281,29 @@ export interface UIState {
   /** Defaults merged into the next rope / spring / pulley placement only. */
   connectorPresets: ConnectorPresetsBundle;
 
+  /** Top-level game mode — sandbox keeps today's free-play UX; puzzle activates levels. */
+  mode: GameMode;
+  /** Puzzle-mode lifecycle: design (paused, placing) → running → won/lost. */
+  phase: GamePhase;
+  /** Active level id when in puzzle mode. */
+  currentLevelId: string | null;
+  /** Remaining counts for each tool the level allows. */
+  inventory: Partial<Record<GameTool, number>>;
+  /** Tools attached to bodies the player has placed this attempt — for refund on delete. */
+  placedByPlayer: Readonly<Record<number, GameTool>>;
+  /** Tracked refs and goal zones from the active level setup. */
+  levelHandles: LevelHandles | null;
+
+  setMode: (mode: GameMode) => void;
+  setPhase: (phase: GamePhase) => void;
+  setCurrentLevelId: (id: string | null) => void;
+  setInventory: (inv: Partial<Record<GameTool, number>>) => void;
+  setLevelHandles: (h: LevelHandles | null) => void;
+  /** Returns true if the count was decremented; false if no inventory or empty. */
+  consumeInventory: (tool: GameTool, placedId: Id) => boolean;
+  /** Restore inventory when a player-placed body is removed. */
+  refundInventory: (placedId: Id) => void;
+
   setTool: (tool: Tool) => void;
   setSelectedId: (id: Id | null) => void;
   toggleGrid: () => void;
@@ -317,6 +346,46 @@ export const useUIStore = create<UIState>((set) => ({
 
   spawnPresets: createDefaultSpawnPresets(),
   connectorPresets: createDefaultConnectorPresets(),
+
+  mode: "sandbox",
+  phase: "design",
+  currentLevelId: null,
+  inventory: {},
+  placedByPlayer: {},
+  levelHandles: null,
+
+  setMode: (mode) => set({ mode }),
+  setPhase: (phase) => set({ phase }),
+  setCurrentLevelId: (currentLevelId) => set({ currentLevelId }),
+  setInventory: (inventory) => set({ inventory }),
+  setLevelHandles: (levelHandles) => set({ levelHandles }),
+  consumeInventory: (tool, placedId) => {
+    let consumed = false;
+    set((s) => {
+      const remaining = s.inventory[tool] ?? 0;
+      if (remaining <= 0) return s;
+      consumed = true;
+      return {
+        inventory: { ...s.inventory, [tool]: remaining - 1 },
+        placedByPlayer: { ...s.placedByPlayer, [placedId]: tool },
+      };
+    });
+    return consumed;
+  },
+  refundInventory: (placedId) =>
+    set((s) => {
+      const tool = s.placedByPlayer[placedId];
+      if (!tool) return s;
+      const next = { ...s.placedByPlayer };
+      delete next[placedId];
+      return {
+        placedByPlayer: next,
+        inventory: {
+          ...s.inventory,
+          [tool]: (s.inventory[tool] ?? 0) + 1,
+        },
+      };
+    }),
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),

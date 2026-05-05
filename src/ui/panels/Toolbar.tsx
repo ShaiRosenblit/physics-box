@@ -24,6 +24,7 @@ import {
   SpringIcon,
 } from "../icons";
 import { useUIStore, type Tool } from "../state/store";
+import type { GameTool } from "../../game/types";
 import type { ViewportMode } from "../hooks/useViewportMode";
 import { ToolGlyph } from "./ToolGlyph";
 
@@ -76,10 +77,30 @@ export function Toolbar({ variant }: ToolbarProps) {
   const toggleEField = useUIStore((s) => s.toggleEField);
   const toggleBField = useUIStore((s) => s.toggleBField);
   const setToolsOpen = useUIStore((s) => s.setToolsOpen);
+  const mode = useUIStore((s) => s.mode);
+  const inventory = useUIStore((s) => s.inventory);
 
   const choose = (id: Tool) => {
     setTool(id);
     if (variant === "sheet") setToolsOpen(false);
+  };
+
+  // In puzzle mode, hide tools the level didn't expose. Always keep
+  // "select" so the player can still inspect placed bodies.
+  const allowedInPuzzle = (id: Tool): boolean => {
+    if (mode !== "puzzle") return true;
+    if (id === "select") return true;
+    return inventory[id as GameTool] !== undefined;
+  };
+  const filteredBodyTools = bodyTools.filter((t) => allowedInPuzzle(t.id));
+  const filteredConnectorTools = connectorTools.filter((t) =>
+    allowedInPuzzle(t.id),
+  );
+  const inventoryCount = (id: Tool): number | null => {
+    if (mode !== "puzzle") return null;
+    if (id === "select") return null;
+    const c = inventory[id as GameTool];
+    return c === undefined ? null : c;
   };
 
   if (variant === "rail") {
@@ -93,6 +114,7 @@ export function Toolbar({ variant }: ToolbarProps) {
             active={tool === t.id}
             icon={t.icon}
             thumbSrc={bodyToolThumbSrc[t.id]}
+            count={inventoryCount(t.id)}
             onClick={() => choose(t.id)}
           />
         ))}
@@ -106,9 +128,11 @@ export function Toolbar({ variant }: ToolbarProps) {
       >
         {renderRailGroup([selectTool])}
         <div style={railSeparatorStyle} />
-        {renderRailGroup(bodyTools)}
-        <div style={railSeparatorStyle} />
-        {renderRailGroup(connectorTools)}
+        {renderRailGroup(filteredBodyTools)}
+        {filteredConnectorTools.length > 0 && (
+          <div style={railSeparatorStyle} />
+        )}
+        {renderRailGroup(filteredConnectorTools)}
         <div style={railSeparatorStyle} />
         <div style={railGroupStyle}>
           <RailToggle
@@ -157,34 +181,40 @@ export function Toolbar({ variant }: ToolbarProps) {
         />
       </Section>
 
-      <Section label="Bodies">
-        {/* Single-column list keeps full labels readable at panel widths
-            and on narrow phone sheets without truncating to "Bal" / "Mag". */}
-        {bodyTools.map((t) => (
-          <FullToolButton
-            key={t.id}
-            label={t.label}
-            testId={`${testIds.toolButtonPrefix}${t.id}`}
-            active={tool === t.id}
-            icon={t.icon}
-            thumbSrc={bodyToolThumbSrc[t.id]}
-            onClick={() => choose(t.id)}
-          />
-        ))}
-      </Section>
+      {filteredBodyTools.length > 0 && (
+        <Section label="Bodies">
+          {/* Single-column list keeps full labels readable at panel widths
+              and on narrow phone sheets without truncating to "Bal" / "Mag". */}
+          {filteredBodyTools.map((t) => (
+            <FullToolButton
+              key={t.id}
+              label={t.label}
+              testId={`${testIds.toolButtonPrefix}${t.id}`}
+              active={tool === t.id}
+              icon={t.icon}
+              thumbSrc={bodyToolThumbSrc[t.id]}
+              count={inventoryCount(t.id)}
+              onClick={() => choose(t.id)}
+            />
+          ))}
+        </Section>
+      )}
 
-      <Section label="Connectors">
-        {connectorTools.map((t) => (
-          <FullToolButton
-            key={t.id}
-            label={t.label}
-            testId={`${testIds.toolButtonPrefix}${t.id}`}
-            active={tool === t.id}
-            icon={t.icon}
-            onClick={() => choose(t.id)}
-          />
-        ))}
-      </Section>
+      {filteredConnectorTools.length > 0 && (
+        <Section label="Connectors">
+          {filteredConnectorTools.map((t) => (
+            <FullToolButton
+              key={t.id}
+              label={t.label}
+              testId={`${testIds.toolButtonPrefix}${t.id}`}
+              active={tool === t.id}
+              icon={t.icon}
+              count={inventoryCount(t.id)}
+              onClick={() => choose(t.id)}
+            />
+          ))}
+        </Section>
+      )}
 
       <Section label="View">
         <FullToggleButton
@@ -234,24 +264,31 @@ function FullToolButton(props: {
   active: boolean;
   icon: IconC;
   thumbSrc?: string;
+  count?: number | null;
   onClick: () => void;
 }) {
+  const empty = props.count === 0;
   return (
     <button
       type="button"
       data-testid={props.testId}
       aria-label={props.label}
       aria-pressed={props.active}
-      onClick={props.onClick}
+      aria-disabled={empty ? true : undefined}
+      onClick={empty ? undefined : props.onClick}
       style={{
         ...buttonStyle,
         ...(props.active ? buttonActiveStyle : {}),
+        ...(empty ? buttonDisabledStyle : {}),
       }}
     >
       <span style={iconWrapStyle} aria-hidden="true">
         <ToolGlyph icon={props.icon} thumbSrc={props.thumbSrc} />
       </span>
       <span style={labelTextStyle}>{props.label}</span>
+      {props.count !== null && props.count !== undefined && (
+        <span style={countBadgeStyle}>×{props.count}</span>
+      )}
     </button>
   );
 }
@@ -295,22 +332,34 @@ function RailButton(props: {
   active: boolean;
   icon: IconC;
   thumbSrc?: string;
+  count?: number | null;
   onClick: () => void;
 }) {
+  const empty = props.count === 0;
   return (
     <button
       type="button"
       data-testid={props.testId}
       aria-label={props.label}
       aria-pressed={props.active}
-      title={props.label}
-      onClick={props.onClick}
+      aria-disabled={empty ? true : undefined}
+      title={
+        props.count !== null && props.count !== undefined
+          ? `${props.label} (×${props.count})`
+          : props.label
+      }
+      onClick={empty ? undefined : props.onClick}
       style={{
         ...railButtonStyle,
         ...(props.active ? buttonActiveStyle : {}),
+        ...(empty ? buttonDisabledStyle : {}),
+        position: "relative",
       }}
     >
       <ToolGlyph icon={props.icon} thumbSrc={props.thumbSrc} />
+      {props.count !== null && props.count !== undefined && (
+        <span style={railCountStyle}>{props.count}</span>
+      )}
     </button>
   );
 }
@@ -468,6 +517,37 @@ const buttonActiveStyle: React.CSSProperties = {
 const buttonDisabledStyle: React.CSSProperties = {
   opacity: 0.4,
   cursor: "not-allowed",
+};
+
+const countBadgeStyle: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  fontVariantNumeric: "tabular-nums",
+  background: "#eae2d5",
+  color: "#5a4f43",
+  padding: "1px 7px",
+  borderRadius: 999,
+  border: "1px solid #d8cfbe",
+  marginLeft: 4,
+};
+
+const railCountStyle: React.CSSProperties = {
+  position: "absolute",
+  top: -4,
+  right: -4,
+  fontSize: 10,
+  fontWeight: 700,
+  fontVariantNumeric: "tabular-nums",
+  background: "#2a2520",
+  color: "#f5efe6",
+  minWidth: 16,
+  height: 16,
+  padding: "0 4px",
+  borderRadius: 999,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  pointerEvents: "none",
 };
 
 // Suppress unused warning when only "panel" is rendered.

@@ -26,6 +26,12 @@ export const palette = {
   chargeNeg: 0x3a567a,
   magnetN: 0x9c4a3a,
   magnetS: 0x3a567a,
+
+  /** Game-mode accents. */
+  accent: 0x3a8c5e,
+  accentEdge: 0x2a6e47,
+  goalZone: 0xc99a2e,
+  goalZoneEdge: 0xa57a1c,
 } as const;
 
 export const stroke = {

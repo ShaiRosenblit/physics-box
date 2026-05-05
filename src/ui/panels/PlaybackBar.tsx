@@ -7,6 +7,7 @@ import {
   StepIcon,
 } from "../icons";
 import { useUIStore } from "../state/store";
+import type { GameMode } from "../../game/types";
 
 const SCENE_LABEL: Record<SceneName, string> = {
   empty: "Empty",
@@ -45,6 +46,12 @@ export interface PlaybackBarProps {
   readonly onPause: () => void;
   readonly onStep: () => void;
   readonly onReset: () => void;
+  /** Top-level mode (defaults to "sandbox" — when omitted the puzzle slot is ignored). */
+  readonly mode?: GameMode;
+  /** Slot rendered at the start of the bar (typically the Sandbox/Puzzle toggle). */
+  readonly modeToggle?: React.ReactNode;
+  /** Slot rendered in place of the scene picker when `mode === "puzzle"`. */
+  readonly puzzlePicker?: React.ReactNode;
 }
 
 export function PlaybackBar(props: PlaybackBarProps) {
@@ -57,23 +64,28 @@ export function PlaybackBar(props: PlaybackBarProps) {
       style={{ ...barStyle, ...(props.compact ? compactBarStyle : {}) }}
     >
       <div style={{ ...controlsStyle, ...(props.compact ? compactControlsStyle : {}) }}>
-        <select
-          data-testid={testIds.sceneSelect}
-          aria-label="Scene"
-          title="Scene"
-          value={props.scene}
-          onChange={(e) => props.onSceneChange(e.target.value as SceneName)}
-          style={{
-            ...sceneSelectStyle,
-            ...(props.compact ? sceneSelectCompactStyle : {}),
-          }}
-        >
-          {sceneIds.map((id) => (
-            <option key={id} value={id}>
-              {SCENE_LABEL[id]}
-            </option>
-          ))}
-        </select>
+        {props.modeToggle}
+        {props.mode === "puzzle" ? (
+          props.puzzlePicker
+        ) : (
+          <select
+            data-testid={testIds.sceneSelect}
+            aria-label="Scene"
+            title="Scene"
+            value={props.scene}
+            onChange={(e) => props.onSceneChange(e.target.value as SceneName)}
+            style={{
+              ...sceneSelectStyle,
+              ...(props.compact ? sceneSelectCompactStyle : {}),
+            }}
+          >
+            {sceneIds.map((id) => (
+              <option key={id} value={id}>
+                {SCENE_LABEL[id]}
+              </option>
+            ))}
+          </select>
+        )}
         <label style={{ ...gravityToggleStyle, ...(props.compact ? gravityToggleCompactStyle : {}) }}>
           <input
             type="checkbox"
