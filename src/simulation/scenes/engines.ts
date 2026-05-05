@@ -154,11 +154,13 @@ export function engines(world: World): void {
     }),
   );
 
+  const bobY = 3.2;
+  const pinLocal = { x: discR, y: 0 };
   world.addConstraint(
     bar({
-      a: bodyAnchor(disc),
+      a: bodyAnchor(disc, pinLocal),
       b: bodyAnchor(bobId),
-      length: 3.1,
+      length: Math.hypot(discR, bobY - discR),
     }),
   );
 }
