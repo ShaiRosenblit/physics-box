@@ -63,6 +63,7 @@ export {
   engine,
   magnet,
   rope,
+  bar,
   hinge,
   spring,
   pulley,

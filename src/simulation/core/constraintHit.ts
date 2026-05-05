@@ -92,6 +92,9 @@ function distToConstraint(c: ConstraintView, p: Vec2): number {
     // welds are invisible; not user-selectable
     return Number.POSITIVE_INFINITY;
   }
+  if (c.kind === "bar") {
+    return Math.sqrt(distPointSegmentSq(p.x, p.y, c.a.x, c.a.y, c.b.x, c.b.y));
+  }
   return Number.POSITIVE_INFINITY;
 }
 

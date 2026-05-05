@@ -1,5 +1,6 @@
 import { PULLEY_DEFAULT_HALF_SPREAD } from "../mechanics/pulley";
 import type {
+  BarSpec,
   BeltSpec,
   ConstraintPatch,
   ConstraintSpec,
@@ -67,6 +68,11 @@ export function mergeConstraintPatch(spec: ConstraintSpec, patch: ConstraintPatc
       }
       return n;
     }
+    case "bar": {
+      let n: BarSpec = { ...spec };
+      if (patch.barLength !== undefined) n = { ...n, length: patch.barLength };
+      return n;
+    }
     default: {
       const _e: never = spec;
       return _e;
@@ -109,6 +115,9 @@ export function sanitizeConstraintSpec(spec: ConstraintSpec): ConstraintSpec {
     return spec;
   }
   if (spec.kind === "weld") return spec;
+  if (spec.kind === "bar") {
+    return { ...spec, length: Math.max(MIN_CONNECTOR_REST, spec.length) };
+  }
   return spec;
 }
 

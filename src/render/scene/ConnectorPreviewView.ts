@@ -3,9 +3,9 @@ import { PULLEY_DEFAULT_HALF_SPREAD, type Vec2 } from "../../simulation";
 import { drawApproxCircle } from "../approxCircle";
 import { palette, stroke } from "../style/palette";
 
-/** Two-click connectors (rope / hinge / spring / belt). */
+/** Two-click connectors (rope / hinge / spring / belt / bar). */
 export interface ConnectorPreviewLinearState {
-  readonly kind: "rope" | "hinge" | "spring" | "belt";
+  readonly kind: "rope" | "hinge" | "spring" | "belt" | "bar";
   readonly a: Vec2;
   /** End point. May equal `a` when the user hasn't moved yet. */
   readonly b: Vec2;

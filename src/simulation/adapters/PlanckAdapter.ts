@@ -2,6 +2,7 @@ import * as planck from "planck";
 import type { SimulationConfig } from "../core/config";
 import type {
   Anchor,
+  BarSpec,
   BeltSpec,
   BodySpec,
   BodyView,
@@ -864,7 +865,7 @@ export class PlanckAdapter {
     if (spec.kind === "weld") {
       return ids.has(spec.bodyA) || ids.has(spec.bodyB);
     }
-    if (spec.kind === "rope" || spec.kind === "spring") {
+    if (spec.kind === "rope" || spec.kind === "spring" || spec.kind === "bar") {
       const hit = (a: Anchor) => a.kind === "body" && ids.has(a.id);
       return hit(spec.a) || hit(spec.b);
     }
@@ -920,6 +921,10 @@ export class PlanckAdapter {
     }
     if (spec.kind === "spring") {
       this.constraints.set(id, this.buildSpring(id, spec));
+      return;
+    }
+    if (spec.kind === "bar") {
+      this.constraints.set(id, this.buildBar(id, spec));
       return;
     }
     if (spec.kind === "pulley") {
@@ -1044,6 +1049,15 @@ export class PlanckAdapter {
         return;
       }
       this.replaceConstraintKeepingId(id, next);
+      return;
+    }
+    if (next.kind === "bar") {
+      const ba = prev as BarSpec;
+      if (ba.length !== next.length) {
+        const dj = rec.joints[0] as planck.DistanceJoint;
+        dj.setLength(next.length);
+        this.constraints.set(id, { ...rec, spec: next });
+      }
       return;
     }
   }
@@ -1250,6 +1264,21 @@ export class PlanckAdapter {
       recordA.body,
       recordB.body,
       anchor,
+    );
+    this.world.createJoint(joint);
+    return { id, spec, internalBodies: [], joints: [joint] };
+  }
+
+  private buildBar(id: Id, spec: BarSpec): ConstraintRecord {
+    const a = this.resolveAnchor(spec.a);
+    const b = this.resolveAnchor(spec.b);
+    const length = Math.max(0.05, spec.length);
+    const joint = new planck.DistanceJoint(
+      { frequencyHz: 0, dampingRatio: 0, length },
+      a.body,
+      b.body,
+      a.worldPoint,
+      b.worldPoint,
     );
     this.world.createJoint(joint);
     return { id, spec, internalBodies: [], joints: [joint] };
@@ -1672,6 +1701,19 @@ function buildConstraintView(
       anchor: Object.freeze({ x: anchorVec.x, y: anchorVec.y }),
       bodyA: spec.bodyA,
       bodyB: spec.bodyB,
+    });
+  }
+
+  if (spec.kind === "bar") {
+    const joint = record.joints[0] as planck.DistanceJoint;
+    const a = joint.getAnchorA();
+    const b = joint.getAnchorB();
+    return Object.freeze({
+      id,
+      kind: "bar" as const,
+      a: Object.freeze({ x: a.x, y: a.y }),
+      b: Object.freeze({ x: b.x, y: b.y }),
+      length: joint.getLength(),
     });
   }
 

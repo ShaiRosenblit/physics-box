@@ -99,7 +99,9 @@ function summarizeConstraint(view: ConstraintView): {
             ? "Belt"
             : view.kind === "weld"
               ? "Weld"
-              : "Pulley";
+              : view.kind === "bar"
+                ? "Bar"
+                : "Pulley";
 
   let stats = "";
   if (view.kind === "rope") {
@@ -112,6 +114,8 @@ function summarizeConstraint(view: ConstraintView): {
     stats = `r ${fmt(view.ratio)} · ${view.driverRotorId}→${view.drivenBodyId}`;
   } else if (view.kind === "weld") {
     stats = `${fmt(view.anchor.x)}, ${fmt(view.anchor.y)}`;
+  } else if (view.kind === "bar") {
+    stats = `L ${fmt(view.length)} m`;
   } else {
     stats = `${fmt(view.anchor.x)}, ${fmt(view.anchor.y)}`;
   }

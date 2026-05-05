@@ -186,6 +186,14 @@ export const BeltIcon = (p: Props) => (
   </Svg>
 );
 
+export const BarIcon = (p: Props) => (
+  <Svg {...p}>
+    <circle cx="2.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="13.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
+    <rect x="3.5" y="6.5" width="9" height="3" rx="0.8" strokeWidth="1.4" />
+  </Svg>
+);
+
 export const GridIcon = (p: Props) => (
   <Svg {...p}>
     <rect x="2.5" y="2.5" width="11" height="11" />

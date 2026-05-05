@@ -221,7 +221,7 @@ export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }
   | { readonly kind: "body"; readonly id: Id; readonly localPoint?: Vec2 };
 
-export type ConstraintKind = "rope" | "hinge" | "spring" | "pulley" | "belt" | "weld";
+export type ConstraintKind = "rope" | "hinge" | "spring" | "pulley" | "belt" | "weld" | "bar";
 
 export interface RopeSpec {
   readonly kind: "rope";
@@ -273,6 +273,14 @@ export interface BeltSpec {
   readonly ratio?: number;
 }
 
+/** Rigid two-sided distance link: maintains a fixed length between two anchors (can push and pull). Uses a rigid Planck `DistanceJoint`. */
+export interface BarSpec {
+  readonly kind: "bar";
+  readonly a: Anchor;
+  readonly b: Anchor;
+  readonly length: number;
+}
+
 /**
  * Rigid attachment: constrains two bodies to have a fixed relative position
  * and angle — equivalent to gluing them at `worldAnchor`. Uses Planck
@@ -292,7 +300,8 @@ export type ConstraintSpec =
   | SpringSpec
   | PulleySpec
   | BeltSpec
-  | WeldSpec;
+  | WeldSpec
+  | BarSpec;
 
 /** Sparse updates for patchConstraint — only fields valid for this kind apply. */
 export interface ConstraintPatch {
@@ -305,6 +314,7 @@ export interface ConstraintPatch {
   readonly worldAnchor?: Vec2;
   readonly halfSpread?: number;
   readonly ratio?: number;
+  readonly barLength?: number;
 }
 
 export interface RopeView {
@@ -370,13 +380,22 @@ export interface WeldView {
   readonly bodyB: Id;
 }
 
+export interface BarView {
+  readonly id: Id;
+  readonly kind: "bar";
+  readonly a: Vec2;
+  readonly b: Vec2;
+  readonly length: number;
+}
+
 export type ConstraintView =
   | RopeView
   | HingeView
   | SpringView
   | PulleyView
   | BeltView
-  | WeldView;
+  | WeldView
+  | BarView;
 
 export interface ChargedSourceView {
   readonly id: Id;

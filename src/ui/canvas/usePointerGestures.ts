@@ -13,11 +13,11 @@ export type SpawnMode =
   | "magnet-"
   | "engine+"
   | "engine-";
-export type ConnectorTool = "rope" | "hinge" | "spring" | "pulley" | "belt";
+export type ConnectorTool = "rope" | "hinge" | "spring" | "pulley" | "belt" | "bar";
 
 export type ConnectorPending =
   | {
-      readonly tool: "rope" | "spring" | "hinge" | "belt";
+      readonly tool: "rope" | "spring" | "hinge" | "belt" | "bar";
       readonly a: ResolvedAnchor;
     }
   | {

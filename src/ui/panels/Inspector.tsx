@@ -434,6 +434,24 @@ function ConstraintDetails({ view }: { view: ConstraintView }) {
           </div>
         </>
       )}
+
+      {view.kind === "bar" && (
+        <>
+          <div style={editRowStyle}>
+            <span style={editLabelStyle}>Length</span>
+            <InspectorNumberInput
+              aria-label="Bar length"
+              min={0.05}
+              step={0.05}
+              style={ctl}
+              value={view.length}
+              clamp={(v) => Math.max(0.05, v)}
+              onCommit={(v) => patchConstraint(view.id, { barLength: v })}
+            />
+          </div>
+          <ReadRow label="Span" value={`${fmt(Math.hypot(view.b.x - view.a.x, view.b.y - view.a.y))} m`} />
+        </>
+      )}
       <RemoveFromSceneFooter id={view.id} />
     </div>
   );
@@ -453,6 +471,8 @@ function constraintKindShort(kind: ConstraintView["kind"]): string {
       return "Belt";
     case "weld":
       return "Weld";
+    case "bar":
+      return "Bar";
   }
 }
 

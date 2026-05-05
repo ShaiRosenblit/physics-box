@@ -4,7 +4,7 @@ import { box } from "../mechanics/box";
 import { engine } from "../mechanics/engine";
 import { belt } from "../mechanics/belt";
 import { hinge } from "../mechanics/hinge";
-import { rope } from "../mechanics/rope";
+import { bar } from "../mechanics/bar";
 import { spring } from "../mechanics/spring";
 import { worldAnchor, bodyAnchor } from "../mechanics/anchors";
 import { addWorkshopEnclosure } from "./workshopEnclosure";
@@ -155,12 +155,10 @@ export function engines(world: World): void {
   );
 
   world.addConstraint(
-    rope({
+    bar({
       a: bodyAnchor(disc),
       b: bodyAnchor(bobId),
       length: 3.1,
-      segments: 10,
-      material: "wood",
     }),
   );
 }

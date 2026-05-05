@@ -5,6 +5,7 @@ export { box, type BoxInput } from "./box";
 export { engine, type EngineInput } from "./engine";
 export { magnet, type MagnetInput } from "./magnet";
 export { rope, type RopeInput } from "./rope";
+export { bar, type BarInput } from "./bar";
 export { hinge, type HingeInput } from "./hinge";
 export { spring, type SpringInput } from "./spring";
 export {

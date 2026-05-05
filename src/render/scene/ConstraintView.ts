@@ -93,6 +93,10 @@ function drawConstraint(
     drawBelt(g, view, zoom);
     return;
   }
+  if (view.kind === "bar") {
+    drawBar(g, view, zoom);
+    return;
+  }
   // weld joints are invisible — no geometry to draw
 }
 
@@ -234,6 +238,54 @@ function drawPulley(
   const hub = rim * 0.35;
   drawApproxCircle(g, cx, cy, hub, zoom);
   g.fill({ color: palette.inkPrimary, alpha: 0.45 });
+}
+
+function drawBar(
+  g: Graphics,
+  view: Extract<ConstraintView, { kind: "bar" }>,
+  zoom: number,
+): void {
+  const ax = view.a.x;
+  const ay = view.a.y;
+  const bx = view.b.x;
+  const by = view.b.y;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return;
+
+  const halfW = Math.max(0.04, 6 / zoom);
+  const ux = dx / len;
+  const uy = dy / len;
+  const nx = -uy * halfW;
+  const ny = ux * halfW;
+
+  // Draw filled body rectangle
+  g.moveTo(ax + nx, ay + ny);
+  g.lineTo(bx + nx, by + ny);
+  g.lineTo(bx - nx, by - ny);
+  g.lineTo(ax - nx, ay - ny);
+  g.closePath();
+  g.fill({ color: palette.metal, alpha: 0.9 });
+
+  // Draw outline
+  g.moveTo(ax + nx, ay + ny);
+  g.lineTo(bx + nx, by + ny);
+  g.lineTo(bx - nx, by - ny);
+  g.lineTo(ax - nx, ay - ny);
+  g.closePath();
+  g.stroke({ width: stroke.bodyOutline / zoom, color: palette.metalEdge, alpha: 0.95 });
+
+  // End caps
+  const capR = halfW * 0.9;
+  drawApproxCircle(g, ax, ay, capR, zoom);
+  g.fill({ color: palette.metal, alpha: 0.95 });
+  drawApproxCircle(g, ax, ay, capR, zoom);
+  g.stroke({ width: stroke.bodyOutline / zoom, color: palette.metalEdge, alpha: 0.95 });
+  drawApproxCircle(g, bx, by, capR, zoom);
+  g.fill({ color: palette.metal, alpha: 0.95 });
+  drawApproxCircle(g, bx, by, capR, zoom);
+  g.stroke({ width: stroke.bodyOutline / zoom, color: palette.metalEdge, alpha: 0.95 });
 }
 
 function drawSpring(

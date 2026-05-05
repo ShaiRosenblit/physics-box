@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ball,
   balloon,
+  bar,
   belt,
   bodyAnchor,
   box,
@@ -348,7 +349,7 @@ export function App() {
   };
 
   const handleConnectorCommit = (
-    tool: "rope" | "hinge" | "spring" | "belt",
+    tool: "rope" | "hinge" | "spring" | "belt" | "bar",
     a: ResolvedAnchor,
     b: ResolvedAnchor,
   ) => {
@@ -407,6 +408,17 @@ export function App() {
           bodyA: a.id,
           bodyB: b.kind === "body" ? b.id : undefined,
           worldAnchor: b.kind === "body" ? b.hitPoint : b.point,
+        }),
+      );
+    }
+    if (tool === "bar") {
+      const length = anchorDistance(snapCommit, a, b);
+      if (length < 0.05) return;
+      sim.world.addConstraint(
+        bar({
+          a: toAnchor(a, snapCommit),
+          b: toAnchor(b, snapCommit),
+          length,
         }),
       );
     }
