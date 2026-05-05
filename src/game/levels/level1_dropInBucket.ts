@@ -96,11 +96,12 @@ export const level1DropInBucket: Level = {
   goalText: "Bridge the gap. Land the marble in the bucket.",
   setupScene,
   palette: {
-    box: 3,
+    box: { count: 3, fixed: true },
   },
   goal: {
     kind: "bodyInZone",
     bodyRef: "marble",
     zoneId: "bucket",
   },
+  viewBounds: { minX: -8, minY: -0.5, maxX: 7, maxY: 8 },
 };

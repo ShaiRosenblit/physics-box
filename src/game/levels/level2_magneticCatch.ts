@@ -94,11 +94,12 @@ export const level2MagneticCatch: Level = {
   goalText: "Pull the metal marble sideways with magnets and land it in the bucket.",
   setupScene,
   palette: {
-    "magnet+": 2,
+    "magnet+": { count: 2, fixed: true },
   },
   goal: {
     kind: "bodyInZone",
     bodyRef: "marble",
     zoneId: "bucket",
   },
+  viewBounds: { minX: -6, minY: -0.5, maxX: 4, maxY: 10 },
 };

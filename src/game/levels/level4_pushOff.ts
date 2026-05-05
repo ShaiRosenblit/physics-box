@@ -112,12 +112,13 @@ export const level4PushOff: Level = {
   goalText: "Repel the marble out of its cradle and over the wall into the bucket.",
   setupScene,
   palette: {
-    "ball+": 2,
-    box: 1,
+    "ball+": { count: 2, fixed: true },
+    box: { count: 1, fixed: true },
   },
   goal: {
     kind: "bodyInZone",
     bodyRef: "marble",
     zoneId: "bucket",
   },
+  viewBounds: { minX: -5, minY: -0.5, maxX: 5.5, maxY: 4 },
 };

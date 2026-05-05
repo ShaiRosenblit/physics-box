@@ -23,6 +23,13 @@ export type GameTool =
   | "belt"
   | "bar";
 
+/** Palette entry specifying tool availability and behavior in puzzle levels. */
+export interface PaletteItem {
+  readonly count: number;
+  /** If true, this item becomes static (non-draggable) when simulation runs. */
+  readonly fixed?: boolean;
+}
+
 /** Axis-aligned rectangular target area in world space. */
 export interface GoalZone {
   readonly id: string;
@@ -58,8 +65,8 @@ export interface Level {
   readonly goalText: string;
   /** Builds the initial scene; returns refs the goal references. */
   readonly setupScene: (world: World) => LevelHandles;
-  /** Tools the player may use, with counts. Tools omitted are unavailable. */
-  readonly palette: Readonly<Partial<Record<GameTool, number>>>;
+  /** Tools the player may use, with counts and behavior flags. Tools omitted are unavailable. */
+  readonly palette: Readonly<Partial<Record<GameTool, PaletteItem>>>;
   readonly goal: Goal;
   /**
    * Optional world-space rectangle the camera should always frame.

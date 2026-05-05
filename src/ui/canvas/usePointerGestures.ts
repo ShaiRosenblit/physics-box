@@ -298,7 +298,15 @@ export function usePointerGestures(
 
       if (state?.kind === "single" && state.pointerId === e.pointerId && xy) {
         if (state.mode === "drag-body") {
-          cbRef.current.world.endDrag();
+          // Check if dragging back to tray for removal
+          const trayBottom = cbRef.current.getTrayBottom?.();
+          if (trayBottom !== undefined && e.clientY >= trayBottom && state.draggedId !== null) {
+            // Dragged over tray area - remove it
+            cbRef.current.onReturnToTray?.(state.draggedId);
+          } else {
+            // Normal drag end
+            cbRef.current.world.endDrag();
+          }
           cbRef.current.onDragStateChange?.(false);
         } else if (
           state.mode === "pending" &&

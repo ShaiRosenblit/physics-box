@@ -86,11 +86,12 @@ export const level3CoulombCatch: Level = {
   goalText: "Pull the positive marble across the gap with negative charges.",
   setupScene,
   palette: {
-    "ball-": 2,
+    "ball-": { count: 2, fixed: true },
   },
   goal: {
     kind: "bodyInZone",
     bodyRef: "marble",
     zoneId: "bucket",
   },
+  viewBounds: { minX: -8, minY: -0.5, maxX: 7, maxY: 8 },
 };

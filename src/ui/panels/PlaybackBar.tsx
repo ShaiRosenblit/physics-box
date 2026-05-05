@@ -217,33 +217,42 @@ export function PlaybackBar(props: PlaybackBarProps) {
     // Three-row layout on phone — each row has plenty of room and nothing
     // gets cut off, even at 320px-wide (iPhone SE).
     //   row 1: mode toggle (left) + scene/level picker (right)
-    //   row 2: gravity + air slider + speed slider (sliders flex)
-    //   row 3: play + step + reset (right-aligned)
+    //   row 2: gravity + air slider + speed slider (sliders flex) [hidden in puzzle mode]
+    //   row 3: play + step + reset (right-aligned) [only play+reset in puzzle mode]
     // Tick counter is intentionally hidden — it's a dev/debug surface.
+    const isPuzzleMode = props.mode === "puzzle";
     return (
       <footer
         data-testid={testIds.playbackBar}
         aria-label="Playback"
-        style={{ ...barStyle, ...compactBarStyle }}
+        style={{
+          ...barStyle,
+          ...compactBarStyle,
+          // Puzzle mode has 1 row; sandbox has 3 rows
+          height: isPuzzleMode ? "auto" : undefined,
+        }}
       >
         <div style={{ ...compactRowStyle, justifyContent: "space-between" }}>
           {props.modeToggle}
           {scenePicker}
         </div>
-        <div style={compactRowStyle}>
-          {gravityControl}
-          {airControl}
-          {speedControl}
-        </div>
+        {!isPuzzleMode && (
+          <div style={compactRowStyle}>
+            {gravityControl}
+            {airControl}
+            {speedControl}
+          </div>
+        )}
         <div style={{ ...compactRowStyle, justifyContent: "flex-end" }}>
           {playButton}
-          {stepButton}
+          {!isPuzzleMode && stepButton}
           {resetButton}
         </div>
       </footer>
     );
   }
 
+  const isPuzzleMode = props.mode === "puzzle";
   return (
     <footer
       data-testid={testIds.playbackBar}
@@ -253,21 +262,23 @@ export function PlaybackBar(props: PlaybackBarProps) {
       <div style={controlsStyle}>
         {props.modeToggle}
         {scenePicker}
-        {gravityControl}
-        {airControl}
-        {speedControl}
+        {!isPuzzleMode && gravityControl}
+        {!isPuzzleMode && airControl}
+        {!isPuzzleMode && speedControl}
         {playButton}
-        {stepButton}
+        {!isPuzzleMode && stepButton}
         {resetButton}
       </div>
 
-      <div
-        aria-live="polite"
-        data-testid={testIds.tickCounter}
-        style={tickStyle}
-      >
-        tick {props.tick}
-      </div>
+      {!isPuzzleMode && (
+        <div
+          aria-live="polite"
+          data-testid={testIds.tickCounter}
+          style={tickStyle}
+        >
+          tick {props.tick}
+        </div>
+      )}
     </footer>
   );
 }

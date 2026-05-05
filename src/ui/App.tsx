@@ -58,10 +58,12 @@ import {
   levels,
   type GameMode,
   type GameTool,
+  type PaletteItem,
 } from "../game";
 import { LevelHud } from "../game/ui/LevelHud";
 import { ModeToggle } from "../game/ui/ModeToggle";
 import { WinScreen } from "../game/ui/WinScreen";
+import { PuzzleTray } from "../game/ui/PuzzleTray";
 
 export function App() {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -267,6 +269,191 @@ export function App() {
     if (!bounds) rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
+  /** Restart puzzle from design phase, preserving placed items. */
+  const restartFromDesign = () => {
+    const s = useUIStore.getState();
+    const level = s.currentLevelId ? levelById[s.currentLevelId] : null;
+    if (!level) return;
+
+    // Save positions of currently placed items
+    const snap = sim.world.snapshot();
+    const savedPlacements = Object.entries(s.placedItemMeta).map(
+      ([idStr, meta]) => {
+        const id = Number(idStr);
+        const body = snap.bodies.find((b) => b.id === id);
+        return {
+          tool: meta.tool,
+          position: body?.position ?? { x: 0, y: 0 },
+          angle: body?.angle ?? 0,
+          fixedWhenRunning: meta.fixedWhenRunning,
+        };
+      }
+    );
+
+    // Full scene reset
+    rendererRef.current?.reset();
+    sim.world.reset();
+    const handles = level.setupScene(sim.world);
+    setLevelHandles(handles);
+    rendererRef.current?.setGoalZones(handles.goalZones);
+    s.clearPlacedItemMeta();
+    s.clearUndo();
+
+    // Rebuild inventory from palette
+    const inv: Partial<Record<GameTool, number>> = {};
+    for (const [tool, item] of Object.entries(level.palette)) {
+      inv[tool as GameTool] =
+        typeof item === "object" && item !== null ? item.count : item;
+    }
+    setInventory(inv);
+
+    // Re-add saved placed items as dynamic (for design phase)
+    for (const saved of savedPlacements) {
+      const presets = s.spawnPresets;
+      let newId: import("../simulation").Id | null = null;
+
+      if (saved.tool === "ball") {
+        const p = presets.ball;
+        newId = sim.add(
+          ball({
+            position: saved.position,
+            radius: p.radius,
+            material: p.material,
+            linearDamping: p.linearDamping,
+            angularDamping: p.angularDamping,
+            angle: saved.angle,
+            fixed: false,
+            ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+          })
+        );
+      } else if (saved.tool === "ball+") {
+        const p = presets.ballPlus;
+        newId = sim.add(
+          ball({
+            position: saved.position,
+            radius: p.radius,
+            material: p.material,
+            linearDamping: p.linearDamping,
+            angularDamping: p.angularDamping,
+            angle: saved.angle,
+            fixed: false,
+            charge: p.charge,
+            ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+          })
+        );
+      } else if (saved.tool === "ball-") {
+        const p = presets.ballMinus;
+        newId = sim.add(
+          ball({
+            position: saved.position,
+            radius: p.radius,
+            material: p.material,
+            linearDamping: p.linearDamping,
+            angularDamping: p.angularDamping,
+            angle: saved.angle,
+            fixed: false,
+            charge: p.charge,
+            ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+          })
+        );
+      } else if (saved.tool === "box") {
+        const p = presets.box;
+        newId = sim.add(
+          box({
+            position: saved.position,
+            width: p.width,
+            height: p.height,
+            material: p.material,
+            linearDamping: p.linearDamping,
+            angularDamping: p.angularDamping,
+            angle: saved.angle,
+            fixed: false,
+          })
+        );
+      } else if (saved.tool === "balloon") {
+        const p = presets.balloon;
+        newId = sim.add(
+          balloon({
+            position: saved.position,
+            radius: p.radius,
+            material: p.material,
+            linearDamping: p.linearDamping,
+            angularDamping: p.angularDamping,
+            angle: saved.angle,
+            fixed: false,
+            buoyancyLift: p.buoyancyLift,
+            ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+          })
+        );
+      } else if (saved.tool === "magnet+" || saved.tool === "magnet-") {
+        const p =
+          saved.tool === "magnet+" ? presets.magnetPlus : presets.magnetMinus;
+        const sign = saved.tool === "magnet+" ? 1 : -1;
+        newId = sim.add(
+          magnet({
+            position: saved.position,
+            radius: p.radius,
+            dipole: sign * p.dipoleMagnitude,
+            angle: saved.angle,
+            fixed: false,
+          })
+        );
+      } else if (saved.tool === "engine+" || saved.tool === "engine-") {
+        const p =
+          saved.tool === "engine+" ? presets.enginePlus : presets.engineMinus;
+        const sign = saved.tool === "engine+" ? 1 : -1;
+        newId = sim.add(
+          engine({
+            position: saved.position,
+            width: p.width,
+            height: p.height,
+            rotorRadius: p.flywheelRadius,
+            rpm: sign * p.rpm,
+            maxTorque: p.maxTorque,
+            material: p.material,
+            linearDamping: p.linearDamping,
+            angularDamping: p.angularDamping,
+            angle: saved.angle,
+            fixed: false,
+          })
+        );
+      } else if (saved.tool === "crank") {
+        const p = presets.crank;
+        newId = sim.add(
+          crank({
+            position: saved.position,
+            radius: p.radius,
+            pinRadius: p.pinRadius,
+            material: p.material,
+            linearDamping: p.linearDamping,
+            angularDamping: p.angularDamping,
+            angle: saved.angle,
+            fixed: false,
+            ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
+          })
+        );
+      }
+
+      if (newId !== null) {
+        const meta = {
+          tool: saved.tool,
+          fixedWhenRunning: saved.fixedWhenRunning,
+          spec: {} as any, // not used for restart
+        };
+        s.consumeInventory(saved.tool, newId, meta);
+      }
+    }
+
+    setPhase("design");
+    sim.pause();
+    setRunning(false);
+    setSelectedId(null);
+    setAirDensity(sim.world.config.fluidDensity);
+    const bounds = level.viewBounds ?? null;
+    rendererRef.current?.setViewBounds(bounds);
+    if (!bounds) rendererRef.current?.fitToContent(sim.world.snapshot());
+  };
+
   const enterSandboxMode = () => {
     setMode("sandbox");
     setLevelHandles(null);
@@ -307,7 +494,15 @@ export function App() {
         loadPuzzleLevel(s.currentLevelId ?? defaultLevelId);
         return;
       }
-      if (s.phase === "design") s.setPhase("running");
+      if (s.phase === "design") {
+        // Apply fixed property to player-placed items before running
+        for (const [idStr, meta] of Object.entries(s.placedItemMeta)) {
+          if (meta.fixedWhenRunning) {
+            sim.world.patchBody(Number(idStr), { fixed: true });
+          }
+        }
+        s.setPhase("running");
+      }
     }
     sim.resume();
     setRunning(true);
@@ -322,7 +517,7 @@ export function App() {
   const onReset = () => {
     const s = useUIStore.getState();
     if (s.mode === "puzzle") {
-      loadPuzzleLevel(s.currentLevelId ?? defaultLevelId);
+      restartFromDesign();
       return;
     }
     rendererRef.current?.reset();
@@ -351,6 +546,64 @@ export function App() {
     rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
+  const handleTrayDrop = (tool: GameTool, clientX: number, clientY: number) => {
+    const canvasRect = hostRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+    const camera = rendererRef.current?.camera;
+    if (!camera) return;
+    const screenX = clientX - canvasRect.left;
+    const screenY = clientY - canvasRect.top;
+    const worldPoint = camera.screenToWorld(screenX, screenY);
+    handleSpawn(tool, worldPoint);
+  };
+
+  const handleUndo = () => {
+    const entry = useUIStore.getState().popUndo();
+    if (!entry) return;
+    if (entry.kind === "place") {
+      sim.remove(entry.id);
+      useUIStore.getState().refundInventory(entry.id);
+      setSelectedId(null);
+    } else if (entry.kind === "remove") {
+      // Re-spawn at saved position
+      handleSpawn(entry.tool, entry.position);
+    }
+  };
+
+  const handleReturnToTray = (id: import("../simulation").Id) => {
+    sim.remove(id);
+    useUIStore.getState().refundInventory(id);
+    setSelectedId(null);
+  };
+
+  /** Helper: record placement metadata and consume inventory. */
+  const recordPlacement = (tool: GameTool, placedId: import("../simulation").Id) => {
+    const s = useUIStore.getState();
+    if (s.mode !== "puzzle") return;
+
+    // Get fixed-when-running flag from level palette
+    const level = s.currentLevelId ? levelById[s.currentLevelId] : null;
+    const paletteItem = level?.palette[tool];
+    const fixedWhenRunning =
+      typeof paletteItem === "object" && paletteItem !== null
+        ? paletteItem.fixed ?? false
+        : false;
+
+    // Get the spec that was just spawned
+    const snap = sim.world.snapshot();
+    const body = snap.bodies.find((b) => b.id === placedId);
+    if (!body) return;
+
+    // Record meta and consume inventory
+    const meta = {
+      tool,
+      fixedWhenRunning,
+      spec: body as unknown as import("../../simulation").AnyBodySpec,
+    };
+    s.consumeInventory(tool, placedId, meta);
+    s.pushUndo({ kind: "place", id: placedId, tool });
+  };
+
   const handleSpawn = (kind: SpawnMode, world: Vec2) => {
     const s = useUIStore.getState();
     // Puzzle-mode inventory gate: reject spawns when the level didn't
@@ -360,6 +613,9 @@ export function App() {
       if (remaining === undefined || remaining <= 0) return;
     }
     const presets = s.spawnPresets;
+    // In puzzle design phase, always spawn as dynamic (draggable).
+    // They'll be converted to static on Play if marked fixed-when-running.
+    const inPuzzleDesign = s.mode === "puzzle" && s.phase === "design";
     let placedId: import("../simulation").Id | null = null;
     if (kind === "ball") {
       const p = presets.ball;
@@ -370,7 +626,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
-          fixed: p.fixed,
+          fixed: inPuzzleDesign ? false : p.fixed,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
       );
@@ -383,7 +639,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
-          fixed: p.fixed,
+          fixed: inPuzzleDesign ? false : p.fixed,
           charge: p.charge,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
@@ -397,7 +653,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
-          fixed: p.fixed,
+          fixed: inPuzzleDesign ? false : p.fixed,
           charge: p.charge,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
@@ -411,7 +667,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
-          fixed: p.fixed,
+          fixed: inPuzzleDesign ? false : p.fixed,
           buoyancyLift: p.buoyancyLift,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
@@ -424,7 +680,7 @@ export function App() {
           position: world,
           radius: p.radius,
           dipole: sign * p.dipoleMagnitude,
-          fixed: p.fixed,
+          fixed: inPuzzleDesign ? false : p.fixed,
         }),
       );
     } else if (kind === "engine+" || kind === "engine-") {
@@ -441,7 +697,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
-          fixed: p.fixed,
+          fixed: inPuzzleDesign ? false : p.fixed,
         }),
       );
     } else if (kind === "box") {
@@ -454,7 +710,7 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
-          fixed: p.fixed,
+          fixed: inPuzzleDesign ? false : p.fixed,
         }),
       );
     } else if (kind === "crank") {
@@ -467,13 +723,13 @@ export function App() {
           material: p.material,
           linearDamping: p.linearDamping,
           angularDamping: p.angularDamping,
-          fixed: p.fixed,
+          fixed: inPuzzleDesign ? false : p.fixed,
           ...(p.collideDynamicBalls ? {} : { collideWithBalls: false as const }),
         }),
       );
     }
     if (placedId !== null && s.mode === "puzzle") {
-      consumeInventory(kind as GameTool, placedId);
+      recordPlacement(kind as GameTool, placedId);
     }
   };
 
@@ -606,6 +862,16 @@ export function App() {
     onPulleyCommit: handlePulleyCommit,
     onConnectorPendingChange: handleConnectorPendingChange,
     onConnectorPreviewMove: handleConnectorPreviewMove,
+    onReturnToTray: gameMode === "puzzle" ? handleReturnToTray : undefined,
+    getTrayBottom:
+      gameMode === "puzzle"
+        ? () => {
+            const stage = document.querySelector('[style*="position: relative"]');
+            if (!stage) return window.innerHeight - 120;
+            const rect = stage.getBoundingClientRect();
+            return rect.bottom - 68;
+          }
+        : undefined,
   });
 
   const isPhone = mode === "phone";
@@ -622,18 +888,18 @@ export function App() {
     <SimulationProvider value={sim}>
       <div data-testid={testIds.app} style={appShell}>
         <div style={mainRow}>
-          {/* Toolbar: rail on tablet, full panel on desktop, drawer on phone. */}
-          {isTablet && <Toolbar variant="rail" />}
-          {isDesktop && <Toolbar variant="panel" />}
+          {/* Toolbar: rail on tablet, full panel on desktop, drawer on phone. Hidden in puzzle mode. */}
+          {gameMode !== "puzzle" && isTablet && <Toolbar variant="rail" />}
+          {gameMode !== "puzzle" && isDesktop && <Toolbar variant="panel" />}
 
           <main style={canvasColumn}>
             {/* Tool option panels dock under the toolbar on tablet/desktop
                 so they sit out of the way; on phone we move them BELOW the
                 canvas (above the playback bar) so they don't fight the
                 LevelHud / FABs at the top edge and they land near the
-                user's thumb. */}
-            {!isPhone && <SpawnToolOptions />}
-            {!isPhone && <ConnectorToolOptions />}
+                user's thumb. Hidden in puzzle mode. */}
+            {gameMode !== "puzzle" && !isPhone && <SpawnToolOptions />}
+            {gameMode !== "puzzle" && !isPhone && <ConnectorToolOptions />}
             <div style={canvasStage}>
             <div
               ref={hostRef}
@@ -641,6 +907,18 @@ export function App() {
               aria-label="Physics Box simulation canvas"
               style={canvasHostStyle}
             />
+
+            {gameMode === "puzzle" && (
+              <PuzzleTray
+                onDrop={handleTrayDrop}
+                getTrayBottom={() => {
+                  const stage = document.querySelector('[style*="position: relative"]');
+                  if (!stage) return window.innerHeight - 120;
+                  const rect = stage.getBoundingClientRect();
+                  return rect.bottom - 68;
+                }}
+              />
+            )}
 
             <button
               type="button"
@@ -658,7 +936,7 @@ export function App() {
               <FitViewIcon />
             </button>
 
-            {isPhone && (
+            {gameMode !== "puzzle" && isPhone && (
               <button
                 type="button"
                 aria-label="Open tools"
@@ -670,7 +948,7 @@ export function App() {
               </button>
             )}
 
-            {inspectorAsDrawer && (
+            {gameMode !== "puzzle" && inspectorAsDrawer && (
               <button
                 type="button"
                 aria-label="Open inspector"
@@ -712,14 +990,14 @@ export function App() {
               </Drawer>
             )}
             </div>
-            {isPhone && <SpawnToolOptions dock="bottom" />}
-            {isPhone && <ConnectorToolOptions dock="bottom" />}
+            {gameMode !== "puzzle" && isPhone && <SpawnToolOptions dock="bottom" />}
+            {gameMode !== "puzzle" && isPhone && <ConnectorToolOptions dock="bottom" />}
           </main>
 
-          {isDesktop && <Inspector variant="panel" />}
+          {gameMode !== "puzzle" && isDesktop && <Inspector variant="panel" />}
         </div>
-        {inspectorAsDrawer && <InspectorPeek />}
-        <LevelHud />
+        {gameMode !== "puzzle" && inspectorAsDrawer && <InspectorPeek />}
+        <LevelHud onUndo={gameMode === "puzzle" ? handleUndo : undefined} />
         <WinScreen
           onReplay={() => loadPuzzleLevel(currentLevelId ?? defaultLevelId)}
         />

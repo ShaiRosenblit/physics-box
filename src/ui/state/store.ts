@@ -5,6 +5,8 @@ import {
   type Id,
   type MaterialName,
   type SceneName,
+  type Vec2,
+  type AnyBodySpec,
 } from "../../simulation";
 import type {
   GameMode,
@@ -255,6 +257,21 @@ export function isConnectorTool(
   return CONNECTOR_TOOLS.has(tool);
 }
 
+/** Metadata for a body placed by the player in puzzle mode. */
+export interface PlacedItemMeta {
+  /** Which tool was used to place this. */
+  tool: GameTool;
+  /** Whether this body should be fixed (static) when simulation runs. */
+  fixedWhenRunning: boolean;
+  /** Original body spec at the time of placement (for undo/restart). */
+  spec: AnyBodySpec;
+}
+
+/** Undo stack entry for reverting placement or removal. */
+export type UndoEntry =
+  | { kind: "place"; id: Id; tool: GameTool }
+  | { kind: "remove"; spec: AnyBodySpec; tool: GameTool; position: Vec2 };
+
 export interface UIState {
   tool: Tool;
   selectedId: Id | null;
@@ -293,6 +310,10 @@ export interface UIState {
   placedByPlayer: Readonly<Record<number, GameTool>>;
   /** Tracked refs and goal zones from the active level setup. */
   levelHandles: LevelHandles | null;
+  /** Metadata for each placed body (fixed-when-running flag, original spec). */
+  placedItemMeta: Readonly<Record<number, PlacedItemMeta>>;
+  /** Undo stack for reversing placements/removals in puzzle design phase. */
+  undoStack: readonly UndoEntry[];
 
   setMode: (mode: GameMode) => void;
   setPhase: (phase: GamePhase) => void;
@@ -300,9 +321,17 @@ export interface UIState {
   setInventory: (inv: Partial<Record<GameTool, number>>) => void;
   setLevelHandles: (h: LevelHandles | null) => void;
   /** Returns true if the count was decremented; false if no inventory or empty. */
-  consumeInventory: (tool: GameTool, placedId: Id) => boolean;
+  consumeInventory: (tool: GameTool, placedId: Id, meta: PlacedItemMeta) => boolean;
   /** Restore inventory when a player-placed body is removed. */
   refundInventory: (placedId: Id) => void;
+  /** Clear all placed item metadata (used on level reset). */
+  clearPlacedItemMeta: () => void;
+  /** Clear undo stack. */
+  clearUndo: () => void;
+  /** Push an undo entry onto the stack. */
+  pushUndo: (entry: UndoEntry) => void;
+  /** Pop the last undo entry and return it. */
+  popUndo: () => UndoEntry | null;
 
   setTool: (tool: Tool) => void;
   setSelectedId: (id: Id | null) => void;
@@ -353,13 +382,15 @@ export const useUIStore = create<UIState>((set) => ({
   inventory: {},
   placedByPlayer: {},
   levelHandles: null,
+  placedItemMeta: {},
+  undoStack: [],
 
   setMode: (mode) => set({ mode }),
   setPhase: (phase) => set({ phase }),
   setCurrentLevelId: (currentLevelId) => set({ currentLevelId }),
   setInventory: (inventory) => set({ inventory }),
   setLevelHandles: (levelHandles) => set({ levelHandles }),
-  consumeInventory: (tool, placedId) => {
+  consumeInventory: (tool, placedId, meta) => {
     let consumed = false;
     set((s) => {
       const remaining = s.inventory[tool] ?? 0;
@@ -368,6 +399,7 @@ export const useUIStore = create<UIState>((set) => ({
       return {
         inventory: { ...s.inventory, [tool]: remaining - 1 },
         placedByPlayer: { ...s.placedByPlayer, [placedId]: tool },
+        placedItemMeta: { ...s.placedItemMeta, [placedId]: meta },
       };
     });
     return consumed;
@@ -378,14 +410,34 @@ export const useUIStore = create<UIState>((set) => ({
       if (!tool) return s;
       const next = { ...s.placedByPlayer };
       delete next[placedId];
+      const nextMeta = { ...s.placedItemMeta };
+      delete nextMeta[placedId];
       return {
         placedByPlayer: next,
+        placedItemMeta: nextMeta,
         inventory: {
           ...s.inventory,
           [tool]: (s.inventory[tool] ?? 0) + 1,
         },
       };
     }),
+
+  clearPlacedItemMeta: () => set({ placedItemMeta: {} }),
+  clearUndo: () => set({ undoStack: [] }),
+  pushUndo: (entry) =>
+    set((s) => ({
+      undoStack: [...s.undoStack.slice(-19), entry].slice(-20),
+    })),
+  popUndo: () => {
+    let popped: UndoEntry | null = null;
+    set((s) => {
+      if (s.undoStack.length === 0) return s;
+      const newStack = [...s.undoStack];
+      popped = newStack.pop() ?? null;
+      return { undoStack: newStack };
+    });
+    return popped;
+  },
 
   setTool: (tool) => set({ tool }),
   setSelectedId: (selectedId) => set({ selectedId }),

@@ -22,25 +22,25 @@ const TOOL_LABEL: Readonly<Record<GameTool, string>> = {
   bar: "Bar",
 };
 
+export interface LevelHudProps {
+  readonly onUndo?: () => void;
+}
+
 /**
  * Top-center heads-up display shown only in puzzle mode. Title + goal +
- * inventory chips. Stays invisible in sandbox mode so the existing UX
- * is unchanged.
+ * undo button. Inventory chips are now in the bottom tray. Stays invisible
+ * in sandbox mode so the existing UX is unchanged.
  */
-export function LevelHud() {
+export function LevelHud(props?: LevelHudProps) {
   const mode = useUIStore((s) => s.mode);
   const currentLevelId = useUIStore((s) => s.currentLevelId);
   const phase = useUIStore((s) => s.phase);
-  const inventory = useUIStore((s) => s.inventory);
+  const undoStack = useUIStore((s) => s.undoStack);
   const isPhone = useViewportMode() === "phone";
 
   if (mode !== "puzzle" || !currentLevelId) return null;
   const level = levelById[currentLevelId];
   if (!level) return null;
-
-  const inventoryEntries = Object.entries(inventory) as Array<
-    [GameTool, number]
-  >;
 
   return (
     <div
@@ -48,30 +48,26 @@ export function LevelHud() {
       style={isPhone ? hudPhoneStyle : hudStyle}
       aria-live="polite"
     >
-      <div style={isPhone ? titlePhoneStyle : titleStyle}>{level.title}</div>
-      {/* The goal is essential gameplay info, so it stays visible on every
-          viewport. On phone we use a thinner pill with a smaller font and
-          cap to two lines (with ellipsis for unusually long goals) so it
-          stays compact relative to the canvas. */}
-      <div style={isPhone ? goalPhoneStyle : goalStyle}>{level.goalText}</div>
-      {inventoryEntries.length > 0 && (
-        <div
-          style={isPhone ? inventoryRowPhoneStyle : inventoryRowStyle}
-          // Allow horizontal scroll on phone for many-item inventories
-          // without forcing them to wrap into 3+ lines.
-        >
-          {inventoryEntries.map(([tool, count]) => (
-            <span
-              key={tool}
-              style={count > 0 ? chipStyle : chipEmptyStyle}
-              data-testid={`inventory-${tool}`}
-            >
-              <span>{TOOL_LABEL[tool]}</span>
-              <span style={chipCountStyle}>×{count}</span>
-            </span>
-          ))}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={isPhone ? titlePhoneStyle : titleStyle}>{level.title}</div>
+          {/* The goal is essential gameplay info, so it stays visible on every
+              viewport. On phone we use a thinner pill with a smaller font and
+              cap to two lines (with ellipsis for unusually long goals) so it
+              stays compact relative to the canvas. */}
+          <div style={isPhone ? goalPhoneStyle : goalStyle}>{level.goalText}</div>
         </div>
-      )}
+        {phase === "design" && undoStack.length > 0 && (
+          <button
+            onClick={props?.onUndo}
+            style={undoButtonStyle}
+            aria-label="Undo"
+            title="Undo last placement"
+          >
+            ↩
+          </button>
+        )}
+      </div>
       {phase === "design" && !isPhone && (
         <div style={hintStyle}>
           Place your parts, then press <strong>Run</strong>.
@@ -148,18 +144,6 @@ const titlePhoneStyle: React.CSSProperties = {
   maxWidth: "100%",
 };
 
-const inventoryRowPhoneStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 4,
-  marginTop: 0,
-  // Inventory chips can scroll horizontally on phone — beats wrapping into
-  // a multi-line block that eats canvas height when a level has many tools.
-  maxWidth: "100%",
-  overflowX: "auto",
-  WebkitOverflowScrolling: "touch",
-  pointerEvents: "auto",
-  paddingBottom: 2,
-};
 
 const goalStyle: React.CSSProperties = {
   fontFamily: "var(--display-font)",
@@ -194,44 +178,20 @@ const goalPhoneStyle: React.CSSProperties = {
   wordBreak: "break-word",
 };
 
-const inventoryRowStyle: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  justifyContent: "center",
-  gap: 6,
-  marginTop: 2,
-};
-
-const chipBase: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "3px 10px",
-  borderRadius: 999,
-  fontSize: 12,
-  fontFamily: "var(--display-font)",
-  fontWeight: 600,
-  border: "1px solid #d8cfbe",
-  flexShrink: 0,
-  whiteSpace: "nowrap",
-};
-
-const chipStyle: React.CSSProperties = {
-  ...chipBase,
+const undoButtonStyle: React.CSSProperties = {
+  appearance: "none",
   background: "#f5efe6",
+  border: "1px solid #d8cfbe",
+  borderRadius: 6,
+  padding: "4px 10px",
+  fontSize: 16,
+  fontWeight: 600,
   color: "#2a2520",
-};
-
-const chipEmptyStyle: React.CSSProperties = {
-  ...chipBase,
-  background: "#eae2d5",
-  color: "#9a9189",
-  textDecoration: "line-through",
-};
-
-const chipCountStyle: React.CSSProperties = {
-  fontVariantNumeric: "tabular-nums",
-  opacity: 0.85,
+  cursor: "pointer",
+  flexShrink: 0,
+  transition: "background 120ms ease-out",
+  minWidth: 40,
+  textAlign: "center",
 };
 
 const hintStyle: React.CSSProperties = {
