@@ -38,6 +38,9 @@ const fieldStyle: CSSProperties = {
   flexDirection: "column",
   gap: 2,
   alignItems: "stretch",
+  // Keep natural width inside the phone's horizontally-scrolling row so
+  // each field doesn't squish to its minimum. No-op on desktop wrap.
+  flexShrink: 0,
 };
 
 const ropeSpringHintStyle: CSSProperties = {
@@ -77,10 +80,10 @@ export function ConnectorToolOptions({
 
   const phoneVars: CSSProperties = isPhone
     ? ({
-        ["--pb-ctrl-h" as string]: "36px",
-        ["--pb-ctrl-fs" as string]: "16px",
-        ["--pb-ctrl-min" as string]: "72px",
-        ["--pb-ctrl-pad" as string]: "0 8px",
+        ["--pb-ctrl-h" as string]: "30px",
+        ["--pb-ctrl-fs" as string]: "14px",
+        ["--pb-ctrl-min" as string]: "60px",
+        ["--pb-ctrl-pad" as string]: "0 6px",
       } as CSSProperties)
     : {};
 
@@ -90,31 +93,33 @@ export function ConnectorToolOptions({
       aria-label="Connector options for the active tool"
       style={{
         flexShrink: 0,
-        padding: isPhone ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : "6px 10px",
+        padding: isPhone
+          ? "6px 10px calc(6px + env(safe-area-inset-bottom))"
+          : "6px 10px",
         background: ui.paperShade,
         borderTop: dock === "bottom" ? `1px solid ${ui.rule}` : undefined,
         borderBottom: dock === "top" ? `1px solid ${ui.rule}` : undefined,
         display: "flex",
-        flexWrap: "wrap",
-        gap: isPhone ? "10px 12px" : "8px 14px",
+        // Phone: single horizontally-scrolling row to keep canvas height.
+        flexWrap: isPhone ? "nowrap" : "wrap",
+        overflowX: isPhone ? "auto" : undefined,
+        WebkitOverflowScrolling: isPhone ? "touch" : undefined,
+        gap: isPhone ? "0 10px" : "8px 14px",
         alignItems: "flex-end",
         ...phoneVars,
       }}
     >
-      <div style={{ ...labelStyle, flex: "1 0 100%", marginBottom: -4 }}>
-        Next link
-      </div>
+      {!isPhone && (
+        <div style={{ ...labelStyle, flex: "1 0 100%", marginBottom: -4 }}>
+          Next link
+        </div>
+      )}
 
       {(key === "rope" || key === "spring") && !isPhone && (
         <div style={ropeSpringHintStyle}>
           Tap twice: empty space or any body. On a body, the attachment uses
           exactly where you tapped — click the crank pin to pull a load in a
           straight line as the wheel turns (belt motor → hinge crank → rope).
-        </div>
-      )}
-      {(key === "rope" || key === "spring") && isPhone && (
-        <div style={{ ...ropeSpringHintStyle, fontSize: 12 }}>
-          Tap twice — empty space or any body — to anchor each end.
         </div>
       )}
 

@@ -20,10 +20,9 @@ import { layout, ui } from "../style/tokens";
 
 const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt", "latex"];
 
-// Sizing vars — overridden on phone (see panel root) so inputs grow large
-// enough for fingers and stay above 16px (Mobile Safari auto-zooms the
-// page when focus lands on smaller inputs, which was a major source of
-// the "I have to zoom out" complaint on phone).
+// Sizing vars — overridden on phone (see panel root). The viewport meta
+// pins maximum-scale=1, so we no longer need 16px-floor inputs to stop
+// iOS auto-zooming on focus; phone controls can stay compact.
 const inputStyle: CSSProperties = {
   height: "var(--pb-ctrl-h, 26px)",
   minWidth: "var(--pb-ctrl-min, 56px)",
@@ -48,6 +47,9 @@ const fieldStyle: CSSProperties = {
   flexDirection: "column",
   gap: 2,
   alignItems: "stretch",
+  // Keep natural width inside the phone's horizontally-scrolling row so
+  // each field doesn't squish to its minimum. No-op on desktop wrap.
+  flexShrink: 0,
 };
 
 const spawnToggleLabelStyle: CSSProperties = {
@@ -57,6 +59,8 @@ const spawnToggleLabelStyle: CSSProperties = {
   fontSize: 11,
   color: ui.inkPrimary,
   cursor: "pointer",
+  flexShrink: 0,
+  whiteSpace: "nowrap",
 };
 
 function SpawnFixedToggle(props: {
@@ -104,10 +108,10 @@ export function SpawnToolOptions({ dock = "top" }: SpawnToolOptionsProps = {}) {
 
   const phoneVars: CSSProperties = isPhone
     ? ({
-        ["--pb-ctrl-h" as string]: "36px",
-        ["--pb-ctrl-fs" as string]: "16px",
-        ["--pb-ctrl-min" as string]: "72px",
-        ["--pb-ctrl-pad" as string]: "0 8px",
+        ["--pb-ctrl-h" as string]: "30px",
+        ["--pb-ctrl-fs" as string]: "14px",
+        ["--pb-ctrl-min" as string]: "60px",
+        ["--pb-ctrl-pad" as string]: "0 6px",
       } as CSSProperties)
     : {};
 
@@ -117,20 +121,30 @@ export function SpawnToolOptions({ dock = "top" }: SpawnToolOptionsProps = {}) {
       aria-label="Spawn options for the active tool"
       style={{
         flexShrink: 0,
-        padding: isPhone ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : "6px 10px",
+        padding: isPhone
+          ? "6px 10px calc(6px + env(safe-area-inset-bottom))"
+          : "6px 10px",
         background: ui.paperShade,
         borderTop: dock === "bottom" ? `1px solid ${ui.rule}` : undefined,
         borderBottom: dock === "top" ? `1px solid ${ui.rule}` : undefined,
         display: "flex",
-        flexWrap: "wrap",
-        gap: isPhone ? "10px 12px" : "8px 14px",
+        // Phone: a single row that scrolls horizontally, so the panel
+        // takes only one row's worth of canvas height. Desktop / tablet
+        // keep the wrapping multi-row layout where horizontal space is
+        // not the limiting factor.
+        flexWrap: isPhone ? "nowrap" : "wrap",
+        overflowX: isPhone ? "auto" : undefined,
+        WebkitOverflowScrolling: isPhone ? "touch" : undefined,
+        gap: isPhone ? "0 10px" : "8px 14px",
         alignItems: "flex-end",
         ...phoneVars,
       }}
     >
-      <div style={{ ...labelStyle, flex: "1 0 100%", marginBottom: -4 }}>
-        Next placement
-      </div>
+      {!isPhone && (
+        <div style={{ ...labelStyle, flex: "1 0 100%", marginBottom: -4 }}>
+          Next placement
+        </div>
+      )}
       {mode === "ball" && (
         <BallFields
           preset={spawnPresets.ball}
@@ -446,15 +460,7 @@ function CrankFields(props: {
           }}
         />
       </div>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          fontSize: 11,
-          color: ui.inkPrimary,
-        }}
-      >
+      <label style={spawnToggleLabelStyle}>
         <input
           type="checkbox"
           checked={props.preset.collideDynamicBalls}
@@ -550,16 +556,7 @@ function BallFields(props: {
           }}
         />
       </div>
-      <label
-        style={{
-          display: "flex",
-          gap: 6,
-          alignItems: "center",
-          fontSize: 11,
-          color: ui.inkPrimary,
-          cursor: "pointer",
-        }}
-      >
+      <label style={spawnToggleLabelStyle}>
         <input
           aria-label="Collide with other dynamic balls"
           type="checkbox"
@@ -693,16 +690,7 @@ function BalloonFields(props: {
           }}
         />
       </div>
-      <label
-        style={{
-          display: "flex",
-          gap: 6,
-          alignItems: "center",
-          fontSize: 11,
-          color: ui.inkPrimary,
-          cursor: "pointer",
-        }}
-      >
+      <label style={spawnToggleLabelStyle}>
         <input
           aria-label="Collide with other dynamic balls"
           type="checkbox"
