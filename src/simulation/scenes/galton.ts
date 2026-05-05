@@ -138,6 +138,9 @@ export function galton(world: World): void {
   // ── Chimney walls ─────────────────────────────────────────────────────────
   // Start above the first peg's top edge so the walls don't intersect the peg.
   // Inner half-width clears the maximum marble lateral offset (hopperHalfX + r).
+  // Walls are frictionless: with high marble friction (needed for peg grip) and
+  // 100 marbles stacked above, even modest wall friction lets the column "arch"
+  // and hang on the walls instead of feeding through the chimney bottom.
   const chimneyInnerHalfW = hopperHalfX + dropBallRadius + 0.02;
   const chimneyWallW = 0.12;
   const chimneyBottom = pegArenaTop + pegRadius + dropBallRadius * 2 + 0.05;
@@ -153,6 +156,7 @@ export function galton(world: World): void {
       fixed: true,
       material: "metal",
       fixtureRestitution: 0,
+      fixtureFriction: 0,
     }),
   );
   world.add(
@@ -163,6 +167,7 @@ export function galton(world: World): void {
       fixed: true,
       material: "metal",
       fixtureRestitution: 0,
+      fixtureFriction: 0,
     }),
   );
 
