@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { MaterialName } from "../../simulation";
 import { testIds } from "../a11y/ids";
+import { useViewportMode } from "../hooks/useViewportMode";
 import {
   useUIStore,
   type ConnectorPresetKey,
@@ -14,14 +15,14 @@ const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt"];
 const ROPE_SEGMENTS_MIN = 2;
 
 const inputStyle: CSSProperties = {
-  height: layout.controlHeight,
-  minWidth: 56,
-  padding: "0 6px",
+  height: "var(--pb-ctrl-h, 26px)",
+  minWidth: "var(--pb-ctrl-min, 56px)",
+  padding: "var(--pb-ctrl-pad, 0 6px)",
   borderRadius: layout.controlRadius,
   border: `${layout.controlBorder}px solid ${ui.rule}`,
   background: ui.paper,
   color: ui.inkPrimary,
-  fontSize: 12,
+  fontSize: "var(--pb-ctrl-fs, 12px)",
   fontVariantNumeric: "tabular-nums",
 };
 
@@ -49,11 +50,20 @@ const ropeSpringHintStyle: CSSProperties = {
   maxWidth: 560,
 };
 
+export interface ConnectorToolOptionsProps {
+  /** Where the panel is anchored relative to the canvas — flips the divider. */
+  dock?: "top" | "bottom";
+}
+
 /** Compact controls for rope / spring / pulley placement (before second click commits). */
-export function ConnectorToolOptions() {
+export function ConnectorToolOptions({
+  dock = "top",
+}: ConnectorToolOptionsProps = {}) {
   const tool = useUIStore((s) => s.tool);
   const presets = useUIStore((s) => s.connectorPresets);
   const setPreset = useUIStore((s) => s.setConnectorPresetPartial);
+  const viewportMode = useViewportMode();
+  const isPhone = viewportMode === "phone";
   const key = connectorEligiblePresetTool(tool);
 
   if (key === null) return null;
@@ -65,30 +75,46 @@ export function ConnectorToolOptions() {
     setPreset(k, partial);
   };
 
+  const phoneVars: CSSProperties = isPhone
+    ? ({
+        ["--pb-ctrl-h" as string]: "36px",
+        ["--pb-ctrl-fs" as string]: "16px",
+        ["--pb-ctrl-min" as string]: "72px",
+        ["--pb-ctrl-pad" as string]: "0 8px",
+      } as CSSProperties)
+    : {};
+
   return (
     <div
       data-testid={testIds.connectorToolOptions}
       aria-label="Connector options for the active tool"
       style={{
         flexShrink: 0,
-        padding: "6px 10px",
+        padding: isPhone ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : "6px 10px",
         background: ui.paperShade,
-        borderBottom: `1px solid ${ui.rule}`,
+        borderTop: dock === "bottom" ? `1px solid ${ui.rule}` : undefined,
+        borderBottom: dock === "top" ? `1px solid ${ui.rule}` : undefined,
         display: "flex",
         flexWrap: "wrap",
-        gap: "8px 14px",
+        gap: isPhone ? "10px 12px" : "8px 14px",
         alignItems: "flex-end",
+        ...phoneVars,
       }}
     >
       <div style={{ ...labelStyle, flex: "1 0 100%", marginBottom: -4 }}>
         Next link
       </div>
 
-      {(key === "rope" || key === "spring") && (
+      {(key === "rope" || key === "spring") && !isPhone && (
         <div style={ropeSpringHintStyle}>
           Tap twice: empty space or any body. On a body, the attachment uses
           exactly where you tapped — click the crank pin to pull a load in a
           straight line as the wheel turns (belt motor → hinge crank → rope).
+        </div>
+      )}
+      {(key === "rope" || key === "spring") && isPhone && (
+        <div style={{ ...ropeSpringHintStyle, fontSize: 12 }}>
+          Tap twice — empty space or any body — to anchor each end.
         </div>
       )}
 

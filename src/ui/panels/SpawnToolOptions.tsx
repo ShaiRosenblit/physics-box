@@ -3,6 +3,7 @@ import type { MaterialName } from "../../simulation";
 import { activeSpawnModeFromTool } from "../canvas/usePointerGestures";
 import { testIds } from "../a11y/ids";
 import { useSimulationContext } from "../hooks/SimulationContext";
+import { useViewportMode } from "../hooks/useViewportMode";
 import {
   useUIStore,
   type BalloonSpawnPreset,
@@ -19,15 +20,19 @@ import { layout, ui } from "../style/tokens";
 
 const MATERIALS: MaterialName[] = ["wood", "metal", "cork", "felt", "latex"];
 
+// Sizing vars — overridden on phone (see panel root) so inputs grow large
+// enough for fingers and stay above 16px (Mobile Safari auto-zooms the
+// page when focus lands on smaller inputs, which was a major source of
+// the "I have to zoom out" complaint on phone).
 const inputStyle: CSSProperties = {
-  height: layout.controlHeight,
-  minWidth: 56,
-  padding: "0 6px",
+  height: "var(--pb-ctrl-h, 26px)",
+  minWidth: "var(--pb-ctrl-min, 56px)",
+  padding: "var(--pb-ctrl-pad, 0 6px)",
   borderRadius: layout.controlRadius,
   border: `${layout.controlBorder}px solid ${ui.rule}`,
   background: ui.paper,
   color: ui.inkPrimary,
-  fontSize: 12,
+  fontSize: "var(--pb-ctrl-fs, 12px)",
   fontVariantNumeric: "tabular-nums",
 };
 
@@ -71,11 +76,18 @@ function SpawnFixedToggle(props: {
   );
 }
 
+export interface SpawnToolOptionsProps {
+  /** Where the panel is anchored relative to the canvas — flips the divider. */
+  dock?: "top" | "bottom";
+}
+
 /** Compact controls for the active spawn tool ("recipe" before placement). */
-export function SpawnToolOptions() {
+export function SpawnToolOptions({ dock = "top" }: SpawnToolOptionsProps = {}) {
   const tool = useUIStore((s) => s.tool);
   const spawnPresets = useUIStore((s) => s.spawnPresets);
   const setSpawnPresetPartial = useUIStore((s) => s.setSpawnPresetPartial);
+  const viewportMode = useViewportMode();
+  const isPhone = viewportMode === "phone";
 
   const mode = activeSpawnModeFromTool(tool);
   const { maxCharge, maxDipole, maxBuoyancyLift, maxMotorTorque, maxRpm } =
@@ -90,19 +102,30 @@ export function SpawnToolOptions() {
     setSpawnPresetPartial(k, partial);
   };
 
+  const phoneVars: CSSProperties = isPhone
+    ? ({
+        ["--pb-ctrl-h" as string]: "36px",
+        ["--pb-ctrl-fs" as string]: "16px",
+        ["--pb-ctrl-min" as string]: "72px",
+        ["--pb-ctrl-pad" as string]: "0 8px",
+      } as CSSProperties)
+    : {};
+
   return (
     <div
       data-testid={testIds.spawnToolOptions}
       aria-label="Spawn options for the active tool"
       style={{
         flexShrink: 0,
-        padding: "6px 10px",
+        padding: isPhone ? "10px 12px calc(10px + env(safe-area-inset-bottom))" : "6px 10px",
         background: ui.paperShade,
-        borderBottom: `1px solid ${ui.rule}`,
+        borderTop: dock === "bottom" ? `1px solid ${ui.rule}` : undefined,
+        borderBottom: dock === "top" ? `1px solid ${ui.rule}` : undefined,
         display: "flex",
         flexWrap: "wrap",
-        gap: "8px 14px",
+        gap: isPhone ? "10px 12px" : "8px 14px",
         alignItems: "flex-end",
+        ...phoneVars,
       }}
     >
       <div style={{ ...labelStyle, flex: "1 0 100%", marginBottom: -4 }}>

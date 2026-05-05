@@ -50,7 +50,12 @@ export function Drawer(props: DrawerProps) {
           left: 0,
           right: 0,
           bottom: 0,
-          maxHeight: props.size ? `${props.size}px` : "60vh",
+          // Always cap to ~70vh so the drawer never crowds out the canvas
+          // on short phones (iPhone SE, landscape) — even when a generous
+          // `size` is requested.
+          maxHeight: props.size
+            ? `min(${props.size}px, 70vh)`
+            : "60vh",
           borderTop: "1px solid #d8cfbe",
           borderTopLeftRadius: 14,
           borderTopRightRadius: 14,

@@ -614,8 +614,13 @@ export function App() {
           {isDesktop && <Toolbar variant="panel" />}
 
           <main style={canvasColumn}>
-            <SpawnToolOptions />
-            <ConnectorToolOptions />
+            {/* Tool option panels dock under the toolbar on tablet/desktop
+                so they sit out of the way; on phone we move them BELOW the
+                canvas (above the playback bar) so they don't fight the
+                LevelHud / FABs at the top edge and they land near the
+                user's thumb. */}
+            {!isPhone && <SpawnToolOptions />}
+            {!isPhone && <ConnectorToolOptions />}
             <div style={canvasStage}>
             <div
               ref={hostRef}
@@ -694,6 +699,8 @@ export function App() {
               </Drawer>
             )}
             </div>
+            {isPhone && <SpawnToolOptions dock="bottom" />}
+            {isPhone && <ConnectorToolOptions dock="bottom" />}
           </main>
 
           {isDesktop && <Inspector variant="panel" />}
@@ -747,12 +754,18 @@ export function App() {
                 border: "1px solid #d8cfbe",
                 background: "#f5efe6",
                 color: "#2a2520",
-                padding: isPhone ? "6px 8px" : "3px 8px",
-                borderRadius: isPhone ? 4 : 3,
+                padding: isPhone ? "0 10px" : "3px 8px",
+                borderRadius: isPhone ? 6 : 3,
                 font: "inherit",
-                fontSize: 12,
+                // ≥16px on phone so iOS Safari does not auto-zoom on focus.
+                fontSize: isPhone ? 16 : 12,
+                height: isPhone ? 36 : undefined,
                 cursor: "pointer",
                 minWidth: isPhone ? 92 : 108,
+                // Picker can hold the full level title — but stop it from
+                // ballooning past row 1 width.
+                maxWidth: isPhone ? "60%" : undefined,
+                textOverflow: "ellipsis",
               }}
             >
               {levels.map((lv) => (

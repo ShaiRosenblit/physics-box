@@ -921,6 +921,11 @@ const sheetStyle: CSSProperties = {
   color: ui.inkPrimary,
   height: "100%",
   overflowY: "auto",
+  // Phone uses the sheet — switch all inputs/selects to finger-sized,
+  // ≥16px font (iOS auto-zoom guard).
+  ["--pb-ctrl-h" as string]: "36px",
+  ["--pb-ctrl-fs" as string]: "16px",
+  ["--pb-ctrl-pad" as string]: "0 8px",
 };
 
 const railStyle: CSSProperties = {
@@ -1027,13 +1032,15 @@ const editLabelStyle: CSSProperties = {
 const inspectorControlStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  height: layout.controlHeight,
-  padding: "0 6px",
+  // Phone: bigger inputs (var override below) and ≥16px font so iOS Safari
+  // doesn't auto-zoom the page on focus.
+  height: "var(--pb-ctrl-h, 26px)",
+  padding: "var(--pb-ctrl-pad, 0 6px)",
   borderRadius: layout.controlRadius,
   border: `${layout.controlBorder}px solid ${ui.rule}`,
   background: ui.paper,
   color: ui.inkPrimary,
-  fontSize: 11,
+  fontSize: "var(--pb-ctrl-fs, 11px)",
   fontVariantNumeric: "tabular-nums",
 };
 
@@ -1055,13 +1062,13 @@ const inspectorRemoveSectionStyle: CSSProperties = {
 const inspectorRemoveButtonStyle: CSSProperties = {
   alignSelf: "stretch",
   width: "100%",
-  height: layout.controlHeight,
+  height: "var(--pb-ctrl-h, 26px)",
   padding: "0 8px",
   borderRadius: layout.controlRadius,
   border: `${layout.controlBorder}px solid ${ui.rule}`,
   background: ui.paper,
   color: ui.chargeNeg,
-  fontSize: 11,
+  fontSize: "var(--pb-ctrl-fs, 11px)",
   fontWeight: 500,
   cursor: "pointer",
 };

@@ -359,8 +359,11 @@ const sceneSelectStyle: React.CSSProperties = {
 
 const sceneSelectCompactStyle: React.CSSProperties = {
   minWidth: 92,
-  padding: "6px 8px",
-  borderRadius: 4,
+  height: 36,
+  padding: "0 10px",
+  borderRadius: 6,
+  // ≥16px so iOS Safari does not auto-zoom on focus.
+  fontSize: 16,
 };
 
 const gravityToggleStyle: React.CSSProperties = {
