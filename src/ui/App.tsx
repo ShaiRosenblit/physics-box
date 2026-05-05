@@ -20,7 +20,9 @@ import {
   spring,
   worldAnchor,
   type Anchor,
+  type BodySpec,
   type BodyView,
+  type Id,
   type Snapshot,
   type Vec2,
   type World,
@@ -58,7 +60,6 @@ import {
   levels,
   type GameMode,
   type GameTool,
-  type PaletteItem,
 } from "../game";
 import { LevelHud } from "../game/ui/LevelHud";
 import { ModeToggle } from "../game/ui/ModeToggle";
@@ -316,7 +317,7 @@ export function App() {
     // Re-add saved placed items as dynamic (for design phase)
     for (const saved of savedPlacements) {
       const presets = s.spawnPresets;
-      let newId: import("../simulation").Id | null = null;
+      let newId: Id | null = null;
 
       if (saved.tool === "ball") {
         const p = presets.ball;
@@ -504,7 +505,7 @@ export function App() {
         // Apply fixed property to player-placed items before running
         for (const [idStr, meta] of Object.entries(s.placedItemMeta)) {
           if (meta.fixedWhenRunning) {
-            sim.world.patchBody(Number(idStr), { fixed: true });
+            sim.world.patchBody(Number(idStr) as Id, { fixed: true });
           }
         }
         s.setPhase("running");
@@ -568,7 +569,7 @@ export function App() {
     const screenX = clientX - canvasRect.left;
     const screenY = clientY - canvasRect.top;
     const worldPoint = camera.screenToWorld(screenX, screenY);
-    handleSpawn(tool, worldPoint);
+    handleSpawn(tool as SpawnMode, worldPoint);
   };
 
   const handleUndo = () => {
@@ -580,18 +581,18 @@ export function App() {
       setSelectedId(null);
     } else if (entry.kind === "remove") {
       // Re-spawn at saved position
-      handleSpawn(entry.tool, entry.position);
+      handleSpawn(entry.tool as SpawnMode, entry.position);
     }
   };
 
-  const handleReturnToTray = (id: import("../simulation").Id) => {
+  const handleReturnToTray = (id: Id) => {
     sim.remove(id);
     useUIStore.getState().refundInventory(id);
     setSelectedId(null);
   };
 
   /** Helper: record placement metadata and consume inventory. */
-  const recordPlacement = (tool: GameTool, placedId: import("../simulation").Id) => {
+  const recordPlacement = (tool: GameTool, placedId: Id) => {
     const s = useUIStore.getState();
     if (s.mode !== "puzzle") return;
 
@@ -612,7 +613,7 @@ export function App() {
     const meta = {
       tool,
       fixedWhenRunning,
-      spec: body as unknown as import("../../simulation").AnyBodySpec,
+      spec: body as unknown as BodySpec,
     };
     s.consumeInventory(tool, placedId, meta);
     s.pushUndo({ kind: "place", id: placedId, tool });
@@ -630,7 +631,7 @@ export function App() {
     // In puzzle design phase, always spawn as dynamic (draggable).
     // They'll be converted to static on Play if marked fixed-when-running.
     const inPuzzleDesign = s.mode === "puzzle" && s.phase === "design";
-    let placedId: import("../simulation").Id | null = null;
+    let placedId: Id | null = null;
     if (kind === "ball") {
       const p = presets.ball;
       placedId = sim.add(
@@ -759,7 +760,7 @@ export function App() {
     }
     const presets = s.connectorPresets;
     const snapCommit = sim.world.snapshot();
-    let constraintId: import("../simulation").Id | null = null;
+    let constraintId: Id | null = null;
     if (tool === "belt") {
       if (a.kind !== "body" || b.kind !== "body") return;
       if (a.id === b.id) return;
@@ -821,7 +822,7 @@ export function App() {
       );
     }
     if (constraintId !== null && s.mode === "puzzle") {
-      consumeInventory(tool as GameTool, constraintId);
+      consumeInventory(tool as GameTool, constraintId, { tool: tool as GameTool, fixedWhenRunning: false });
     }
   };
 
@@ -853,7 +854,7 @@ export function App() {
         ratio: pp.ratio,
       }),
     );
-    if (s.mode === "puzzle") consumeInventory("pulley", constraintId);
+    if (s.mode === "puzzle") consumeInventory("pulley", constraintId, { tool: "pulley", fixedWhenRunning: false });
   };
 
   const handleConnectorPendingChange = (pending: ConnectorPending | null) => {

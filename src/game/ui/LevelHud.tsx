@@ -1,26 +1,6 @@
 import { levelById } from "../levels";
 import { useUIStore } from "../../ui/state/store";
 import { useViewportMode } from "../../ui/hooks/useViewportMode";
-import type { GameTool } from "../types";
-
-const TOOL_LABEL: Readonly<Record<GameTool, string>> = {
-  ball: "Ball",
-  balloon: "Balloon",
-  box: "Box",
-  crank: "Crank",
-  "ball+": "Ball (+)",
-  "ball-": "Ball (−)",
-  "magnet+": "Magnet N",
-  "magnet-": "Magnet S",
-  "engine+": "Engine CCW",
-  "engine-": "Engine CW",
-  rope: "Rope",
-  hinge: "Hinge",
-  spring: "Spring",
-  pulley: "Pulley",
-  belt: "Belt",
-  bar: "Bar",
-};
 
 export interface LevelHudProps {
   readonly onUndo?: () => void;

@@ -77,6 +77,10 @@ export interface PointerGestureCallbacks {
   readonly onSelect: (id: Id | null) => void;
   /** Optional: notified when a body drag starts/ends so the UI can react. */
   readonly onDragStateChange?: (active: boolean) => void;
+  /** Optional: called when a dragged body is released above the tray area; should remove + refund it. */
+  readonly onReturnToTray?: (id: Id) => void;
+  /** Optional: returns the screen Y of the tray top edge, used to detect return-to-tray drops. */
+  readonly getTrayBottom?: () => number;
 }
 
 function isConnectorTool(tool: string): ConnectorTool | null {

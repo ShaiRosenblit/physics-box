@@ -6,7 +6,7 @@ import {
   type MaterialName,
   type SceneName,
   type Vec2,
-  type AnyBodySpec,
+  type BodySpec,
 } from "../../simulation";
 import type {
   GameMode,
@@ -264,14 +264,14 @@ export interface PlacedItemMeta {
   tool: GameTool;
   /** Whether this body should be fixed (static) when simulation runs. */
   fixedWhenRunning: boolean;
-  /** Original body spec at the time of placement (for undo/restart). */
-  spec: AnyBodySpec;
+  /** Original body spec at the time of placement (for undo/restart). Only set for body tools, not connector tools. */
+  spec?: BodySpec;
 }
 
 /** Undo stack entry for reverting placement or removal. */
 export type UndoEntry =
   | { kind: "place"; id: Id; tool: GameTool }
-  | { kind: "remove"; spec: AnyBodySpec; tool: GameTool; position: Vec2 };
+  | { kind: "remove"; spec: BodySpec; tool: GameTool; position: Vec2 };
 
 export interface UIState {
   tool: Tool;
