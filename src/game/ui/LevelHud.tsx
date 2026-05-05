@@ -49,11 +49,11 @@ export function LevelHud() {
       aria-live="polite"
     >
       <div style={isPhone ? titlePhoneStyle : titleStyle}>{level.title}</div>
-      {/* On phone we drop the long goal/hint text from the top HUD — it
-          stole 30-40 % of canvas height on small screens. The full goal
-          stays available in the level title (for context) and the design
-          phase hint is implicit in the visible Play button. */}
-      {!isPhone && <div style={goalStyle}>{level.goalText}</div>}
+      {/* The goal is essential gameplay info, so it stays visible on every
+          viewport. On phone we use a thinner pill with a smaller font and
+          cap to two lines (with ellipsis for unusually long goals) so it
+          stays compact relative to the canvas. */}
+      <div style={isPhone ? goalPhoneStyle : goalStyle}>{level.goalText}</div>
       {inventoryEntries.length > 0 && (
         <div
           style={isPhone ? inventoryRowPhoneStyle : inventoryRowStyle}
@@ -124,8 +124,10 @@ const hudPhoneStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 4,
   zIndex: 12,
-  // Reserve room for both corner FABs (each ~56px from edge incl. gutter).
-  maxWidth: "calc(100% - 128px)",
+  // FAB inner edge sits at 56 px from the screen edge (12 gutter + 44 fab),
+  // so 60 px each side keeps a 4 px breathing gap. That leaves 200 px for
+  // the goal text on iPhone-SE (320), which is just enough for two lines.
+  maxWidth: "calc(100% - 120px)",
   textAlign: "center",
 };
 
@@ -168,6 +170,28 @@ const goalStyle: React.CSSProperties = {
   padding: "4px 14px",
   borderRadius: 999,
   border: "1px solid #d8cfbe",
+};
+
+// Phone goal pill — narrower padding, smaller font, capped at two lines.
+// `-webkit-line-clamp` gives us a graceful overflow story for any future
+// level whose goal text doesn't fit a single line on iPhone-SE width.
+const goalPhoneStyle: React.CSSProperties = {
+  fontFamily: "var(--display-font)",
+  fontSize: 11,
+  fontWeight: 500,
+  color: "#5a4f43",
+  background: "rgba(245, 239, 230, 0.85)",
+  padding: "3px 10px",
+  borderRadius: 12,
+  border: "1px solid #d8cfbe",
+  lineHeight: 1.3,
+  maxWidth: "100%",
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  wordBreak: "break-word",
 };
 
 const inventoryRowStyle: React.CSSProperties = {
