@@ -35,7 +35,7 @@ export function PuzzleTray(props: PuzzleTrayProps) {
   const trayRef = useRef<HTMLDivElement>(null);
 
   const inventoryEntries = Object.entries(inventory).filter(
-    ([, count]) => count > 0 || count === undefined,
+    ([, count]) => count > 0,
   ) as Array<[GameTool, number]>;
 
   const handleChipPointerDown = (tool: GameTool) => (e: React.PointerEvent) => {

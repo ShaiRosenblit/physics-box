@@ -255,7 +255,13 @@ export function App() {
     sim.world.reset();
     const handles = level.setupScene(sim.world);
     setLevelHandles(handles);
-    setInventory({ ...level.palette });
+    // Extract counts from palette items
+    const inv: Partial<Record<GameTool, number>> = {};
+    for (const [tool, item] of Object.entries(level.palette)) {
+      inv[tool as GameTool] =
+        typeof item === "object" && item !== null ? item.count : item;
+    }
+    setInventory(inv);
     setCurrentLevelId(id);
     setPhase("design");
     sim.pause();
