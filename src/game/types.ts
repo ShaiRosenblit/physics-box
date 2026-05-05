@@ -61,6 +61,17 @@ export interface Level {
   /** Tools the player may use, with counts. Tools omitted are unavailable. */
   readonly palette: Readonly<Partial<Record<GameTool, number>>>;
   readonly goal: Goal;
+  /**
+   * Optional world-space rectangle the camera should always frame.
+   * When omitted, the renderer falls back to fit-to-content from the
+   * level's bodies. When set, content outside the rectangle is hidden.
+   */
+  readonly viewBounds?: {
+    readonly minX: number;
+    readonly minY: number;
+    readonly maxX: number;
+    readonly maxY: number;
+  };
 }
 
 export type GameMode = "sandbox" | "puzzle";

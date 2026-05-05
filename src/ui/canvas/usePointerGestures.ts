@@ -44,7 +44,7 @@ export type ResolvedAnchor =
 export interface PointerGestureCallbacks {
   /** Active world reference; required for drag and field sampling. */
   readonly world: World;
-  /** Active camera; required for screen↔world conversion and pan/zoom. */
+  /** Active camera; required for screen↔world conversion. */
   readonly getCamera: () => Camera | null;
   /** Spawn callback invoked on tap when a spawn tool is active. */
   readonly onSpawn: (mode: SpawnMode, worldPoint: Vec2) => void;
@@ -75,11 +75,6 @@ export interface PointerGestureCallbacks {
   readonly onSelect: (id: Id | null) => void;
   /** Optional: notified when a body drag starts/ends so the UI can react. */
   readonly onDragStateChange?: (active: boolean) => void;
-  /** Optional: notified when the camera changes so the renderer can refresh. */
-  readonly onCameraChange?: () => void;
-  /** Optional zoom clamps. */
-  readonly minZoom?: number;
-  readonly maxZoom?: number;
 }
 
 function isConnectorTool(tool: string): ConnectorTool | null {
@@ -126,22 +121,12 @@ interface SingleState {
   lastX: number;
   lastY: number;
   totalMovement: number;
-  /** Current resolved mode: starts as "pending", upgrades on movement or commit. */
-  mode: "pending" | "drag-body" | "pan-camera";
+  /** Current resolved mode: starts as "pending", upgrades on first body-drag move. */
+  mode: "pending" | "drag-body";
   draggedId: Id | null;
-  panStartCenter: Vec2;
 }
 
-interface PinchState {
-  kind: "pinch";
-  ids: [number, number];
-  startDist: number;
-  startMid: PointerSample;
-  startZoom: number;
-  startCenter: Vec2;
-}
-
-type GestureState = SingleState | PinchState | null;
+type GestureState = SingleState | null;
 
 function isSpawnTool(tool: string): SpawnMode | null {
   if (
@@ -169,13 +154,11 @@ export function activeSpawnModeFromTool(tool: string): SpawnMode | null {
 /**
  * Centralized pointer-gesture handler for the canvas host.
  *
- * Owns multi-pointer state and emits semantic intents:
+ * The viewport is locked — there is no user pan or zoom. The supported
+ * gestures are:
  *   - 1 pointer on a body → drag the body via the kernel mouse joint.
- *   - 1 pointer on empty space → pan the camera (or spawn on tap).
- *   - 2 pointers → pinch zoom + pan around the gesture midpoint.
- *
- * Mouse wheel + middle/right drag are handled separately by
- * `CameraController` so desktop and touch don't fight for events.
+ *   - 1 pointer on empty space → tap (spawn / connector / deselect).
+ *   - 2+ pointers → cancels any in-flight gesture (no pinch zoom).
  */
 export function usePointerGestures(
   hostRef: React.RefObject<HTMLDivElement | null>,
@@ -216,47 +199,17 @@ export function usePointerGestures(
       return cam.screenToWorld(s.x, s.y);
     };
 
-    const distance = (a: PointerSample, b: PointerSample): number =>
-      Math.hypot(a.x - b.x, a.y - b.y);
-
-    const midpoint = (a: PointerSample, b: PointerSample): PointerSample => ({
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2,
-    });
-
     const cancelSingle = () => {
-      if (state?.kind === "single") {
-        if (state.mode === "drag-body") {
-          cbRef.current.world.endDrag();
-          cbRef.current.onDragStateChange?.(false);
-        }
-      }
-      state = null;
-    };
-
-    const beginPinch = () => {
-      const [ida, idb] = Array.from(pointers.keys()).slice(0, 2) as [number, number];
-      const a = pointers.get(ida)!;
-      const b = pointers.get(idb)!;
-      const cam = cbRef.current.getCamera();
-      if (!cam) return;
-      // If we were dragging or panning with one finger, end that gesture.
       if (state?.kind === "single" && state.mode === "drag-body") {
         cbRef.current.world.endDrag();
         cbRef.current.onDragStateChange?.(false);
       }
-      state = {
-        kind: "pinch",
-        ids: [ida, idb],
-        startDist: distance(a, b),
-        startMid: midpoint(a, b),
-        startZoom: cam.zoom,
-        startCenter: { ...cam.center },
-      };
+      state = null;
     };
 
     const onPointerDown = (e: PointerEvent) => {
-      // Mouse middle/right buttons are owned by CameraController.
+      // Only the primary mouse button starts a gesture; viewport is locked
+      // so middle/right have nothing to do.
       if (e.pointerType === "mouse" && e.button !== 0) return;
       const xy = localXY(e);
       pointers.set(e.pointerId, xy);
@@ -288,10 +241,8 @@ export function usePointerGestures(
             totalMovement: 0,
             mode: "drag-body",
             draggedId,
-            panStartCenter: { x: 0, y: 0 },
           };
         } else {
-          const cam = cbRef.current.getCamera();
           state = {
             kind: "single",
             pointerId: e.pointerId,
@@ -302,13 +253,10 @@ export function usePointerGestures(
             totalMovement: 0,
             mode: "pending",
             draggedId: null,
-            panStartCenter: cam ? { ...cam.center } : { x: 0, y: 0 },
           };
         }
-      } else if (pointers.size === 2) {
-        beginPinch();
       } else {
-        // 3+ pointers: ignore extra, but still cancel single gesture.
+        // 2+ pointers: viewport is locked, so cancel any single gesture.
         cancelSingle();
       }
       e.preventDefault();
@@ -319,74 +267,25 @@ export function usePointerGestures(
       const xy = localXY(e);
       pointers.set(e.pointerId, xy);
 
-      if (state?.kind === "pinch") {
-        const a = pointers.get(state.ids[0])!;
-        const b = pointers.get(state.ids[1])!;
-        const cam = cbRef.current.getCamera();
-        if (!cam) return;
-        const curDist = distance(a, b);
-        const curMid = midpoint(a, b);
-        const minZoom = cbRef.current.minZoom ?? 8;
-        const maxZoom = cbRef.current.maxZoom ?? 240;
-        const factor = curDist / Math.max(state.startDist, 1);
-        const nextZoom = Math.max(minZoom, Math.min(maxZoom, state.startZoom * factor));
-        cam.setZoom(nextZoom);
+      if (state?.kind !== "single" || state.pointerId !== e.pointerId) return;
+      const dx = xy.x - state.lastX;
+      const dy = xy.y - state.lastY;
+      state.totalMovement += Math.hypot(dx, dy);
+      state.lastX = xy.x;
+      state.lastY = xy.y;
 
-        // Pan: keep the world point under the start midpoint anchored to
-        // the current midpoint as the gesture moves.
-        const worldAtStartMid = {
-          x: state.startCenter.x + (state.startMid.x - host.clientWidth / 2) / state.startZoom,
-          y: state.startCenter.y - (state.startMid.y - host.clientHeight / 2) / state.startZoom,
-        };
-        cam.setCenter({
-          x: worldAtStartMid.x - (curMid.x - host.clientWidth / 2) / nextZoom,
-          y: worldAtStartMid.y + (curMid.y - host.clientHeight / 2) / nextZoom,
-        });
-        cbRef.current.onCameraChange?.();
+      if (state.mode === "drag-body") {
+        const w = screenToWorld(xy);
+        if (w) cbRef.current.world.updateDrag(w);
         return;
       }
 
-      if (state?.kind === "single" && state.pointerId === e.pointerId) {
-        const dx = xy.x - state.lastX;
-        const dy = xy.y - state.lastY;
-        state.totalMovement += Math.hypot(dx, dy);
-        state.lastX = xy.x;
-        state.lastY = xy.y;
-
-        if (state.mode === "drag-body") {
-          const w = screenToWorld(xy);
-          if (w) cbRef.current.world.updateDrag(w);
-          return;
-        }
-
-        if (state.mode === "pending") {
-          // Live preview for the connector being placed: emit the
-          // current world point so the renderer can redraw the ghost
-          // line from anchor A to the cursor.
-          if (pendingConnector) {
-            const w = screenToWorld(xy);
-            if (w) cbRef.current.onConnectorPreviewMove?.(w);
-          }
-          if (state.totalMovement > TAP_MOVEMENT_THRESHOLD) {
-            // Upgrade to camera pan.
-            state.mode = "pan-camera";
-          } else {
-            return;
-          }
-        }
-
-        if (state.mode === "pan-camera") {
-          const cam = cbRef.current.getCamera();
-          if (!cam) return;
-          const totalDx = xy.x - state.startX;
-          const totalDy = xy.y - state.startY;
-          const z = cam.zoom;
-          cam.setCenter({
-            x: state.panStartCenter.x - totalDx / z,
-            y: state.panStartCenter.y + totalDy / z,
-          });
-          cbRef.current.onCameraChange?.();
-        }
+      // pending: not on a body; only emit connector preview moves so the
+      // ghost line follows the finger. Viewport is locked, so we never
+      // upgrade to a pan.
+      if (pendingConnector) {
+        const w = screenToWorld(xy);
+        if (w) cbRef.current.onConnectorPreviewMove?.(w);
       }
     };
 
@@ -397,19 +296,14 @@ export function usePointerGestures(
         host.releasePointerCapture(e.pointerId);
       }
 
-      if (state?.kind === "pinch") {
-        if (pointers.size < 2) {
-          // Pinch ended; if one pointer remains, just drop into idle.
-          state = null;
-        }
-        return;
-      }
-
       if (state?.kind === "single" && state.pointerId === e.pointerId && xy) {
         if (state.mode === "drag-body") {
           cbRef.current.world.endDrag();
           cbRef.current.onDragStateChange?.(false);
-        } else if (state.mode === "pending") {
+        } else if (
+          state.mode === "pending" &&
+          state.totalMovement <= TAP_MOVEMENT_THRESHOLD
+        ) {
           // Tap. Spawn, place a connector anchor, or deselect.
           const tool = cbRef.current.getTool();
           const w = screenToWorld(xy);

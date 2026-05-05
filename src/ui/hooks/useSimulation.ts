@@ -8,12 +8,15 @@ import {
   type BodySpec,
   type ConstraintPatch,
   type Id,
+  type SceneInfo,
   type SceneName,
 } from "../../simulation";
 
 export interface SimulationApi {
   /** The owned World instance. Reference is stable across renders. */
   readonly world: World;
+  /** Metadata returned by the scene that was loaded on construction. */
+  readonly initialSceneInfo: SceneInfo;
   /** Latest tick observed by the hook. */
   readonly tick: number;
   /** Whether Planck world gravity uses the configured vector (otherwise zero). */
@@ -25,8 +28,11 @@ export interface SimulationApi {
   resume(): void;
   /** Advance one fixed substep regardless of pause state. */
   stepOnce(): void;
-  /** Reset the kernel and apply the named scene. Returns the loaded scene. */
-  loadScene(name: SceneName): SceneName;
+  /**
+   * Reset the kernel and apply the named scene. Returns whatever metadata
+   * the scene declared (e.g. `viewBounds`); `{}` if it returned nothing.
+   */
+  loadScene(name: SceneName): SceneInfo;
   setGravityEnabled(enabled: boolean): void;
   /** Clamp to `playbackTimeScaleMin`…`playbackTimeScaleMax`; persists across scene load. */
   setTimeScale(multiplier: number): void;
@@ -44,9 +50,10 @@ export interface SimulationApi {
  */
 export function useSimulation(initialScene: SceneName): SimulationApi {
   const worldRef = useRef<World | null>(null);
+  const initialInfoRef = useRef<SceneInfo>({});
   if (worldRef.current === null) {
     const w = new World({ ...defaultConfig, timeScale: playbackTimeScale });
-    scenes[initialScene](w);
+    initialInfoRef.current = scenes[initialScene](w) ?? {};
     worldRef.current = w;
   }
   const world = worldRef.current;
@@ -70,11 +77,11 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
     setTick(world.tick);
   }, [world]);
   const loadScene = useCallback(
-    (name: SceneName) => {
+    (name: SceneName): SceneInfo => {
       world.reset();
-      scenes[name](world);
+      const info = scenes[name](world) ?? {};
       setTick(0);
-      return name;
+      return info;
     },
     [world],
   );
@@ -110,6 +117,7 @@ export function useSimulation(initialScene: SceneName): SimulationApi {
 
   return {
     world,
+    initialSceneInfo: initialInfoRef.current,
     tick,
     gravityEnabled,
     add,

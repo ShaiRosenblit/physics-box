@@ -121,4 +121,4 @@ export {
   random,
   welcome,
 } from "./scenes";
-export type { SceneFn, SceneName } from "./scenes";
+export type { SceneFn, SceneInfo, SceneName } from "./scenes";

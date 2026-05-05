@@ -8,7 +8,21 @@ import { newtonsCradle } from "./newtonsCradle";
 import { random } from "./random";
 import { welcome } from "./welcome";
 
-export type SceneFn = (world: World) => void;
+/**
+ * Optional metadata a scene may return. When `viewBounds` is set the
+ * camera is locked to that world-space rectangle for the lifetime of
+ * the scene; otherwise the renderer falls back to fit-to-content.
+ */
+export interface SceneInfo {
+  readonly viewBounds?: {
+    readonly minX: number;
+    readonly minY: number;
+    readonly maxX: number;
+    readonly maxY: number;
+  };
+}
+
+export type SceneFn = (world: World) => SceneInfo | void;
 export type SceneName =
   | "empty"
   | "welcome"

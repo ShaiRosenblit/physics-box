@@ -158,8 +158,13 @@ export function App() {
     renderer.attach(host).then(() => {
       if (cancelled) return;
       renderer.setShowGrid(useUIStore.getState().showGrid);
-      // Fit camera when bodies exist (empty scenes keep the default framing).
-      renderer.fitToContent(sim.world.snapshot());
+      // Honor any view bounds the initial scene declared; otherwise fit
+      // to the bodies it added (empty scenes keep the default framing).
+      const initBounds = sim.initialSceneInfo.viewBounds ?? null;
+      renderer.setViewBounds(initBounds);
+      if (!initBounds) {
+        renderer.fitToContent(sim.world.snapshot());
+      }
       last = performance.now();
       raf = requestAnimationFrame(loop);
     });
@@ -257,7 +262,9 @@ export function App() {
     setTool("select");
     rendererRef.current?.setGoalZones(handles.goalZones);
     setAirDensity(sim.world.config.fluidDensity);
-    rendererRef.current?.fitToContent(sim.world.snapshot());
+    const bounds = level.viewBounds ?? null;
+    rendererRef.current?.setViewBounds(bounds);
+    if (!bounds) rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
   const enterSandboxMode = () => {
@@ -268,12 +275,14 @@ export function App() {
     setPhase("design");
     rendererRef.current?.reset();
     rendererRef.current?.setGoalZones([]);
-    sim.loadScene(scene);
+    const info = sim.loadScene(scene);
     sim.resume();
     setRunning(true);
     setSelectedId(null);
     setAirDensity(sim.world.config.fluidDensity);
-    rendererRef.current?.fitToContent(sim.world.snapshot());
+    const bounds = info.viewBounds ?? null;
+    rendererRef.current?.setViewBounds(bounds);
+    if (!bounds) rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
   const handleModeChange = (next: GameMode) => {
@@ -317,21 +326,25 @@ export function App() {
       return;
     }
     rendererRef.current?.reset();
-    sim.loadScene(s.scene);
+    const info = sim.loadScene(s.scene);
     setSelectedId(null);
     setRunning(true);
     setAirDensity(sim.world.config.fluidDensity);
-    rendererRef.current?.fitToContent(sim.world.snapshot());
+    const bounds = info.viewBounds ?? null;
+    rendererRef.current?.setViewBounds(bounds);
+    if (!bounds) rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
   const onSceneChange = (name: SceneName) => {
     setScene(name);
     if (gameMode === "puzzle") return; // scene picker is hidden in puzzle mode
     rendererRef.current?.reset();
-    sim.loadScene(name);
+    const info = sim.loadScene(name);
     setSelectedId(null);
     setAirDensity(sim.world.config.fluidDensity);
-    rendererRef.current?.fitToContent(sim.world.snapshot());
+    const bounds = info.viewBounds ?? null;
+    rendererRef.current?.setViewBounds(bounds);
+    if (!bounds) rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
   const onFitView = () => {

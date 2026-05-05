@@ -1,4 +1,4 @@
-import { Application, Container } from "pixi.js";
+import { Application, Container, Graphics } from "pixi.js";
 import {
   defaultConfig,
   type Id,
@@ -6,7 +6,6 @@ import {
   type Snapshot,
 } from "../simulation";
 import { Camera } from "./camera/Camera";
-import { CameraController } from "./camera/CameraController";
 import { BodyLayer, SelectionView } from "./scene/BodyView";
 import { loadRenderTextures } from "./loadRenderTextures";
 import {
@@ -22,11 +21,25 @@ import type { GoalZone } from "../game/types";
 
 const GEOM_REFRESH_LOG_THRESHOLD = 0.4;
 
+/** Inclusive world-space rectangle the camera should always frame. */
+export interface ViewBounds {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+}
+
 export interface RendererOptions {
   readonly background?: number;
   readonly antialias?: boolean;
   readonly resolution?: number;
 }
+
+const VIEW_BOUNDS_FIT = {
+  paddingFraction: 0,
+  minZoom: 0.5,
+  maxZoom: 4000,
+} as const;
 
 /**
  * The Pixi-backed renderer.
@@ -44,6 +57,7 @@ export interface RendererOptions {
 export class Renderer {
   private app: Application | null = null;
   private worldRoot = new Container();
+  private letterbox = new Graphics();
   private grid = new Grid();
   private goalZoneView = new GoalZoneView();
   private bodyLayer: BodyLayer;
@@ -52,9 +66,16 @@ export class Renderer {
   private selectionView: SelectionView;
   private connectorPreview: ConnectorPreviewView;
   private _camera = new Camera();
-  private _controller = new CameraController();
   private _lastSnapshot: Snapshot | null = null;
-  private _pendingFit: { paddingFraction: number } | null = null;
+  private _pendingFit:
+    | { kind: "content"; paddingFraction: number }
+    | { kind: "bounds"; bounds: ViewBounds }
+    | null = null;
+  private _viewBounds: ViewBounds | null = null;
+  private _lastContentFit: {
+    bounds: ViewBounds;
+    paddingFraction: number;
+  } | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private _initPromise: Promise<void> | null = null;
   private _ready = false;
@@ -91,15 +112,24 @@ export class Renderer {
   }
 
   /**
-   * Frame the snapshot's bodies inside the canvas with margin. Safe to
-   * call before `attach()` resolves; the request is queued and runs on
-   * the first render once the canvas is sized.
+   * Frame the snapshot's bodies inside the canvas with margin. When the
+   * scene has declared explicit `viewBounds`, those win and content is
+   * not re-framed (the viewport stays locked to the scene-declared rect).
+   *
+   * Safe to call before `attach()` resolves; the request is queued and
+   * runs on the first render once the canvas is sized.
    */
   fitToContent(snapshot: Snapshot, paddingFraction = 0.12): void {
+    if (this._viewBounds) {
+      // Scene declared an explicit view rectangle — that's the framing,
+      // regardless of body layout.
+      return;
+    }
     const bounds = computeBounds(snapshot);
     if (!bounds) return;
+    this._lastContentFit = { bounds, paddingFraction };
     if (this._camera.canvasSize.width <= 0 || this._camera.canvasSize.height <= 0) {
-      this._pendingFit = { paddingFraction };
+      this._pendingFit = { kind: "content", paddingFraction };
       return;
     }
     this._camera.fit(bounds, { paddingFraction });
@@ -108,11 +138,38 @@ export class Renderer {
     if (this.app) {
       this._camera.apply(this.worldRoot);
       this.grid.update(this._camera);
+      this.updateLetterbox();
     }
   }
 
-  get controller(): CameraController {
-    return this._controller;
+  /**
+   * Lock the camera to the given world-space rectangle. While set, the
+   * camera ignores `fitToContent` and re-fits to these bounds on resize
+   * so the rectangle is always exactly framed. Pass `null` to clear and
+   * fall back to fit-to-content.
+   *
+   * Content outside the rectangle is masked with the canvas background
+   * so it never bleeds into the visible area on a non-matching aspect
+   * ratio.
+   */
+  setViewBounds(bounds: ViewBounds | null): void {
+    this._viewBounds = bounds ? { ...bounds } : null;
+    this._lastFieldTick = -1;
+    if (!bounds) {
+      this.updateLetterbox();
+      return;
+    }
+    if (this._camera.canvasSize.width <= 0 || this._camera.canvasSize.height <= 0) {
+      this._pendingFit = { kind: "bounds", bounds: { ...bounds } };
+      return;
+    }
+    this._camera.fit(bounds, VIEW_BOUNDS_FIT);
+    this._geomDirty = true;
+    if (this.app) {
+      this._camera.apply(this.worldRoot);
+      this.grid.update(this._camera);
+      this.updateLetterbox();
+    }
   }
 
   setShowGrid(visible: boolean): void {
@@ -137,6 +194,7 @@ export class Renderer {
     this.connectorPreview.clear();
     this._lastFieldTick = -1;
     this._lastSnapshot = null;
+    this._lastContentFit = null;
   }
 
   get camera(): Camera {
@@ -192,18 +250,21 @@ export class Renderer {
         this.worldRoot.addChild(this.constraintLayer.inFrontOfBodies);
         this.worldRoot.addChild(this.selectionView.node);
         this.worldRoot.addChild(this.connectorPreview.node);
+        // Letterbox lives on the stage (screen space) so it covers any
+        // pixels outside scene-declared view bounds with the paper color.
+        app.stage.addChild(this.letterbox);
 
         this._camera.setCanvas(app.renderer.width, app.renderer.height);
+        if (this._viewBounds) {
+          this._camera.fit(this._viewBounds, VIEW_BOUNDS_FIT);
+        }
         this._camera.apply(this.worldRoot);
         this.grid.update(this._camera);
+        this.updateLetterbox();
         this._lastGeomZoom = this._camera.zoom;
 
         this.resizeObserver = new ResizeObserver(() => this.handleResize());
         this.resizeObserver.observe(host);
-
-        this._controller.attach(host, this._camera, () => {
-          this._geomDirty = true;
-        });
 
         this._ready = true;
       });
@@ -216,14 +277,29 @@ export class Renderer {
     if (!this.app) return;
     this._lastSnapshot = snapshot;
 
-    if (this._pendingFit) {
-      const bounds = computeBounds(snapshot);
-      if (bounds && this._camera.canvasSize.width > 0) {
-        this._camera.fit(bounds, {
-          paddingFraction: this._pendingFit.paddingFraction,
-        });
+    if (this._pendingFit && this._camera.canvasSize.width > 0) {
+      if (this._pendingFit.kind === "bounds") {
+        this._camera.fit(this._pendingFit.bounds, VIEW_BOUNDS_FIT);
         this._geomDirty = true;
         this._lastFieldTick = -1;
+        this._pendingFit = null;
+      } else if (!this._viewBounds) {
+        const bounds = computeBounds(snapshot);
+        if (bounds) {
+          this._lastContentFit = {
+            bounds,
+            paddingFraction: this._pendingFit.paddingFraction,
+          };
+          this._camera.fit(bounds, {
+            paddingFraction: this._pendingFit.paddingFraction,
+          });
+          this._geomDirty = true;
+          this._lastFieldTick = -1;
+          this._pendingFit = null;
+        }
+      } else {
+        // viewBounds was set after a content-fit was queued; the bounds
+        // win, drop the queued fit.
         this._pendingFit = null;
       }
     }
@@ -231,6 +307,7 @@ export class Renderer {
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
     this.goalZoneView.update(this._camera);
+    this.updateLetterbox();
 
     if (
       this._geomDirty &&
@@ -276,12 +353,12 @@ export class Renderer {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
-    this._controller.detach();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.bodyLayer.clear();
     this.constraintLayer.clear();
     this.connectorPreview.clear();
+    this.letterbox.clear();
 
     if (this._ready && this.app) {
       this.destroyApp(this.app);
@@ -304,8 +381,49 @@ export class Renderer {
   private handleResize(): void {
     if (!this.app) return;
     this._camera.setCanvas(this.app.renderer.width, this.app.renderer.height);
+    // The viewport is locked, so on resize we re-frame whatever the
+    // active fit policy is (explicit view bounds or last content fit).
+    if (this._viewBounds) {
+      this._camera.fit(this._viewBounds, VIEW_BOUNDS_FIT);
+      this._geomDirty = true;
+    } else if (this._lastContentFit) {
+      this._camera.fit(this._lastContentFit.bounds, {
+        paddingFraction: this._lastContentFit.paddingFraction,
+      });
+      this._geomDirty = true;
+    }
     this._camera.apply(this.worldRoot);
     this.grid.update(this._camera);
+    this.updateLetterbox();
+  }
+
+  /**
+   * Paint paper-colored bands over any pixels outside the active view
+   * rectangle so off-bounds content never bleeds through. With no
+   * `viewBounds` set, the letterbox is empty.
+   */
+  private updateLetterbox(): void {
+    const g = this.letterbox;
+    g.clear();
+    if (!this._viewBounds) return;
+    const { width, height } = this._camera.canvasSize;
+    if (width <= 0 || height <= 0) return;
+
+    const tl = this._camera.worldToScreen(this._viewBounds.minX, this._viewBounds.maxY);
+    const br = this._camera.worldToScreen(this._viewBounds.maxX, this._viewBounds.minY);
+    const left = Math.max(0, Math.min(width, tl.x));
+    const right = Math.max(0, Math.min(width, br.x));
+    const top = Math.max(0, Math.min(height, tl.y));
+    const bottom = Math.max(0, Math.min(height, br.y));
+
+    const paint = (x: number, y: number, w: number, h: number) => {
+      if (w <= 0 || h <= 0) return;
+      g.rect(x, y, w, h).fill({ color: palette.paper });
+    };
+    paint(0, 0, width, top);
+    paint(0, bottom, width, height - bottom);
+    paint(0, top, left, bottom - top);
+    paint(right, top, width - right, bottom - top);
   }
 }
 
