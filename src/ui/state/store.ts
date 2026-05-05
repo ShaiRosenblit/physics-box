@@ -14,6 +14,7 @@ import type {
   GameTool,
   LevelHandles,
 } from "../../game/types";
+import { defaultLevelId } from "../../game";
 
 export type Tool =
   | "select"
@@ -376,9 +377,9 @@ export const useUIStore = create<UIState>((set) => ({
   spawnPresets: createDefaultSpawnPresets(),
   connectorPresets: createDefaultConnectorPresets(),
 
-  mode: "sandbox",
+  mode: "puzzle",
   phase: "design",
-  currentLevelId: null,
+  currentLevelId: defaultLevelId,
   inventory: {},
   placedByPlayer: {},
   levelHandles: null,
