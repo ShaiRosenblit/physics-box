@@ -7,7 +7,14 @@ import {
 } from "pixi.js";
 import type { BodyView, Id, Snapshot } from "../../simulation";
 import { drawApproxCircle } from "../approxCircle";
-import { materialStyles, opacity, palette, stroke } from "../style/palette";
+import {
+  materialStyles,
+  opacity,
+  palette,
+  stroke,
+  themes,
+  type RenderTheme,
+} from "../style/palette";
 
 /** PNG-driven body looks; optional until `BodyLayer.setRasterTextures` runs. */
 export interface RasterBodyTextures {
@@ -81,7 +88,10 @@ export class BodyLayer {
   private readonly entries = new Map<Id, BodyEntry>();
   private rasterTextures: RasterBodyTextures = {};
 
-  constructor(private readonly cameraZoomGetter: () => number) {}
+  constructor(
+    private readonly cameraZoomGetter: () => number,
+    private readonly themeGetter: () => RenderTheme = () => "workshop",
+  ) {}
 
   /**
    * Enables PNG materials for wood boxes (non-fixed) and wood balls.
@@ -93,10 +103,11 @@ export class BodyLayer {
 
   reconcile(snapshot: Snapshot): void {
     const seen = new Set<Id>();
+    const theme = this.themeGetter();
 
     for (const body of snapshot.bodies) {
       seen.add(body.id);
-      const styleKey = bodyStyleKey(body, this.rasterTextures);
+      const styleKey = bodyStyleKey(body, this.rasterTextures, theme);
       let entry = this.entries.get(body.id);
       if (!entry || entry.styleKey !== styleKey) {
         if (entry) {
@@ -107,6 +118,7 @@ export class BodyLayer {
           body,
           this.cameraZoomGetter(),
           this.rasterTextures,
+          theme,
         );
         this.node.addChild(node);
         entry = { node, styleKey };
@@ -188,7 +200,11 @@ function woodBoxUseNineSlice(
   return true;
 }
 
-function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
+function bodyStyleKey(
+  body: BodyView,
+  raster: RasterBodyTextures,
+  theme: RenderTheme,
+): string {
   const sign = signOf(body.charge);
   const dSign =
     body.kind === "magnet" || body.kind === "electromagnet"
@@ -198,9 +214,13 @@ function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
     body.kind === "engine" || body.kind === "engine_rotor"
       ? signOf(body.rpm)
       : 0;
+  // Cartoon mode bypasses workshop raster textures — bodies render as
+  // procedural cartoon stickers regardless of material.
+  const useRaster = theme === "workshop";
   const woodBox =
-    body.kind === "box" && woodBoxUseNineSlice(body, raster);
+    useRaster && body.kind === "box" && woodBoxUseNineSlice(body, raster);
   const woodBall =
+    useRaster &&
     body.kind === "ball" &&
     body.material === "wood" &&
     raster.woodBall !== undefined;
@@ -213,22 +233,26 @@ function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
       : body.kind === "electromagnet" || body.kind === "fan"
         ? body.enabled ? "E" : "e"
         : "-";
-  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}:${crank}:${onState}:${bodyGeometryKey(body)}`;
+  const themeTag = theme === "cartoon" ? "C" : "W";
+  return `${themeTag}:${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}:${crank}:${onState}:${bodyGeometryKey(body)}`;
 }
 
 function createBodyNode(
   body: BodyView,
   cameraZoom: number,
   raster: RasterBodyTextures,
+  theme: RenderTheme,
 ): Container {
-  if (body.kind === "box" && woodBoxUseNineSlice(body, raster)) {
-    return wrapRasterWoodBox(body, cameraZoom, raster.woodBox!);
-  }
-  if (body.kind === "ball" && body.material === "wood" && raster.woodBall) {
-    return wrapRasterWoodBall(body, cameraZoom, raster.woodBall);
+  if (theme === "workshop") {
+    if (body.kind === "box" && woodBoxUseNineSlice(body, raster)) {
+      return wrapRasterWoodBox(body, cameraZoom, raster.woodBox!);
+    }
+    if (body.kind === "ball" && body.material === "wood" && raster.woodBall) {
+      return wrapRasterWoodBall(body, cameraZoom, raster.woodBall);
+    }
   }
 
-  const g = buildProceduralBody(body, cameraZoom);
+  const g = buildProceduralBody(body, cameraZoom, theme);
   const c = new Container();
   c.addChild(g);
   return c;
@@ -318,6 +342,7 @@ function wrapRasterWoodBall(
     body.radius,
     lineWidth,
     cameraZoom,
+    "workshop",
   );
 
   c.addChild(shadow, spr, clip, edge, orient, chargeOverlay);
@@ -330,21 +355,23 @@ function drawEngineHousing(
   lineWidth: number,
   style: { fill: number; edge: number },
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
+  const t = themes[theme];
   const hw = body.width / 2;
   const hh = body.height / 2;
   g.rect(-hw, -hh - 0.04, body.width, body.height);
-  g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow * 0.9 });
+  g.fill({ color: t.pal.inkPrimary, alpha: t.shadowAlpha * 0.9 });
   g.rect(-hw, -hh, body.width, body.height);
   g.fill({ color: style.fill, alpha: 1 });
   g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
-  drawBoxGrain(g, body.material, hw, hh);
+  if (theme === "workshop") drawBoxGrain(g, body.material, hw, hh);
 
   const bore = Math.min(body.rotorRadius, hw, hh) * 1.02;
   drawApproxCircle(g, 0, 0, bore, cameraZoom);
   g.stroke({
     width: lineWidth * 0.65,
-    color: palette.inkMuted,
+    color: t.pal.inkMuted,
     alpha: 0.42,
   });
 
@@ -355,7 +382,7 @@ function drawEngineHousing(
   g.lineTo(hw, tab);
   g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.65 });
 
-  drawChargeMark(g, body.charge, Math.min(hw, hh), lineWidth, cameraZoom);
+  drawChargeMark(g, body.charge, Math.min(hw, hh), lineWidth, cameraZoom, theme);
 }
 
 function drawEngineRotor(
@@ -364,16 +391,18 @@ function drawEngineRotor(
   lineWidth: number,
   style: { fill: number; edge: number },
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
+  const t = themes[theme];
   drawApproxCircle(g, 0, -0.04, body.radius, cameraZoom);
-  g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+  g.fill({ color: t.pal.inkPrimary, alpha: t.shadowAlpha });
   drawApproxCircle(g, 0, 0, body.radius, cameraZoom);
   g.fill({ color: style.fill, alpha: 1 });
   g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
 
   const hubR = body.radius * 0.18;
   drawApproxCircle(g, 0, 0, hubR, cameraZoom);
-  g.fill({ color: palette.inkMuted, alpha: 0.35 });
+  g.fill({ color: t.pal.inkMuted, alpha: 0.35 });
   g.stroke({ width: lineWidth * 0.65, color: style.edge, alpha: 0.55 });
 
   const tickLen = body.radius * 0.55;
@@ -388,11 +417,11 @@ function drawEngineRotor(
   g.arc(0, 0, rr, a0, a1, !ccw);
   g.stroke({
     width: lineWidth * 0.7,
-    color: palette.inkMuted,
+    color: t.pal.inkMuted,
     alpha: 0.48,
   });
 
-  drawChargeMark(g, body.charge, body.radius, lineWidth, cameraZoom);
+  drawChargeMark(g, body.charge, body.radius, lineWidth, cameraZoom, theme);
 }
 
 function drawCrankWheel(
@@ -401,14 +430,16 @@ function drawCrankWheel(
   lineWidth: number,
   style: { fill: number; edge: number },
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
+  const t = themes[theme];
   const r = body.radius;
   drawApproxCircle(g, 0, -0.04, r, cameraZoom);
-  g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+  g.fill({ color: t.pal.inkPrimary, alpha: t.shadowAlpha });
   drawApproxCircle(g, 0, 0, r, cameraZoom);
   g.fill({ color: style.fill, alpha: 1 });
   g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
-  drawHighlight(g, body.material, r, "ball", cameraZoom);
+  drawHighlight(g, body.material, r, "ball", cameraZoom, theme);
   const px = body.pinLocal.x;
   const py = body.pinLocal.y;
   g.moveTo(0, 0);
@@ -416,44 +447,54 @@ function drawCrankWheel(
   g.stroke({ width: lineWidth * 0.75, color: style.edge, alpha: 0.5 });
   const pinR = Math.max(0.04, r * 0.12);
   drawApproxCircle(g, px, py, pinR, cameraZoom);
-  g.fill({ color: palette.inkMuted, alpha: 0.55 });
+  g.fill({ color: t.pal.inkMuted, alpha: 0.55 });
   g.stroke({ width: lineWidth * 0.65, color: style.edge, alpha: 0.75 });
-  drawChargeMark(g, body.charge, r, lineWidth, cameraZoom);
+  drawChargeMark(g, body.charge, r, lineWidth, cameraZoom, theme);
 }
 
-function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
+function buildProceduralBody(
+  body: BodyView,
+  cameraZoom: number,
+  theme: RenderTheme,
+): Graphics {
   const g = new Graphics();
-  const lineWidth = stroke.bodyOutline / cameraZoom;
+  const t = themes[theme];
+  const lineWidth = t.outlineWidth / cameraZoom;
   const style = body.fixed
-    ? { fill: palette.paperShade, edge: palette.inkMuted }
-    : materialStyles[body.material];
+    ? { fill: t.pal.paperShade, edge: t.pal.inkMuted }
+    : t.matStyles[body.material];
+  // Cartoon mode draws a bigger, more visible drop shadow below each body.
+  const shadowOffset = theme === "cartoon" ? -0.08 : -0.04;
 
   if (body.kind === "ball" || body.kind === "balloon") {
-    drawApproxCircle(g, 0, -0.04, body.radius, cameraZoom);
-    g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+    drawApproxCircle(g, 0, shadowOffset, body.radius, cameraZoom);
+    g.fill({ color: t.pal.inkPrimary, alpha: t.shadowAlpha });
     drawApproxCircle(g, 0, 0, body.radius, cameraZoom);
     const filmAlpha = body.kind === "balloon" ? 0.88 : 1;
     g.fill({ color: style.fill, alpha: filmAlpha });
-    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
-    drawHighlight(g, body.material, body.radius, body.kind, cameraZoom);
-    const tickLen = body.radius * 0.55;
-    g.moveTo(0, 0);
-    g.lineTo(tickLen, 0);
-    g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
-    drawChargeMark(g, body.charge, body.radius, lineWidth, cameraZoom);
+    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.95 });
+    drawHighlight(g, body.material, body.radius, body.kind, cameraZoom, theme);
+    if (theme === "workshop") {
+      // Orientation tick reads as "engineering" in cartoon mode.
+      const tickLen = body.radius * 0.55;
+      g.moveTo(0, 0);
+      g.lineTo(tickLen, 0);
+      g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.45 });
+    }
+    drawChargeMark(g, body.charge, body.radius, lineWidth, cameraZoom, theme);
   } else if (body.kind === "engine") {
-    drawEngineHousing(g, body, lineWidth, style, cameraZoom);
+    drawEngineHousing(g, body, lineWidth, style, cameraZoom, theme);
   } else if (body.kind === "engine_rotor") {
-    drawEngineRotor(g, body, lineWidth, style, cameraZoom);
+    drawEngineRotor(g, body, lineWidth, style, cameraZoom, theme);
   } else if (body.kind === "crank") {
-    drawCrankWheel(g, body, lineWidth, style, cameraZoom);
+    drawCrankWheel(g, body, lineWidth, style, cameraZoom, theme);
   } else if (body.kind === "magnet") {
-    drawApproxCircle(g, 0, -0.04, body.radius, cameraZoom);
-    g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
-    drawMagnet(g, body.radius, body.dipole, lineWidth, style, cameraZoom);
+    drawApproxCircle(g, 0, shadowOffset, body.radius, cameraZoom);
+    g.fill({ color: t.pal.inkPrimary, alpha: t.shadowAlpha });
+    drawMagnet(g, body.radius, body.dipole, lineWidth, style, cameraZoom, theme);
   } else if (body.kind === "electromagnet") {
-    drawApproxCircle(g, 0, -0.04, body.radius, cameraZoom);
-    g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+    drawApproxCircle(g, 0, shadowOffset, body.radius, cameraZoom);
+    g.fill({ color: t.pal.inkPrimary, alpha: t.shadowAlpha });
     drawElectromagnet(
       g,
       body.radius,
@@ -462,23 +503,39 @@ function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
       lineWidth,
       style,
       cameraZoom,
+      theme,
     );
   } else if (body.kind === "switch") {
-    drawSwitch(g, body, lineWidth, cameraZoom);
+    drawSwitch(g, body, lineWidth, cameraZoom, theme);
   } else if (body.kind === "fan") {
-    drawFan(g, body, lineWidth, style, cameraZoom);
+    drawFan(g, body, lineWidth, style, cameraZoom, theme);
   } else {
     const hw = body.width / 2;
     const hh = body.height / 2;
-    g.rect(-hw, -hh - 0.04, body.width, body.height);
-    g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow * 0.9 });
+    const boxShadowOffset = theme === "cartoon" ? 0.08 : 0.04;
+    g.rect(-hw, -hh - boxShadowOffset, body.width, body.height);
+    g.fill({ color: t.pal.inkPrimary, alpha: t.shadowAlpha * 0.9 });
     g.rect(-hw, -hh, body.width, body.height);
     g.fill({ color: style.fill, alpha: 1 });
-    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
-    drawBoxGrain(g, body.material, hw, hh);
+    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.95 });
+    if (theme === "workshop") {
+      drawBoxGrain(g, body.material, hw, hh);
+    } else {
+      drawBoxHighlightCartoon(g, hw, hh);
+    }
   }
 
   return g;
+}
+
+/** Top-left soft highlight for cartoon boxes — gives flat rectangles a hint
+ *  of dimensionality without faces or other personality. */
+function drawBoxHighlightCartoon(g: Graphics, hw: number, hh: number): void {
+  const inset = Math.min(hw, hh) * 0.18;
+  const w = hw * 0.6;
+  const h = hh * 0.18;
+  g.rect(-hw + inset, -hh + inset, w, h);
+  g.fill({ color: 0xfffae6, alpha: 0.55 });
 }
 
 /**
@@ -683,8 +740,19 @@ function drawHighlight(
   radius: number,
   bodyKind: BodyView["kind"],
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
   if (bodyKind === "balloon") return;
+  // Cartoon: strong, fixed-position top-left highlight on every body —
+  // that's the "toy / sticker" look. Workshop keeps its material-tuned
+  // subtle highlight.
+  if (theme === "cartoon") {
+    const offset = radius * 0.38;
+    const r = radius * 0.42;
+    drawApproxCircle(g, -offset, -offset, r, cameraZoom);
+    g.fill({ color: 0xfffae6, alpha: 0.6 });
+    return;
+  }
   const offset = radius * 0.32;
   const r = radius * 0.55;
   const alpha =
@@ -732,12 +800,14 @@ function drawElectromagnet(
   lineWidth: number,
   style: { fill: number; edge: number },
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
+  const t = themes[theme];
   if (enabled) {
-    drawMagnet(g, radius, dipole, lineWidth, style, cameraZoom);
+    drawMagnet(g, radius, dipole, lineWidth, style, cameraZoom, theme);
   } else {
     drawApproxCircle(g, 0, 0, radius, cameraZoom);
-    g.fill({ color: palette.paperShade, alpha: 0.85 });
+    g.fill({ color: t.pal.paperShade, alpha: 0.85 });
     g.stroke({ width: lineWidth, color: style.edge, alpha: 0.85 });
   }
   // Coil wraps: a few short tangential ticks indicate the wound copper.
@@ -763,13 +833,15 @@ function drawSwitch(
   body: Extract<BodyView, { kind: "switch" }>,
   lineWidth: number,
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
+  const t = themes[theme];
   const hw = body.width / 2;
   const hh = body.height / 2;
   // Base plate (chassis).
   g.rect(-hw, -hh, body.width, body.height);
-  g.fill({ color: palette.paperShade, alpha: 0.95 });
-  g.stroke({ width: lineWidth, color: palette.metalEdge, alpha: 0.9 });
+  g.fill({ color: t.pal.paperShade, alpha: 0.95 });
+  g.stroke({ width: lineWidth, color: t.pal.metalEdge, alpha: 0.9 });
   // Pad sits on top of plate; sinks slightly when pressed.
   const padInset = Math.min(hw, hh) * 0.15;
   const padHwidth = hw - padInset;
@@ -777,15 +849,15 @@ function drawSwitch(
   const padBaseOffset = body.pressed ? hh * 0.3 : 0;
   g.rect(-padHwidth, -padBaseOffset, padHwidth * 2, padTopOffset);
   g.fill({
-    color: body.pressed ? palette.metalEdge : palette.metal,
+    color: body.pressed ? t.pal.metalEdge : t.pal.metal,
     alpha: 0.92,
   });
-  g.stroke({ width: lineWidth, color: palette.metalEdge, alpha: 0.95 });
+  g.stroke({ width: lineWidth, color: t.pal.metalEdge, alpha: 0.95 });
   // Status pip.
   const pipR = Math.min(hw, hh) * 0.18;
   drawApproxCircle(g, 0, hh * 0.7, pipR, cameraZoom);
   g.fill({
-    color: body.pressed ? palette.fieldB : palette.inkMuted,
+    color: body.pressed ? t.pal.fieldB : t.pal.inkMuted,
     alpha: 0.95,
   });
 }
@@ -796,7 +868,9 @@ function drawFan(
   lineWidth: number,
   style: { fill: number; edge: number },
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
+  const t = themes[theme];
   const hw = body.width / 2;
   const hh = body.height / 2;
   // Housing.
@@ -806,7 +880,7 @@ function drawFan(
   // Hub at center.
   const hubR = Math.min(hw, hh) * 0.45;
   drawApproxCircle(g, 0, 0, hubR, cameraZoom);
-  g.fill({ color: palette.metal, alpha: 0.9 });
+  g.fill({ color: t.pal.metal, alpha: 0.9 });
   g.stroke({ width: lineWidth * 0.85, color: style.edge, alpha: 0.9 });
   // Three blades, drawn as short triangular tabs around the hub.
   for (let i = 0; i < 3; i++) {
@@ -822,7 +896,7 @@ function drawFan(
     g.lineTo(baseBx, baseBy);
     g.closePath();
     g.fill({
-      color: body.enabled ? palette.metalEdge : palette.inkMuted,
+      color: body.enabled ? t.pal.metalEdge : t.pal.inkMuted,
       alpha: body.enabled ? 0.9 : 0.5,
     });
   }
@@ -833,7 +907,7 @@ function drawFan(
   g.lineTo(mouthX, hh * 0.6);
   g.stroke({
     width: lineWidth * 1.1,
-    color: body.enabled ? palette.fieldB : palette.inkMuted,
+    color: body.enabled ? t.pal.fieldB : t.pal.inkMuted,
     alpha: body.enabled ? 0.95 : 0.55,
   });
 }
@@ -845,24 +919,26 @@ function drawMagnet(
   lineWidth: number,
   style: { fill: number; edge: number },
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
-  const north = dipole >= 0 ? palette.magnetN : palette.magnetS;
-  const south = dipole >= 0 ? palette.magnetS : palette.magnetN;
+  const t = themes[theme];
+  const north = dipole >= 0 ? t.pal.magnetN : t.pal.magnetS;
+  const south = dipole >= 0 ? t.pal.magnetS : t.pal.magnetN;
   const rr = radius * 0.78;
   drawApproxCircle(g, 0, 0, radius, cameraZoom);
   g.fill({ color: style.fill, alpha: 1 });
-  g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+  g.stroke({ width: lineWidth, color: style.edge, alpha: 0.95 });
   /* North along local +x (Planck); S on −x — matches moment direction. */
   g.beginPath();
   g.arc(0, 0, rr, -Math.PI / 2, Math.PI / 2, false);
   g.lineTo(0, -rr);
   g.closePath();
-  g.fill({ color: north, alpha: 0.9 });
+  g.fill({ color: north, alpha: theme === "cartoon" ? 1 : 0.9 });
   g.beginPath();
   g.arc(0, 0, rr, Math.PI / 2, -Math.PI / 2, false);
   g.lineTo(0, rr);
   g.closePath();
-  g.fill({ color: south, alpha: 0.9 });
+  g.fill({ color: south, alpha: theme === "cartoon" ? 1 : 0.9 });
   g.moveTo(0, -rr);
   g.lineTo(0, rr);
   g.stroke({ width: lineWidth * 0.8, color: style.edge, alpha: 0.6 });
@@ -874,9 +950,11 @@ function drawChargeMark(
   radius: number,
   lineWidth: number,
   cameraZoom: number,
+  theme: RenderTheme,
 ): void {
   if (charge === 0) return;
-  const color = charge > 0 ? palette.chargePos : palette.chargeNeg;
+  const t = themes[theme];
+  const color = charge > 0 ? t.pal.chargePos : t.pal.chargeNeg;
   drawApproxCircle(g, 0, 0, radius * 1.05, cameraZoom);
   g.stroke({ width: lineWidth * 1.2, color, alpha: 0.8 });
   const armLen = radius * 0.45;
