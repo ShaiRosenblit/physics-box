@@ -18,6 +18,7 @@ import { level21BumperBounce } from "./level21_bumperBounce";
 import { level22MagnetPush } from "./level22_magnetPush";
 import { level23WreckingBall } from "./level23_wreckingBall";
 import { level24Trampoline } from "./level24_trampoline";
+import { level90Tripwire } from "./level90_tripwire";
 
 export const levels: readonly Level[] = [
   level1DropInBucket,
@@ -39,6 +40,7 @@ export const levels: readonly Level[] = [
   level22MagnetPush,
   level23WreckingBall,
   level24Trampoline,
+  level90Tripwire,
 ];
 
 export const levelById: Readonly<Record<string, Level>> = Object.fromEntries(
@@ -67,4 +69,5 @@ export {
   level22MagnetPush,
   level23WreckingBall,
   level24Trampoline,
+  level90Tripwire,
 };
