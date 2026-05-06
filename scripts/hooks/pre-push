@@ -1,0 +1,12 @@
+#!/bin/sh
+# Runs before every `git push`. Mirrors the CI gate so broken deploys are
+# caught locally instead of in GitHub Actions.
+set -e
+
+echo "pre-push: running typecheck..."
+npm run typecheck
+
+echo "pre-push: running tests..."
+npm test
+
+echo "pre-push: checks passed."

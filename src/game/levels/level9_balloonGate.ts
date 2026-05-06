@@ -1,4 +1,4 @@
-import { ball, box, balloon, rope, worldAnchor, bodyAnchor } from "../../simulation";
+import { ball, box, rope, worldAnchor, bodyAnchor } from "../../simulation";
 import { addWorkshopEnclosure } from "../../simulation/scenes/workshopEnclosure";
 import type { Level, LevelHandles } from "../types";
 
