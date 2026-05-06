@@ -4,6 +4,7 @@ export interface BarInput {
   a: Anchor;
   b: Anchor;
   length: number;
+  breakForce?: number;
 }
 
 export function bar(input: BarInput): BarSpec {
@@ -15,5 +16,8 @@ export function bar(input: BarInput): BarSpec {
     a: input.a,
     b: input.b,
     length: input.length,
+    ...(input.breakForce !== undefined && input.breakForce > 0
+      ? { breakForce: input.breakForce }
+      : {}),
   };
 }

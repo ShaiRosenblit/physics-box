@@ -451,6 +451,7 @@ function computeBounds(
       body.kind === "ball" ||
       body.kind === "balloon" ||
       body.kind === "magnet" ||
+      body.kind === "electromagnet" ||
       body.kind === "engine_rotor" ||
       body.kind === "crank"
     ) {

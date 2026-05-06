@@ -6,6 +6,7 @@ export interface RopeInput {
   length: number;
   segments?: number;
   material?: MaterialName;
+  breakForce?: number;
 }
 
 export function rope(input: RopeInput): RopeSpec {
@@ -28,5 +29,8 @@ export function rope(input: RopeInput): RopeSpec {
     length: input.length,
     segments: input.segments,
     material: input.material ?? "wood",
+    ...(input.breakForce !== undefined && input.breakForce > 0
+      ? { breakForce: input.breakForce }
+      : {}),
   };
 }

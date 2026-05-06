@@ -12,7 +12,10 @@ export type BodyKind =
   | "crank"
   | "engine"
   | "engine_rotor"
-  | "magnet";
+  | "magnet"
+  | "switch"
+  | "electromagnet"
+  | "fan";
 
 export type MaterialName = "wood" | "metal" | "cork" | "felt" | "latex";
 
@@ -107,6 +110,54 @@ export interface MagnetSpec extends BaseBodySpec {
   readonly dipole: number;
 }
 
+/**
+ * Pressure plate. Solid rectangular static fixture with a `pressed` signal
+ * exposed in the snapshot whenever any dynamic body is in contact with it.
+ * Other bodies (electromagnet, fan) can subscribe to its state via
+ * `triggerBy`.
+ */
+export interface SwitchSpec extends BaseBodySpec {
+  readonly kind: "switch";
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Toggleable magnet. Behaves like a regular magnet whenever its effective
+ * `enabled` is true; otherwise its dipole is suppressed (no field, no
+ * forces). When `triggerBy` is set, `enabled` mirrors that switch's
+ * `pressed` state; otherwise `defaultEnabled` (default `true`) is used.
+ */
+export interface ElectromagnetSpec extends BaseBodySpec {
+  readonly kind: "electromagnet";
+  readonly radius: number;
+  readonly dipole: number;
+  readonly defaultEnabled?: boolean;
+  /** Switch body whose pressed state gates this magnet. Ignored when missing. */
+  readonly triggerBy?: Id;
+}
+
+/**
+ * Air jet. Static rectangular housing emitting a directional cone of force
+ * along its local +x axis. Affects every dynamic body whose center sits
+ * inside the cone, with strength fading linearly from `force` at the
+ * mouth to `0` at `range`. Effective state follows the same triggering
+ * convention as `electromagnet`.
+ */
+export interface FanSpec extends BaseBodySpec {
+  readonly kind: "fan";
+  readonly width: number;
+  readonly height: number;
+  /** Effective range of the wind cone (m). */
+  readonly range: number;
+  /** Half-angle of the cone (rad). */
+  readonly halfAngle: number;
+  /** Peak force at the fan mouth (N). */
+  readonly force: number;
+  readonly defaultEnabled?: boolean;
+  readonly triggerBy?: Id;
+}
+
 export type BodySpec =
   | BallSpec
   | BalloonSpec
@@ -114,7 +165,10 @@ export type BodySpec =
   | CrankSpec
   | EngineSpec
   | EngineRotorSpec
-  | MagnetSpec;
+  | MagnetSpec
+  | SwitchSpec
+  | ElectromagnetSpec
+  | FanSpec;
 
 /** Sparse mutation payload for patchBody — ignored keys stay unchanged. */
 export interface BodyPatch {
@@ -141,6 +195,11 @@ export interface BodyPatch {
   readonly rotorRadius?: number;
   /** Crank pin offset in body-local coordinates (m). */
   readonly pinLocal?: Vec2;
+  readonly defaultEnabled?: boolean;
+  readonly triggerBy?: Id | null;
+  readonly range?: number;
+  readonly halfAngle?: number;
+  readonly force?: number;
 }
 
 export interface BaseBodyView {
@@ -201,6 +260,38 @@ export interface MagnetView extends BaseBodyView {
   readonly dipole: number;
 }
 
+export interface SwitchView extends BaseBodyView {
+  readonly kind: "switch";
+  readonly width: number;
+  readonly height: number;
+  /** True while at least one dynamic body's contacts on the plate are touching. */
+  readonly pressed: boolean;
+}
+
+export interface ElectromagnetView extends BaseBodyView {
+  readonly kind: "electromagnet";
+  readonly radius: number;
+  /** Dipole magnitude as authored (independent of enabled state). */
+  readonly dipole: number;
+  /** Effective dipole used by the field solvers (`dipole` when enabled, else 0). */
+  readonly effectiveDipole: number;
+  readonly enabled: boolean;
+  readonly defaultEnabled: boolean;
+  readonly triggerBy: Id | null;
+}
+
+export interface FanView extends BaseBodyView {
+  readonly kind: "fan";
+  readonly width: number;
+  readonly height: number;
+  readonly range: number;
+  readonly halfAngle: number;
+  readonly force: number;
+  readonly enabled: boolean;
+  readonly defaultEnabled: boolean;
+  readonly triggerBy: Id | null;
+}
+
 export interface CrankView extends BaseBodyView {
   readonly kind: "crank";
   readonly radius: number;
@@ -215,13 +306,32 @@ export type BodyView =
   | CrankView
   | EngineHousingView
   | EngineRotorView
-  | MagnetView;
+  | MagnetView
+  | SwitchView
+  | ElectromagnetView
+  | FanView;
 
 export type Anchor =
   | { readonly kind: "world"; readonly point: Vec2 }
   | { readonly kind: "body"; readonly id: Id; readonly localPoint?: Vec2 };
 
-export type ConstraintKind = "rope" | "hinge" | "spring" | "pulley" | "belt" | "weld" | "bar";
+export type ConstraintKind =
+  | "rope"
+  | "hinge"
+  | "spring"
+  | "pulley"
+  | "belt"
+  | "weld"
+  | "bar"
+  | "slider";
+
+/**
+ * Universal break threshold attached to any joint that supports it. When
+ * the magnitude of the joint's reaction force exceeds `breakForce` for one
+ * solver step, the joint is destroyed and a `break` event is emitted.
+ * `0` or `undefined` means the joint is unbreakable.
+ */
+export type Breakable = { readonly breakForce?: number };
 
 export interface RopeSpec {
   readonly kind: "rope";
@@ -231,6 +341,7 @@ export interface RopeSpec {
   /** `0` = one rigid distance joint between endpoints; `undefined` = auto chain; else bead count ≥ 2. */
   readonly segments?: number;
   readonly material?: MaterialName;
+  readonly breakForce?: number;
 }
 
 export interface HingeSpec {
@@ -247,6 +358,7 @@ export interface SpringSpec {
   readonly restLength?: number;
   readonly frequencyHz?: number;
   readonly dampingRatio?: number;
+  readonly breakForce?: number;
 }
 
 /** Ideal pulley via Planck `PulleyJoint`: two dynamic bodies, fixed wheel axis in world space. */
@@ -279,6 +391,26 @@ export interface BarSpec {
   readonly a: Anchor;
   readonly b: Anchor;
   readonly length: number;
+  readonly breakForce?: number;
+}
+
+/**
+ * Linear slider: constrains a body to translate along a fixed world axis
+ * passing through `worldAnchor`. Uses Planck `PrismaticJoint`. The
+ * counterpart is the static ground unless `bodyB` is provided. `axis` is
+ * a direction vector in world space (unit length not required — it is
+ * normalized internally).
+ */
+export interface SliderSpec {
+  readonly kind: "slider";
+  readonly bodyA: Id;
+  readonly bodyB?: Id;
+  readonly worldAnchor: Vec2;
+  readonly axis: Vec2;
+  /** Optional translation limits along the axis (m). When omitted, motion is unbounded. */
+  readonly lowerLimit?: number;
+  readonly upperLimit?: number;
+  readonly breakForce?: number;
 }
 
 /**
@@ -292,6 +424,7 @@ export interface WeldSpec {
   readonly bodyB: Id;
   /** World-space point used as the anchor when the weld is created. */
   readonly worldAnchor: Vec2;
+  readonly breakForce?: number;
 }
 
 export type ConstraintSpec =
@@ -301,7 +434,8 @@ export type ConstraintSpec =
   | PulleySpec
   | BeltSpec
   | WeldSpec
-  | BarSpec;
+  | BarSpec
+  | SliderSpec;
 
 /** Sparse updates for patchConstraint — only fields valid for this kind apply. */
 export interface ConstraintPatch {
@@ -315,6 +449,10 @@ export interface ConstraintPatch {
   readonly halfSpread?: number;
   readonly ratio?: number;
   readonly barLength?: number;
+  readonly lowerLimit?: number;
+  readonly upperLimit?: number;
+  readonly axis?: Vec2;
+  readonly breakForce?: number;
 }
 
 export interface RopeView {
@@ -388,6 +526,19 @@ export interface BarView {
   readonly length: number;
 }
 
+export interface SliderView {
+  readonly id: Id;
+  readonly kind: "slider";
+  readonly bodyA: Id;
+  readonly bodyB?: Id;
+  readonly anchor: Vec2;
+  readonly axis: Vec2;
+  readonly lowerLimit?: number;
+  readonly upperLimit?: number;
+  /** Current bodyA anchor position in world space. */
+  readonly currentAnchor: Vec2;
+}
+
 export type ConstraintView =
   | RopeView
   | HingeView
@@ -395,7 +546,8 @@ export type ConstraintView =
   | PulleyView
   | BeltView
   | WeldView
-  | BarView;
+  | BarView
+  | SliderView;
 
 export interface ChargedSourceView {
   readonly id: Id;

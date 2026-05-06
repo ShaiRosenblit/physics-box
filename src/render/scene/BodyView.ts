@@ -152,9 +152,12 @@ function bodyGeometryKey(body: BodyView): string {
     case "ball":
     case "balloon":
     case "magnet":
+    case "electromagnet":
     case "engine_rotor":
       return `r${body.radius}`;
     case "box":
+    case "switch":
+    case "fan":
       return `${body.width}x${body.height}`;
     case "engine":
       return `${body.width}x${body.height}r${body.rotorRadius}`;
@@ -187,7 +190,10 @@ function woodBoxUseNineSlice(
 
 function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
   const sign = signOf(body.charge);
-  const dSign = body.kind === "magnet" ? signOf(body.dipole) : 0;
+  const dSign =
+    body.kind === "magnet" || body.kind === "electromagnet"
+      ? signOf(body.dipole)
+      : 0;
   const tSign =
     body.kind === "engine" || body.kind === "engine_rotor"
       ? signOf(body.rpm)
@@ -199,7 +205,15 @@ function bodyStyleKey(body: BodyView, raster: RasterBodyTextures): string {
     body.material === "wood" &&
     raster.woodBall !== undefined;
   const crank = body.kind === "crank" ? "C" : "-";
-  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}:${crank}:${bodyGeometryKey(body)}`;
+  // Switch press / electromagnet & fan enable state must trigger style updates
+  // so the visual reflects on/off transitions.
+  const onState =
+    body.kind === "switch"
+      ? body.pressed ? "P" : "p"
+      : body.kind === "electromagnet" || body.kind === "fan"
+        ? body.enabled ? "E" : "e"
+        : "-";
+  return `${body.kind}:${body.material}:${body.fixed ? "1" : "0"}:${sign}:${dSign}:${tSign}:${woodBox ? "Wb" : "-"}:${woodBall ? "Wl" : "-"}:${crank}:${onState}:${bodyGeometryKey(body)}`;
 }
 
 function createBodyNode(
@@ -437,6 +451,22 @@ function buildProceduralBody(body: BodyView, cameraZoom: number): Graphics {
     drawApproxCircle(g, 0, -0.04, body.radius, cameraZoom);
     g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
     drawMagnet(g, body.radius, body.dipole, lineWidth, style, cameraZoom);
+  } else if (body.kind === "electromagnet") {
+    drawApproxCircle(g, 0, -0.04, body.radius, cameraZoom);
+    g.fill({ color: palette.inkPrimary, alpha: opacity.bodyShadow });
+    drawElectromagnet(
+      g,
+      body.radius,
+      body.dipole,
+      body.enabled,
+      lineWidth,
+      style,
+      cameraZoom,
+    );
+  } else if (body.kind === "switch") {
+    drawSwitch(g, body, lineWidth, cameraZoom);
+  } else if (body.kind === "fan") {
+    drawFan(g, body, lineWidth, style, cameraZoom);
   } else {
     const hw = body.width / 2;
     const hh = body.height / 2;
@@ -486,6 +516,7 @@ export class SelectionView {
         body.kind === "ball" ||
         body.kind === "balloon" ||
         body.kind === "magnet" ||
+        body.kind === "electromagnet" ||
         body.kind === "engine_rotor" ||
         body.kind === "crank"
       ) {
@@ -691,6 +722,120 @@ function signOf(q: number): -1 | 0 | 1 {
   if (q > 0) return 1;
   if (q < 0) return -1;
   return 0;
+}
+
+function drawElectromagnet(
+  g: Graphics,
+  radius: number,
+  dipole: number,
+  enabled: boolean,
+  lineWidth: number,
+  style: { fill: number; edge: number },
+  cameraZoom: number,
+): void {
+  if (enabled) {
+    drawMagnet(g, radius, dipole, lineWidth, style, cameraZoom);
+  } else {
+    drawApproxCircle(g, 0, 0, radius, cameraZoom);
+    g.fill({ color: palette.paperShade, alpha: 0.85 });
+    g.stroke({ width: lineWidth, color: style.edge, alpha: 0.85 });
+  }
+  // Coil wraps: a few short tangential ticks indicate the wound copper.
+  const coils = 6;
+  for (let i = 0; i < coils; i++) {
+    const a = (i / coils) * Math.PI * 2;
+    const x0 = Math.cos(a) * radius * 0.95;
+    const y0 = Math.sin(a) * radius * 0.95;
+    const x1 = Math.cos(a) * radius * 1.18;
+    const y1 = Math.sin(a) * radius * 1.18;
+    g.moveTo(x0, y0);
+    g.lineTo(x1, y1);
+    g.stroke({
+      width: lineWidth * 0.85,
+      color: style.edge,
+      alpha: enabled ? 0.85 : 0.4,
+    });
+  }
+}
+
+function drawSwitch(
+  g: Graphics,
+  body: Extract<BodyView, { kind: "switch" }>,
+  lineWidth: number,
+  cameraZoom: number,
+): void {
+  const hw = body.width / 2;
+  const hh = body.height / 2;
+  // Base plate (chassis).
+  g.rect(-hw, -hh, body.width, body.height);
+  g.fill({ color: palette.paperShade, alpha: 0.95 });
+  g.stroke({ width: lineWidth, color: palette.metalEdge, alpha: 0.9 });
+  // Pad sits on top of plate; sinks slightly when pressed.
+  const padInset = Math.min(hw, hh) * 0.15;
+  const padHwidth = hw - padInset;
+  const padTopOffset = body.pressed ? hh * 0.85 : hh * 0.55;
+  const padBaseOffset = body.pressed ? hh * 0.3 : 0;
+  g.rect(-padHwidth, -padBaseOffset, padHwidth * 2, padTopOffset);
+  g.fill({
+    color: body.pressed ? palette.metalEdge : palette.metal,
+    alpha: 0.92,
+  });
+  g.stroke({ width: lineWidth, color: palette.metalEdge, alpha: 0.95 });
+  // Status pip.
+  const pipR = Math.min(hw, hh) * 0.18;
+  drawApproxCircle(g, 0, hh * 0.7, pipR, cameraZoom);
+  g.fill({
+    color: body.pressed ? palette.fieldB : palette.inkMuted,
+    alpha: 0.95,
+  });
+}
+
+function drawFan(
+  g: Graphics,
+  body: Extract<BodyView, { kind: "fan" }>,
+  lineWidth: number,
+  style: { fill: number; edge: number },
+  cameraZoom: number,
+): void {
+  const hw = body.width / 2;
+  const hh = body.height / 2;
+  // Housing.
+  g.rect(-hw, -hh, body.width, body.height);
+  g.fill({ color: style.fill, alpha: 1 });
+  g.stroke({ width: lineWidth, color: style.edge, alpha: 0.9 });
+  // Hub at center.
+  const hubR = Math.min(hw, hh) * 0.45;
+  drawApproxCircle(g, 0, 0, hubR, cameraZoom);
+  g.fill({ color: palette.metal, alpha: 0.9 });
+  g.stroke({ width: lineWidth * 0.85, color: style.edge, alpha: 0.9 });
+  // Three blades, drawn as short triangular tabs around the hub.
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    const tipX = Math.cos(a) * hubR * 1.95;
+    const tipY = Math.sin(a) * hubR * 1.95;
+    const baseAx = Math.cos(a + 0.35) * hubR * 0.6;
+    const baseAy = Math.sin(a + 0.35) * hubR * 0.6;
+    const baseBx = Math.cos(a - 0.35) * hubR * 0.6;
+    const baseBy = Math.sin(a - 0.35) * hubR * 0.6;
+    g.moveTo(baseAx, baseAy);
+    g.lineTo(tipX, tipY);
+    g.lineTo(baseBx, baseBy);
+    g.closePath();
+    g.fill({
+      color: body.enabled ? palette.metalEdge : palette.inkMuted,
+      alpha: body.enabled ? 0.9 : 0.5,
+    });
+  }
+  // Mouth indicator: a small chevron on the +x side showing flow direction.
+  const mouthX = hw * 1.05;
+  g.moveTo(mouthX, -hh * 0.6);
+  g.lineTo(mouthX + 0.08, 0);
+  g.lineTo(mouthX, hh * 0.6);
+  g.stroke({
+    width: lineWidth * 1.1,
+    color: body.enabled ? palette.fieldB : palette.inkMuted,
+    alpha: body.enabled ? 0.95 : 0.55,
+  });
 }
 
 function drawMagnet(

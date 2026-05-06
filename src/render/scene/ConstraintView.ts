@@ -97,6 +97,10 @@ function drawConstraint(
     drawBar(g, view, zoom);
     return;
   }
+  if (view.kind === "slider") {
+    drawSlider(g, view, zoom);
+    return;
+  }
   // weld joints are invisible — no geometry to draw
 }
 
@@ -123,6 +127,7 @@ function closestPointOnBodyHull(body: BodyView, p: { x: number; y: number }): {
     body.kind === "ball" ||
     body.kind === "balloon" ||
     body.kind === "magnet" ||
+    body.kind === "electromagnet" ||
     body.kind === "engine_rotor" ||
     body.kind === "crank"
   ) {
@@ -286,6 +291,41 @@ function drawBar(
   g.fill({ color: palette.metal, alpha: 0.95 });
   drawApproxCircle(g, bx, by, capR, zoom);
   g.stroke({ width: stroke.bodyOutline / zoom, color: palette.metalEdge, alpha: 0.95 });
+}
+
+function drawSlider(
+  g: Graphics,
+  view: Extract<ConstraintView, { kind: "slider" }>,
+  zoom: number,
+): void {
+  const ax = view.anchor.x;
+  const ay = view.anchor.y;
+  const ux = view.axis.x;
+  const uy = view.axis.y;
+  const lo = view.lowerLimit ?? -0.4;
+  const hi = view.upperLimit ?? 0.4;
+  const trackAx = ax + ux * lo;
+  const trackAy = ay + uy * lo;
+  const trackBx = ax + ux * hi;
+  const trackBy = ay + uy * hi;
+  const lineWidth = (stroke.bodyOutline * 1.1) / zoom;
+  // Track: thicker base + thinner highlight to read as a rail.
+  g.moveTo(trackAx, trackAy);
+  g.lineTo(trackBx, trackBy);
+  g.stroke({ width: lineWidth * 1.6, color: palette.metalEdge, alpha: 0.7 });
+  g.moveTo(trackAx, trackAy);
+  g.lineTo(trackBx, trackBy);
+  g.stroke({ width: lineWidth * 0.6, color: palette.metal, alpha: 0.95 });
+  // End caps.
+  const capLen = 0.12;
+  const nx = -uy * capLen;
+  const ny = ux * capLen;
+  g.moveTo(trackAx - nx, trackAy - ny);
+  g.lineTo(trackAx + nx, trackAy + ny);
+  g.stroke({ width: lineWidth, color: palette.metalEdge, alpha: 0.85 });
+  g.moveTo(trackBx - nx, trackBy - ny);
+  g.lineTo(trackBx + nx, trackBy + ny);
+  g.stroke({ width: lineWidth, color: palette.metalEdge, alpha: 0.85 });
 }
 
 function drawSpring(

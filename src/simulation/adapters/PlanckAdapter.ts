@@ -16,6 +16,7 @@ import type {
   MagneticSourceView,
   PulleySpec,
   RopeSpec,
+  SliderSpec,
   Snapshot,
   SpringSpec,
   Vec2,
@@ -747,8 +748,31 @@ export class PlanckAdapter {
   }
 
   /**
-   * Live state of all magnets. Used by EM solvers to compute B fields
-   * and dipole-on-dipole forces.
+   * Set of switch ids whose plate currently has any contact with a
+   * touching dynamic body. Computed once per snapshot/pre-step.
+   */
+  collectPressedSwitches(): Set<Id> {
+    const out = new Set<Id>();
+    for (const [id, record] of this.bodies) {
+      if (record.spec.kind !== "switch") continue;
+      const body = record.body;
+      let pressed = false;
+      for (let edge = body.getContactList(); edge; edge = edge.next) {
+        const contact = edge.contact;
+        if (!contact || !contact.isTouching()) continue;
+        const other = edge.other;
+        if (!other || !other.isDynamic()) continue;
+        pressed = true;
+        break;
+      }
+      if (pressed) out.add(id);
+    }
+    return out;
+  }
+
+  /**
+   * Live state of all magnets and currently-enabled electromagnets. Used
+   * by EM solvers to compute B fields and dipole-on-dipole forces.
    */
   collectMagnets(): Array<{
     id: Id;
@@ -758,15 +782,69 @@ export class PlanckAdapter {
   }> {
     const out: Array<{ id: Id; position: Vec2; dipole: number; angle: number }> =
       [];
+    const pressed = this.collectPressedSwitches();
     for (const [id, record] of this.bodies) {
-      if (record.spec.kind !== "magnet") continue;
-      if (record.spec.dipole === 0) continue;
+      const spec = record.spec;
+      if (spec.kind === "magnet") {
+        if (spec.dipole === 0) continue;
+        const p = record.body.getPosition();
+        out.push({
+          id,
+          position: { x: p.x, y: p.y },
+          dipole: spec.dipole,
+          angle: record.body.getAngle(),
+        });
+        continue;
+      }
+      if (spec.kind === "electromagnet") {
+        if (spec.dipole === 0) continue;
+        if (!effectiveEnabled(spec, pressed)) continue;
+        const p = record.body.getPosition();
+        out.push({
+          id,
+          position: { x: p.x, y: p.y },
+          dipole: spec.dipole,
+          angle: record.body.getAngle(),
+        });
+        continue;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Active fans, with current pose and tunable settings. Used by the
+   * fan-force solver each pre-step.
+   */
+  collectActiveFans(): Array<{
+    id: Id;
+    position: Vec2;
+    angle: number;
+    range: number;
+    halfAngle: number;
+    force: number;
+  }> {
+    const pressed = this.collectPressedSwitches();
+    const out: Array<{
+      id: Id;
+      position: Vec2;
+      angle: number;
+      range: number;
+      halfAngle: number;
+      force: number;
+    }> = [];
+    for (const [id, record] of this.bodies) {
+      if (record.spec.kind !== "fan") continue;
+      if (!effectiveEnabled(record.spec, pressed)) continue;
+      if (record.spec.force === 0) continue;
       const p = record.body.getPosition();
       out.push({
         id,
         position: { x: p.x, y: p.y },
-        dipole: record.spec.dipole,
         angle: record.body.getAngle(),
+        range: record.spec.range,
+        halfAngle: record.spec.halfAngle,
+        force: record.spec.force,
       });
     }
     return out;
@@ -816,14 +894,19 @@ export class PlanckAdapter {
     for (const [id, record] of this.bodies) {
       if (!record.body.isDynamic()) continue;
       const spec = record.spec;
-      if (spec.kind === "magnet") continue;
+      if (spec.kind === "magnet" || spec.kind === "electromagnet") continue;
       if (!isFerromagnetic(spec.material)) continue;
       let area = 0;
       if (spec.kind === "ball" || spec.kind === "balloon") {
         area = Math.PI * spec.radius * spec.radius;
       } else if (spec.kind === "engine_rotor" || spec.kind === "crank") {
         area = Math.PI * spec.radius * spec.radius;
-      } else if (spec.kind === "box" || spec.kind === "engine") {
+      } else if (
+        spec.kind === "box" ||
+        spec.kind === "engine" ||
+        spec.kind === "switch" ||
+        spec.kind === "fan"
+      ) {
         area = spec.width * spec.height;
       }
       if (area <= 0) continue;
@@ -843,7 +926,12 @@ export class PlanckAdapter {
       if (!record.body.isDynamic()) continue;
       const spec = record.spec;
       let displacedArea = 0;
-      if (spec.kind === "ball" || spec.kind === "balloon" || spec.kind === "magnet") {
+      if (
+        spec.kind === "ball" ||
+        spec.kind === "balloon" ||
+        spec.kind === "magnet" ||
+        spec.kind === "electromagnet"
+      ) {
         displacedArea = Math.PI * spec.radius * spec.radius;
       } else if (spec.kind === "engine_rotor" || spec.kind === "crank") {
         displacedArea = Math.PI * spec.radius * spec.radius;
@@ -858,6 +946,52 @@ export class PlanckAdapter {
         buoyancyScale: spec.buoyancyScale ?? 1,
         buoyancyLift: spec.buoyancyLift ?? 0,
       });
+    }
+    return out;
+  }
+
+  /**
+   * Iterate constraints flagged as breakable, removing any whose latest
+   * reaction force exceeded the threshold. Returns the ids of the
+   * constraints that were broken (caller emits events).
+   *
+   * Reaction force is sampled via Planck's `joint.getReactionForce(invDt)`,
+   * which reports the impulse in newtons given the inverse timestep. We
+   * pick the first joint of the constraint record (the user-facing joint),
+   * which is correct for rope/spring/bar/weld/slider — segmented chain
+   * ropes still pass since the head joint carries equivalent tension.
+   */
+  pruneBrokenJoints(invDt: number): Array<{ id: Id; force: number }> {
+    if (this.constraints.size === 0) return [];
+    const broken: Array<{ id: Id; force: number }> = [];
+    for (const [id, rec] of this.constraints) {
+      const threshold = breakForceOf(rec.spec);
+      if (threshold === undefined) continue;
+      const joint = rec.joints[0];
+      if (!joint) continue;
+      const f = joint.getReactionForce(invDt);
+      const mag = Math.hypot(f.x, f.y);
+      if (mag > threshold) broken.push({ id, force: mag });
+    }
+    for (const { id } of broken) {
+      const rec = this.constraints.get(id);
+      if (!rec) continue;
+      this.disposeConstraintRecord(rec);
+      this.constraints.delete(id);
+    }
+    return broken;
+  }
+
+  /**
+   * Lightweight pose snapshot of all dynamic bodies. Used by the fan
+   * force solver, which needs to know which bodies are inside each cone.
+   */
+  collectDynamicTargets(): Array<{ id: Id; position: Vec2 }> {
+    const out: Array<{ id: Id; position: Vec2 }> = [];
+    for (const [id, record] of this.bodies) {
+      if (!record.body.isDynamic()) continue;
+      const p = record.body.getPosition();
+      out.push({ id, position: { x: p.x, y: p.y } });
     }
     return out;
   }
@@ -896,6 +1030,10 @@ export class PlanckAdapter {
     if (spec.kind === "rope" || spec.kind === "spring" || spec.kind === "bar") {
       const hit = (a: Anchor) => a.kind === "body" && ids.has(a.id);
       return hit(spec.a) || hit(spec.b);
+    }
+    if (spec.kind === "slider") {
+      return ids.has(spec.bodyA) ||
+        (spec.bodyB !== undefined && ids.has(spec.bodyB));
     }
     const exhaustive: never = spec;
     void exhaustive;
@@ -963,6 +1101,10 @@ export class PlanckAdapter {
       this.constraints.set(id, this.buildBelt(id, spec));
       return;
     }
+    if (spec.kind === "slider") {
+      this.constraints.set(id, this.buildSlider(id, spec));
+      return;
+    }
     const exhaustive: never = spec;
     throw new Error(
       `PlanckAdapter.installConstraintInternal: unknown kind ${(exhaustive as { kind: string }).kind}`,
@@ -1018,7 +1160,14 @@ export class PlanckAdapter {
       return;
     }
     if (next.kind === "rope") {
-      if (!ropeRebuildNeeded(prev as RopeSpec, next as RopeSpec)) return;
+      const np = next as RopeSpec;
+      const pp = prev as RopeSpec;
+      if (!ropeRebuildNeeded(pp, np)) {
+        if ((pp.breakForce ?? 0) !== (np.breakForce ?? 0)) {
+          this.constraints.set(id, { ...rec, spec: np });
+        }
+        return;
+      }
       this.replaceConstraintKeepingId(id, next);
       return;
     }
@@ -1068,12 +1217,15 @@ export class PlanckAdapter {
     if (next.kind === "weld") {
       const wa = prev as WeldSpec;
       const wb = next;
-      if (
+      const sameAnchor =
         wa.bodyA === wb.bodyA &&
         wa.bodyB === wb.bodyB &&
         wa.worldAnchor.x === wb.worldAnchor.x &&
-        wa.worldAnchor.y === wb.worldAnchor.y
-      ) {
+        wa.worldAnchor.y === wb.worldAnchor.y;
+      if (sameAnchor) {
+        if ((wa.breakForce ?? 0) !== (wb.breakForce ?? 0)) {
+          this.constraints.set(id, { ...rec, spec: wb });
+        }
         return;
       }
       this.replaceConstraintKeepingId(id, next);
@@ -1081,20 +1233,29 @@ export class PlanckAdapter {
     }
     if (next.kind === "bar") {
       const ba = prev as BarSpec;
-      if (ba.length !== next.length) {
+      const lenChanged = ba.length !== next.length;
+      const breakChanged = (ba.breakForce ?? 0) !== (next.breakForce ?? 0);
+      if (lenChanged) {
         const dj = rec.joints[0] as planck.DistanceJoint;
         dj.setLength(next.length);
+      }
+      if (lenChanged || breakChanged) {
         this.constraints.set(id, { ...rec, spec: next });
       }
+      return;
+    }
+    if (next.kind === "slider") {
+      this.replaceConstraintKeepingId(id, next);
       return;
     }
   }
 
   buildSnapshot(tick: number, time: number): Snapshot {
     const ids = Array.from(this.bodies.keys()).sort((a, b) => a - b);
+    const pressedSwitches = this.collectPressedSwitches();
     const bodies: BodyView[] = ids.map((id) => {
       const record = this.bodies.get(id)!;
-      return buildView(record, this.engineAssemblies);
+      return buildView(record, this.engineAssemblies, pressedSwitches);
     });
 
     const constraintIds = Array.from(this.constraints.keys()).sort(
@@ -1121,6 +1282,21 @@ export class PlanckAdapter {
         );
       }
       if (record.spec.kind === "magnet" && record.spec.dipole !== 0) {
+        const p = record.body.getPosition();
+        magnets.push(
+          Object.freeze({
+            id,
+            position: Object.freeze({ x: p.x, y: p.y }),
+            dipole: record.spec.dipole,
+            angle: record.body.getAngle(),
+          }),
+        );
+      }
+      if (
+        record.spec.kind === "electromagnet" &&
+        record.spec.dipole !== 0 &&
+        effectiveEnabled(record.spec, pressedSwitches)
+      ) {
         const p = record.body.getPosition();
         magnets.push(
           Object.freeze({
@@ -1472,6 +1648,61 @@ export class PlanckAdapter {
       ...(ownsPivot ? { beltOwnsDrivenPivot: true as const } : {}),
     };
   }
+
+  private buildSlider(id: Id, spec: SliderSpec): ConstraintRecord {
+    const recA = this.bodies.get(spec.bodyA);
+    if (!recA) {
+      throw new Error(`slider: bodyA id ${spec.bodyA} not found`);
+    }
+    if (!recA.body.isDynamic()) {
+      throw new Error("slider: bodyA must be dynamic");
+    }
+    const bodyB = spec.bodyB === undefined
+      ? this.groundBody
+      : this.bodies.get(spec.bodyB)?.body;
+    if (!bodyB) {
+      throw new Error(`slider: bodyB id ${spec.bodyB} not found`);
+    }
+    const anchor = planck.Vec2(spec.worldAnchor.x, spec.worldAnchor.y);
+    const axis = planck.Vec2(spec.axis.x, spec.axis.y);
+    const def: planck.PrismaticJointOpt = { collideConnected: false };
+    if (spec.lowerLimit !== undefined && spec.upperLimit !== undefined) {
+      def.enableLimit = true;
+      def.lowerTranslation = spec.lowerLimit;
+      def.upperTranslation = spec.upperLimit;
+    }
+    const joint = new planck.PrismaticJoint(
+      def,
+      bodyB,
+      recA.body,
+      anchor,
+      axis,
+    );
+    this.world.createJoint(joint);
+    return { id, spec, internalBodies: [], joints: [joint] };
+  }
+}
+
+function breakForceOf(spec: ConstraintSpec): number | undefined {
+  switch (spec.kind) {
+    case "rope":
+    case "spring":
+    case "bar":
+    case "weld":
+    case "slider":
+      return spec.breakForce !== undefined && spec.breakForce > 0
+        ? spec.breakForce
+        : undefined;
+    case "hinge":
+    case "pulley":
+    case "belt":
+      return undefined;
+    default: {
+      const _e: never = spec;
+      void _e;
+      return undefined;
+    }
+  }
 }
 
 function resolveBeltGearRatio(spec: BeltSpec, bodies: Map<Id, BodyRecord>): number {
@@ -1542,6 +1773,15 @@ function fixturesNeedRebuild(oldS: BodySpec, newS: BodySpec): boolean {
   if (oldS.kind === "magnet" && newS.kind === "magnet") {
     if (oldS.radius !== newS.radius) return true;
   }
+  if (oldS.kind === "electromagnet" && newS.kind === "electromagnet") {
+    if (oldS.radius !== newS.radius) return true;
+  }
+  if (oldS.kind === "switch" && newS.kind === "switch") {
+    if (oldS.width !== newS.width || oldS.height !== newS.height) return true;
+  }
+  if (oldS.kind === "fan" && newS.kind === "fan") {
+    if (oldS.width !== newS.width || oldS.height !== newS.height) return true;
+  }
   return false;
 }
 
@@ -1584,13 +1824,16 @@ function makeShape(spec: BodySpec): planck.Shape {
   if (spec.kind === "ball" || spec.kind === "balloon" || spec.kind === "crank") {
     return new planck.CircleShape(spec.radius);
   }
-  if (spec.kind === "magnet") {
+  if (spec.kind === "magnet" || spec.kind === "electromagnet") {
     return new planck.CircleShape(spec.radius);
   }
   if (spec.kind === "engine_rotor") {
     return new planck.CircleShape(spec.radius);
   }
   if (spec.kind === "engine") {
+    return new planck.BoxShape(spec.width / 2, spec.height / 2);
+  }
+  if (spec.kind === "switch" || spec.kind === "fan") {
     return new planck.BoxShape(spec.width / 2, spec.height / 2);
   }
   return new planck.BoxShape(spec.width / 2, spec.height / 2);
@@ -1745,6 +1988,22 @@ function buildConstraintView(
     });
   }
 
+  if (spec.kind === "slider") {
+    const joint = record.joints[0] as planck.PrismaticJoint;
+    const cur = joint.getAnchorB();
+    return Object.freeze({
+      id,
+      kind: "slider" as const,
+      bodyA: spec.bodyA,
+      ...(spec.bodyB !== undefined ? { bodyB: spec.bodyB } : {}),
+      anchor: Object.freeze({ x: spec.worldAnchor.x, y: spec.worldAnchor.y }),
+      axis: Object.freeze({ x: spec.axis.x, y: spec.axis.y }),
+      ...(spec.lowerLimit !== undefined ? { lowerLimit: spec.lowerLimit } : {}),
+      ...(spec.upperLimit !== undefined ? { upperLimit: spec.upperLimit } : {}),
+      currentAnchor: Object.freeze({ x: cur.x, y: cur.y }),
+    });
+  }
+
   const exhaustive: never = spec;
   throw new Error(
     `buildConstraintView: unknown kind ${(exhaustive as { kind: string }).kind}`,
@@ -1754,6 +2013,7 @@ function buildConstraintView(
 function buildView(
   record: BodyRecord,
   engineAssemblies: ReadonlyMap<Id, EngineAssembly>,
+  pressedSwitches: ReadonlySet<Id>,
 ): BodyView {
   const { id, spec, body } = record;
   const p = body.getPosition();
@@ -1841,6 +2101,53 @@ function buildView(
       height: spec.height,
     });
   }
+  if (spec.kind === "switch") {
+    return Object.freeze({
+      ...base,
+      kind: "switch" as const,
+      width: spec.width,
+      height: spec.height,
+      pressed: pressedSwitches.has(record.id),
+    });
+  }
+  if (spec.kind === "electromagnet") {
+    const enabled = effectiveEnabled(spec, pressedSwitches);
+    return Object.freeze({
+      ...base,
+      kind: "electromagnet" as const,
+      radius: spec.radius,
+      dipole: spec.dipole,
+      effectiveDipole: enabled ? spec.dipole : 0,
+      enabled,
+      defaultEnabled: spec.defaultEnabled ?? true,
+      triggerBy: spec.triggerBy ?? null,
+    });
+  }
+  if (spec.kind === "fan") {
+    const enabled = effectiveEnabled(spec, pressedSwitches);
+    return Object.freeze({
+      ...base,
+      kind: "fan" as const,
+      width: spec.width,
+      height: spec.height,
+      range: spec.range,
+      halfAngle: spec.halfAngle,
+      force: spec.force,
+      enabled,
+      defaultEnabled: spec.defaultEnabled ?? true,
+      triggerBy: spec.triggerBy ?? null,
+    });
+  }
   const _: never = spec;
   throw new Error(`buildView: unknown body kind ${(_ as { kind: string }).kind}`);
+}
+
+function effectiveEnabled(
+  spec: { defaultEnabled?: boolean; triggerBy?: Id },
+  pressed: ReadonlySet<Id>,
+): boolean {
+  if (spec.triggerBy !== undefined) {
+    return pressed.has(spec.triggerBy);
+  }
+  return spec.defaultEnabled ?? true;
 }

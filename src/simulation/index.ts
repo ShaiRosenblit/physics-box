@@ -27,6 +27,8 @@ export type {
   BodyView,
   BallView,
   BeltView,
+  ElectromagnetSpec,
+  ElectromagnetView,
   EngineSpec,
   EngineHousingView,
   EngineRotorSpec,
@@ -36,6 +38,8 @@ export type {
   ConstraintPatch,
   ConstraintSpec,
   ConstraintView,
+  FanSpec,
+  FanView,
   HingeSpec,
   Id,
   MagnetSpec,
@@ -45,8 +49,12 @@ export type {
   RopeSpec,
   RopeView,
   HingeView,
+  SliderSpec,
+  SliderView,
   SpringSpec,
   SpringView,
+  SwitchSpec,
+  SwitchView,
   PulleySpec,
   PulleyView,
   WeldSpec,
@@ -60,12 +68,16 @@ export {
   balloon,
   box,
   crank,
+  electromagnet,
   engine,
+  fan,
   magnet,
+  pressureSwitch,
   rope,
   bar,
   hinge,
   spring,
+  slider,
   pulley,
   belt,
   weld,
@@ -74,7 +86,13 @@ export {
   worldAnchor,
   bodyAnchor,
 } from "./mechanics";
-export type { WeldInput } from "./mechanics";
+export type {
+  ElectromagnetInput,
+  FanInput,
+  SliderInput,
+  SwitchInput,
+  WeldInput,
+} from "./mechanics";
 
 export { ChargeRegistry } from "./electromagnetism/ChargeRegistry";
 export { computeCoulombForces, type ChargedBodyState } from "./electromagnetism/coulomb";

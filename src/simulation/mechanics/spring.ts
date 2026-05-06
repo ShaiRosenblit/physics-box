@@ -6,6 +6,7 @@ export interface SpringInput {
   restLength?: number;
   frequencyHz?: number;
   dampingRatio?: number;
+  breakForce?: number;
 }
 
 export function spring(input: SpringInput): SpringSpec {
@@ -26,5 +27,8 @@ export function spring(input: SpringInput): SpringSpec {
     restLength: input.restLength,
     frequencyHz: input.frequencyHz ?? 4,
     dampingRatio: input.dampingRatio ?? 0.5,
+    ...(input.breakForce !== undefined && input.breakForce > 0
+      ? { breakForce: input.breakForce }
+      : {}),
   };
 }

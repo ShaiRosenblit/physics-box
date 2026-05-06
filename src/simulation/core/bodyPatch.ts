@@ -1,5 +1,15 @@
 import type { SimulationConfig } from "./config";
-import type { BallSpec, BalloonSpec, BodyPatch, BodySpec, CrankSpec } from "./types";
+import type {
+  BallSpec,
+  BalloonSpec,
+  BodyPatch,
+  BodySpec,
+  CrankSpec,
+  ElectromagnetSpec,
+  FanSpec,
+  Id,
+  SwitchSpec,
+} from "./types";
 
 export const MIN_BODY_RADIUS = 0.05;
 export const MIN_BOX_EXTENT = 0.05;
@@ -20,6 +30,12 @@ export function clampBodySpecToConfig(spec: BodySpec, cfg: SimulationConfig): Bo
 
   if (next.kind === "magnet") {
     const m = next as Extract<BodySpec, { kind: "magnet" }>;
+    const d = clampToSymmetricCap(m.dipole, cfg.maxDipole);
+    if (d !== m.dipole) next = { ...m, dipole: d };
+  }
+
+  if (next.kind === "electromagnet") {
+    const m = next as ElectromagnetSpec;
     const d = clampToSymmetricCap(m.dipole, cfg.maxDipole);
     if (d !== m.dipole) next = { ...m, dipole: d };
   }
@@ -98,6 +114,32 @@ export function sanitizeBodyGeometry(spec: BodySpec): BodySpec {
     if (px !== spec.pinLocal.x || py !== spec.pinLocal.y) {
       next = { ...next, pinLocal: { x: px, y: py } };
     }
+    return next;
+  }
+  if (spec.kind === "switch") {
+    const w = Math.max(MIN_BOX_EXTENT, spec.width);
+    const h = Math.max(MIN_BOX_EXTENT, spec.height);
+    if (w === spec.width && h === spec.height) return spec;
+    return { ...spec, width: w, height: h };
+  }
+  if (spec.kind === "electromagnet") {
+    const r = Math.max(MIN_BODY_RADIUS, spec.radius);
+    return r === spec.radius ? spec : { ...spec, radius: r };
+  }
+  if (spec.kind === "fan") {
+    const w = Math.max(MIN_BOX_EXTENT, spec.width);
+    const h = Math.max(MIN_BOX_EXTENT, spec.height);
+    const range = Math.max(0.05, spec.range);
+    const halfAngle = Math.max(
+      0.01,
+      Math.min(spec.halfAngle, Math.PI / 2 - 0.01),
+    );
+    let next: FanSpec = spec;
+    if (w !== spec.width || h !== spec.height) {
+      next = { ...next, width: w, height: h };
+    }
+    if (range !== spec.range) next = { ...next, range };
+    if (halfAngle !== spec.halfAngle) next = { ...next, halfAngle };
     return next;
   }
   const _: never = spec;
@@ -198,6 +240,46 @@ export function mergeBodyPatch(spec: BodySpec, patch: BodyPatch): BodySpec {
     if (p.radius !== undefined) m = { ...m, radius: p.radius };
     if (p.dipole !== undefined) m = { ...m, dipole: p.dipole };
     n = m;
+  } else if (n.kind === "switch") {
+    let s: SwitchSpec = n;
+    if (p.width !== undefined) s = { ...s, width: p.width };
+    if (p.height !== undefined) s = { ...s, height: p.height };
+    n = s;
+  } else if (n.kind === "electromagnet") {
+    let e: ElectromagnetSpec = n;
+    if (p.radius !== undefined) e = { ...e, radius: p.radius };
+    if (p.dipole !== undefined) e = { ...e, dipole: p.dipole };
+    if (p.defaultEnabled !== undefined) {
+      e = { ...e, defaultEnabled: p.defaultEnabled };
+    }
+    if (p.triggerBy !== undefined) {
+      if (p.triggerBy === null) {
+        const { triggerBy: _omit, ...rest } = e;
+        e = rest as ElectromagnetSpec;
+      } else {
+        e = { ...e, triggerBy: p.triggerBy as Id };
+      }
+    }
+    n = e;
+  } else if (n.kind === "fan") {
+    let f: FanSpec = n;
+    if (p.width !== undefined) f = { ...f, width: p.width };
+    if (p.height !== undefined) f = { ...f, height: p.height };
+    if (p.range !== undefined) f = { ...f, range: p.range };
+    if (p.halfAngle !== undefined) f = { ...f, halfAngle: p.halfAngle };
+    if (p.force !== undefined) f = { ...f, force: p.force };
+    if (p.defaultEnabled !== undefined) {
+      f = { ...f, defaultEnabled: p.defaultEnabled };
+    }
+    if (p.triggerBy !== undefined) {
+      if (p.triggerBy === null) {
+        const { triggerBy: _omit, ...rest } = f;
+        f = rest as FanSpec;
+      } else {
+        f = { ...f, triggerBy: p.triggerBy as Id };
+      }
+    }
+    n = f;
   } else {
     const _: never = n;
     void _;
