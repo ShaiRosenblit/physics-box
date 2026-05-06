@@ -233,5 +233,91 @@ prevents direct linking / bookmarking levels and made testing slower.
    ceiling) so it doesn't look like a render bug.
 5. **Truncate level names in the dropdown less aggressively, or shorten the
    titles** ("Coulomb Catch" instead of "Coulomb's Catch" etc.).
-6. **Real playtest Levels 6, 7, 11, 13** — these are the four where the
-   intended solution looks tightest given the palette budgets.
+
+---
+
+# Update: actual play-through results (max 3 attempts/level via Playwright)
+
+Each level was attempted by automating `pointerdown → pointermove → pointerup`
+on the canvas with explicit world-coordinate placements and reading
+`window.__pb` (a dev-only probe in `App.tsx`) for body positions and the
+"Solved!" win banner. Camera transform from `__pb.getCameraState()` was used to
+convert world → screen coords, so placement positions are precise (to within
+1px). Each level got 3 attempts; on failure I logged where the marble actually
+ended.
+
+## Scoreboard
+
+| Level | Result | End-state notes |
+|-------|--------|-----------------|
+| 1 — Drop In | ❌ failed (3 attempts) | Marble lands at x≈3.0–3.4, **bucket starts at x=3.86** — every reasonable bridge placement leaves the marble 0.5–1.5 units short. With small (0.7×0.7) fixed boxes and a 5+ unit horizontal gap, the geometry is very unforgiving. |
+| 2 — Magnetic Catch | ❌ failed (3) | Marble drops the chute and lands on the floor at x ≈ −3.5 to −2.3. Magnets at distance > ~2 from the chute exit don't perturb the marble enough to drag it the 5.6 horizontal units to the bucket. |
+| 3 — Coulomb's Catch | ✅ **solved** | Two `ball−` stacked at `(5, 0.5)` and `(5, 1.5)` (in bucket + above). Final marble at `(4.89, 0.97)` — clean. |
+| 4 — Push Off | ❌ failed (3) | The puzzle is wildly tuning-sensitive: 2 ball+ at floor sends the marble all the way to the right wall at x=19.8 (overshoot); 1 ball+ leaves it at x=−0.29 against the barrier (undershoot). No middle ground in 3 tries. |
+| 5 — Step Up | ❌ failed (3) | Best attempt landed marble *on the platform* at `(2.19, 3.19)` — but bucket starts at x=2.8, so the marble stops short. Looks solvable but tight. |
+| 6 — Magnetic Crane | ❌ failed (3) | Best attempt with magnet just above the pit (distance 0.7) lifted the marble from y=0.3 only to y=0.70 — not enough to clear the 1.0-tall pit walls. Magnets are too weak to overcome gravity. |
+| 7 — Over the Wall | ❌ failed (3) | Marble could be lifted to y=7.1 (against the top of the 7-unit wall), but never made it across — chained ball− attractions can't be daisy-handed when each magnet's force falls off as 1/r² at scene-scale distances. |
+| 8 — Rocket | ✅ **solved** | Symmetric ball+ pair outside the channel at `(±0.7, 0.2)` plus a third at `(−0.7, 4.0)` for a second-stage boost. Marble launches up the channel and lands in the bucket at `(0.12, 8.13)`. |
+| 9 — Balloon Gate | ❌ failed (3) | **Marble lands at (4.60, 0.16) — 0.31 units left of the bucket's left wall (x=4.85).** The balloon-gate mechanism does open, the marble crosses, but every right-track exit trajectory I tried lands just short. With the right track ending at x=6.25 and the bucket centered at x=5.5, this looks like a level-design tuning issue — the bucket might just be ~0.5 too far right. |
+| 10 — Seesaw | ❌ failed (3) | The seesaw flips, but the cork marble is hurled *sideways-left* (final positions x=−2.4, x=−5.1, x=−8.9) instead of straight up to the bucket directly above. The geometry of the rotating plank doesn't impart vertical velocity to a ball perched on its tip — it imparts mostly tangential velocity, which on a horizontal plank is downward-then-sideways. Looks fundamentally broken. |
+| 11 — Magnet Relay | ❌ failed (3) | Even with a magnet placed at distance ~1.0 from the marble, the marble **never moved at all** (Δx < 0.01 over 25 s). Floor friction + magnet weakness combine to lock the marble in place. **Most likely unsolvable as currently tuned.** |
+| 12 — Spring Catapult | 🐛 **BUG: catapult does not fire** | I verified this with no boxes placed at all: marble stays at `(−2.41, 2.27)` for 30 s of sim time, position frozen to floating-point noise. The spring/hinge configuration on the cocked arm doesn't release — the spring force is presumably equal-and-opposite the gravity torque on the cocked arm, leaving it in equilibrium. **Needs a code fix or different spring tuning.** |
+| 13 — Coulomb Balance | ❌ failed (3) | The marble does respond to a player-placed `ball−`, but only weakly: best attempt nudged it from `(0, 0.4)` to `(0.82, 0.84)`. The fixed +4 charge at x=3.5 blocks any further travel — the player's −4 ball isn't strong enough to escort the marble past the symmetric +charge "barrier". |
+| 14 — Two for One | ✅ **solved** | 2 deflectors at `(±1.0, 2.5)` plus a `(0, 0.4)` catcher inside the bucket. Both marbles end up at `(±0.27, 1.08)`. |
+
+**Score: 3 solved, 10 failed within 3 attempts, 1 confirmed-broken.**
+
+## Bug-class findings (most important)
+
+- 🐛 **L12 catapult does not fire.** Confirmed reproducible with no
+  player input. The spring/hinge equilibrium prevents the arm from
+  swinging. As shipped, **L12 is currently unsolvable.**
+
+- 🐛 **L11 marble stuck under magnet attraction.** A `magnet+` placed at
+  distance ~1.0 from the metal marble produces no observable motion in 25 s.
+  The combination of (a) `dipoleMagnitude: 12` for the player's magnet and
+  (b) the workshop floor's friction means the magnet field is below the
+  static-friction threshold. The whole "pull a marble around two walls
+  with a chain of magnets" premise needs significantly stronger magnets
+  to be solvable.
+
+- ⚠️ **L2 / L6 / L11: magnets vs floor friction in general.** Levels that
+  rely on a magnet *initiating* horizontal motion of a stationary metal
+  marble (L11), or *lifting* a marble sitting on the floor or in a pit
+  (L6), are not solvable in practice — the magnet force at game-scale
+  distances cannot overcome static friction + gravity. L2 is borderline
+  because the marble already has falling momentum when it passes near the
+  magnet; L6 / L11 don't get that.
+
+- ⚠️ **L10 seesaw direction.** The plank flips correctly when a heavy box
+  is dropped on the left end, but the cork marble at the right end is
+  thrown *down-and-left* (it gets sucked along the rotating plank arc),
+  not *up* into the bucket directly above. Either the marble needs to
+  start at a different perch, or the plank needs to be a launching
+  cup/stop, for the level concept to work.
+
+- ⚠️ **L9 marble overshoots / undershoots by ~0.3 units regardless of
+  balloon placement.** Every legal balloon-under-gate placement produced
+  the same final marble position at `(4.604, 0.16)`. The bucket starts at
+  x=4.85, so this is *deterministically* a near-miss. Looks like the
+  bucket is a half-bucket-width too far right relative to where the
+  marble naturally falls off the right track.
+
+## Recoverable failures (close, but missed in 3 tries)
+
+- **L1 / L4 / L5** are puzzles where the design is sound but the budget
+  is so tight that finding the exact placement within 3 attempts isn't
+  realistic. A human might find it; an LLM working from world-coords
+  doesn't unless it gets to iterate freely. Useful as a difficulty signal.
+
+- **L7 / L13** are likely solvable with very precise placements but the
+  Coulomb-force budget and the wall geometry leave only a narrow corridor
+  of valid solutions. Consider a hint or ghost-trajectory.
+
+## What "solvable" looks like
+
+Both successful solves (L3, L8, L14) used a "stack pieces at the goal /
+along the goal axis" strategy — those puzzles have a forgiving design
+where roughly-correct placement still works. The unsolvable ones (L2, L6,
+L10, L11, L12, L13) all have a fundamental physics-tuning issue that
+narrowly-correct placement can't compensate for.
