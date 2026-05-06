@@ -33,6 +33,9 @@ coverage/
 .nyc_output/
 playwright-report/
 test-results/
+.playwright-mcp/
+level*_initial.png
+level*_snap.yml
 
 # vite cache
 .vite/

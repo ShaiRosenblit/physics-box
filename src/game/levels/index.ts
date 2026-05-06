@@ -13,6 +13,7 @@ import { level11MagnetRelay } from "./level11_magnetRelay";
 import { level12SpringCatapult } from "./level12_springCatapult";
 import { level13CoulombBalance } from "./level13_coulombBalance";
 import { level14TwoForOne } from "./level14_twoForOne";
+import { level15ChargedPendulum } from "./level15_chargedPendulum";
 import { level20PulleyLift } from "./level20_pulleyLift";
 import { level21BumperBounce } from "./level21_bumperBounce";
 import { level22MagnetPush } from "./level22_magnetPush";
@@ -35,6 +36,7 @@ export const levels: readonly Level[] = [
   level12SpringCatapult,
   level13CoulombBalance,
   level14TwoForOne,
+  level15ChargedPendulum,
   level20PulleyLift,
   level21BumperBounce,
   level22MagnetPush,
@@ -64,6 +66,7 @@ export {
   level12SpringCatapult,
   level13CoulombBalance,
   level14TwoForOne,
+  level15ChargedPendulum,
   level20PulleyLift,
   level21BumperBounce,
   level22MagnetPush,
