@@ -3,12 +3,32 @@ import { level1DropInBucket } from "./level1_dropInBucket";
 import { level2MagneticCatch } from "./level2_magneticCatch";
 import { level3CoulombCatch } from "./level3_coulombCatch";
 import { level4PushOff } from "./level4_pushOff";
+import { level5StepUp } from "./level5_stepUp";
+import { level6MagneticCrane } from "./level6_magneticCrane";
+import { level7OverTheWall } from "./level7_overTheWall";
+import { level8Rocket } from "./level8_rocket";
+import { level9BalloonGate } from "./level9_balloonGate";
+import { level10Seesaw } from "./level10_seesaw";
+import { level11MagnetRelay } from "./level11_magnetRelay";
+import { level12SpringCatapult } from "./level12_springCatapult";
+import { level13CoulombBalance } from "./level13_coulombBalance";
+import { level14TwoForOne } from "./level14_twoForOne";
 
 export const levels: readonly Level[] = [
   level1DropInBucket,
   level2MagneticCatch,
   level3CoulombCatch,
   level4PushOff,
+  level5StepUp,
+  level6MagneticCrane,
+  level7OverTheWall,
+  level8Rocket,
+  level9BalloonGate,
+  level10Seesaw,
+  level11MagnetRelay,
+  level12SpringCatapult,
+  level13CoulombBalance,
+  level14TwoForOne,
 ];
 
 export const levelById: Readonly<Record<string, Level>> = Object.fromEntries(
@@ -22,4 +42,14 @@ export {
   level2MagneticCatch,
   level3CoulombCatch,
   level4PushOff,
+  level5StepUp,
+  level6MagneticCrane,
+  level7OverTheWall,
+  level8Rocket,
+  level9BalloonGate,
+  level10Seesaw,
+  level11MagnetRelay,
+  level12SpringCatapult,
+  level13CoulombBalance,
+  level14TwoForOne,
 };
