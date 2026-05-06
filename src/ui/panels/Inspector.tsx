@@ -473,6 +473,8 @@ function constraintKindShort(kind: ConstraintView["kind"]): string {
       return "Weld";
     case "bar":
       return "Bar";
+    case "slider":
+      return "Slider";
   }
 }
 
@@ -887,6 +889,12 @@ function labelOf(kind: BodyView["kind"]): string {
       return "Rotor";
     case "magnet":
       return "Magnet";
+    case "switch":
+      return "Switch";
+    case "electromagnet":
+      return "Electromagnet";
+    case "fan":
+      return "Fan";
   }
 }
 

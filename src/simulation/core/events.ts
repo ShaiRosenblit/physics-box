@@ -4,6 +4,7 @@ export interface KernelEvents {
   add: { id: Id };
   remove: { id: Id };
   step: { tick: number };
+  joint_break: { id: Id; force: number };
 }
 
 export type EventName = keyof KernelEvents;

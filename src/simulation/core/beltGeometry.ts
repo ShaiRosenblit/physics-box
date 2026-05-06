@@ -6,6 +6,7 @@ export function effectivePulleyRadiusFromSpec(spec: BodySpec): number {
     spec.kind === "ball" ||
     spec.kind === "balloon" ||
     spec.kind === "magnet" ||
+    spec.kind === "electromagnet" ||
     spec.kind === "engine_rotor" ||
     spec.kind === "crank"
   ) {
@@ -14,7 +15,16 @@ export function effectivePulleyRadiusFromSpec(spec: BodySpec): number {
   if (spec.kind === "engine") {
     return Math.min(spec.width, spec.height) / 2;
   }
-  return Math.min(spec.width, spec.height) / 2;
+  if (
+    spec.kind === "box" ||
+    spec.kind === "switch" ||
+    spec.kind === "fan"
+  ) {
+    return Math.min(spec.width, spec.height) / 2;
+  }
+  const _e: never = spec;
+  void _e;
+  return 0;
 }
 
 export function effectivePulleyRadiusFromView(view: BodyView): number {
@@ -22,6 +32,7 @@ export function effectivePulleyRadiusFromView(view: BodyView): number {
     view.kind === "ball" ||
     view.kind === "balloon" ||
     view.kind === "magnet" ||
+    view.kind === "electromagnet" ||
     view.kind === "engine_rotor" ||
     view.kind === "crank"
   ) {
@@ -30,7 +41,16 @@ export function effectivePulleyRadiusFromView(view: BodyView): number {
   if (view.kind === "engine") {
     return Math.min(view.width, view.height) / 2;
   }
-  return Math.min(view.width, view.height) / 2;
+  if (
+    view.kind === "box" ||
+    view.kind === "switch" ||
+    view.kind === "fan"
+  ) {
+    return Math.min(view.width, view.height) / 2;
+  }
+  const _e: never = view;
+  void _e;
+  return 0;
 }
 
 export interface BeltTangents {

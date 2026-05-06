@@ -37,6 +37,7 @@ import {
 } from "../electromagnetism/magnetForces";
 import { sampleB } from "../electromagnetism/magnetism";
 import { computeBuoyancyForces } from "../mechanics/buoyancy";
+import { computeFanForces } from "../mechanics/fanForce";
 
 /**
  * The simulation kernel facade.
@@ -72,6 +73,18 @@ export class World {
     this._stepper = new Stepper(config.dt, config.maxSubsteps);
     this.registerEmSolvers();
     this.registerBuoyancySolver();
+    this.registerFanSolver();
+  }
+
+  private registerFanSolver(): void {
+    this._preStepHooks.push(() => {
+      const fans = this._adapter.collectActiveFans();
+      if (fans.length === 0) return;
+      const targets = this._adapter.collectDynamicTargets();
+      if (targets.length === 0) return;
+      const forces = computeFanForces(fans, targets);
+      if (forces.size > 0) this._adapter.applyForces(forces);
+    });
   }
 
   private registerEmSolvers(): void {
@@ -395,6 +408,14 @@ export class World {
       this._config.posIters,
     );
     this._adapter.clampBodySpeeds(this._config.maxSpeed);
+    const invDt = dtSim > 0 ? 1 / dtSim : 0;
+    if (invDt > 0) {
+      const broken = this._adapter.pruneBrokenJoints(invDt);
+      for (const { id, force } of broken) {
+        this._events.emit("joint_break", { id, force });
+        this._events.emit("remove", { id });
+      }
+    }
     this._tick += 1;
     this._events.emit("step", { tick: this._tick });
   }

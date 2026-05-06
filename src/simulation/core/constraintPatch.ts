@@ -7,9 +7,22 @@ import type {
   HingeSpec,
   PulleySpec,
   RopeSpec,
+  SliderSpec,
   SpringSpec,
   WeldSpec,
 } from "./types";
+
+function applyBreakForce<T extends { breakForce?: number }>(
+  spec: T,
+  breakForce: number | undefined,
+): T {
+  if (breakForce === undefined) return spec;
+  if (breakForce <= 0) {
+    const { breakForce: _omit, ...rest } = spec;
+    return rest as T;
+  }
+  return { ...spec, breakForce };
+}
 
 export const MIN_CONNECTOR_REST = 0.05;
 export const MIN_PULLEY_HALF_SPREAD = 0.05;
@@ -30,10 +43,11 @@ export function anchorEqual(a: RopeSpec["a"], b: RopeSpec["a"]): boolean {
 export function mergeConstraintPatch(spec: ConstraintSpec, patch: ConstraintPatch): ConstraintSpec {
   switch (spec.kind) {
     case "rope": {
-      let n = { ...spec };
+      let n: RopeSpec = { ...spec };
       if (patch.length !== undefined) n = { ...n, length: patch.length };
       if (patch.segments !== undefined) n = { ...n, segments: patch.segments };
       if (patch.material !== undefined) n = { ...n, material: patch.material };
+      n = applyBreakForce(n, patch.breakForce);
       return n;
     }
     case "spring": {
@@ -41,6 +55,7 @@ export function mergeConstraintPatch(spec: ConstraintSpec, patch: ConstraintPatc
       if (patch.restLength !== undefined) n = { ...n, restLength: patch.restLength };
       if (patch.frequencyHz !== undefined) n = { ...n, frequencyHz: patch.frequencyHz };
       if (patch.dampingRatio !== undefined) n = { ...n, dampingRatio: patch.dampingRatio };
+      n = applyBreakForce(n, patch.breakForce);
       return n;
     }
     case "hinge": {
@@ -66,11 +81,29 @@ export function mergeConstraintPatch(spec: ConstraintSpec, patch: ConstraintPatc
       if (patch.worldAnchor !== undefined) {
         n = { ...n, worldAnchor: { ...patch.worldAnchor } };
       }
+      n = applyBreakForce(n, patch.breakForce);
       return n;
     }
     case "bar": {
       let n: BarSpec = { ...spec };
       if (patch.barLength !== undefined) n = { ...n, length: patch.barLength };
+      n = applyBreakForce(n, patch.breakForce);
+      return n;
+    }
+    case "slider": {
+      let n: SliderSpec = { ...spec };
+      if (patch.worldAnchor !== undefined) {
+        n = { ...n, worldAnchor: { ...patch.worldAnchor } };
+      }
+      if (patch.axis !== undefined) {
+        const len = Math.hypot(patch.axis.x, patch.axis.y);
+        if (len > 1e-9) {
+          n = { ...n, axis: { x: patch.axis.x / len, y: patch.axis.y / len } };
+        }
+      }
+      if (patch.lowerLimit !== undefined) n = { ...n, lowerLimit: patch.lowerLimit };
+      if (patch.upperLimit !== undefined) n = { ...n, upperLimit: patch.upperLimit };
+      n = applyBreakForce(n, patch.breakForce);
       return n;
     }
     default: {
@@ -117,6 +150,24 @@ export function sanitizeConstraintSpec(spec: ConstraintSpec): ConstraintSpec {
   if (spec.kind === "weld") return spec;
   if (spec.kind === "bar") {
     return { ...spec, length: Math.max(MIN_CONNECTOR_REST, spec.length) };
+  }
+  if (spec.kind === "slider") {
+    const len = Math.hypot(spec.axis.x, spec.axis.y);
+    let next: SliderSpec = spec;
+    if (Math.abs(len - 1) > 1e-6 && len > 1e-9) {
+      next = {
+        ...next,
+        axis: { x: spec.axis.x / len, y: spec.axis.y / len },
+      };
+    }
+    if (
+      next.lowerLimit !== undefined &&
+      next.upperLimit !== undefined &&
+      next.lowerLimit > next.upperLimit
+    ) {
+      next = { ...next, lowerLimit: next.upperLimit };
+    }
+    return next;
   }
   return spec;
 }
