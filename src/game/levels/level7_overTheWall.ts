@@ -26,12 +26,16 @@ const setupScene = (world: import("../../simulation").World): LevelHandles => {
     }),
   );
 
-  // Very tall wall blocking direct path to the bucket.
+  // Tall wall blocking direct path to the bucket. Was 7 units before;
+  // chained Coulomb attractions can't lift a + marble that high in
+  // practice, so the puzzle was unsolvable. 4.5 keeps the "you must arc
+  // *up* and *over*, not just push sideways" challenge intact while
+  // staying in reach of three player charges.
   world.add(
     box({
-      position: { x: -0.5, y: 3.5 },
+      position: { x: -0.5, y: 2.25 },
       width: 0.25,
-      height: 7,
+      height: 4.5,
       fixed: true,
       material: "wood",
     }),

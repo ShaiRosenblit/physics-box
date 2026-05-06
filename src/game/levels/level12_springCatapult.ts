@@ -16,10 +16,15 @@ const setupScene = (world: import("../../simulation").World): LevelHandles => {
   addWorkshopEnclosure(world);
 
   // ── Catapult mechanism ────────────────────────────────────────────────
-  const pivot = { x: -4.5, y: 0.4 };
-  const armW = 2.8;
+  // Mirrors the working `catapult` scene in src/simulation/scenes/catapult.
+  // Critically the hinge here connects the arm to the post (bodyA + bodyB),
+  // not arm-to-world. With a world-anchor-only hinge the arm body and the
+  // post body would still collide every frame at the pivot, which pinned
+  // the spring and prevented release in the original L12 setup.
+  const pivot = { x: -4.5, y: 0.38 };
+  const armW = 2.85;
   const armH = 0.13;
-  const armAngle = (38 * Math.PI) / 180; // cocked angle
+  const armAngle = (40 * Math.PI) / 180; // cocked angle
 
   const cos = Math.cos(armAngle);
   const sin = Math.sin(armAngle);
@@ -27,16 +32,16 @@ const setupScene = (world: import("../../simulation").World): LevelHandles => {
   // Base platform under the catapult.
   world.add(
     box({
-      position: { x: -5.5, y: 0.1 },
-      width: 3.2,
-      height: 0.2,
+      position: { x: -5.4, y: 0.075 },
+      width: 2.6,
+      height: 0.15,
       fixed: true,
       material: "wood",
     }),
   );
 
-  // Pivot post.
-  world.add(
+  // Pivot post (short — the cocked arm reaches just over its top).
+  const postId = world.add(
     box({
       position: { x: pivot.x, y: pivot.y / 2 },
       width: 0.14,
@@ -57,28 +62,32 @@ const setupScene = (world: import("../../simulation").World): LevelHandles => {
       angle: armAngle,
       material: "wood",
       angularDamping: 0.08,
-      linearDamping: 0.01,
+      linearDamping: 0.02,
     }),
   );
 
   world.addConstraint(
     hinge({
       bodyA: armId,
+      bodyB: postId,
       worldAnchor: pivot,
     }),
   );
 
-  // Spring: anchor is behind and below the pivot; attached to the short
-  // tail of the arm so the spring is already compressed at rest.
-  const springAnchorX = pivot.x - 0.8;
-  const springAnchorY = pivot.y - 0.1;
+  // Spring: anchor sits behind the frame so the spring is taut while
+  // cocked. Releasing it pulls the arm tail forward and swings the long
+  // tip up-and-over, flinging the cork projectile to the right. These
+  // parameters match the working sandbox catapult scene (verified by
+  // catapultScene.test).
+  const springAnchorX = pivot.x - 1.27;
+  const springAnchorY = pivot.y - 0.12;
   world.addConstraint(
     spring({
       a: worldAnchor({ x: springAnchorX, y: springAnchorY }),
       b: bodyAnchor(armId, { x: -armW / 2, y: 0 }),
-      restLength: 0.65,
-      frequencyHz: 9,
-      dampingRatio: 0.18,
+      restLength: 0.72,
+      frequencyHz: 8,
+      dampingRatio: 0.22,
     }),
   );
 
@@ -101,20 +110,26 @@ const setupScene = (world: import("../../simulation").World): LevelHandles => {
     }),
   );
 
-  // ── Obstacle wall ────────────────────────────────────────────────────
-  // A wall that the ball's natural arc cannot clear unaided.
+  // ── Obstacle barrier ────────────────────────────────────────────────
+  // A short fence that the natural cork-shot arc just clips, so the
+  // marble lands SHORT of the bucket without help. The two player boxes
+  // are used as ramps to lift the shot trajectory clear and steer it
+  // into the bucket. (The original "tall wall" version of this level
+  // was unsolvable: the catapult's cork-shot range is roughly 1.5 units
+  // forward from the launch perch, well short of a 4.4-tall obstacle
+  // plus a far bucket.)
   world.add(
     box({
-      position: { x: 0.5, y: 2.2 },
+      position: { x: -1.4, y: 0.45 },
       width: 0.2,
-      height: 4.4,
+      height: 0.9,
       fixed: true,
       material: "wood",
     }),
   );
 
-  // ── Bucket beyond the wall ───────────────────────────────────────────
-  const bucketCx = 4.5;
+  // ── Bucket beyond the barrier ───────────────────────────────────────
+  const bucketCx = -0.5;
   const bucketBaseY = 0;
   const wallH = 1.0;
   const bucketHalfW = 0.7;

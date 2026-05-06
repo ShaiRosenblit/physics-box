@@ -14,7 +14,20 @@ import type {
   GameTool,
   LevelHandles,
 } from "../../game/types";
-import { defaultLevelId } from "../../game";
+import { defaultLevelId, levelById } from "../../game";
+
+// Honor `?level=<id>` on initial load so deep links (e.g. shared bug-repro
+// URLs) open the right puzzle directly.
+function initialLevelIdFromUrl(): string {
+  if (typeof window === "undefined") return defaultLevelId;
+  try {
+    const fromUrl = new URL(window.location.href).searchParams.get("level");
+    if (fromUrl && levelById[fromUrl]) return fromUrl;
+  } catch {
+    // Malformed URL — fall through to default.
+  }
+  return defaultLevelId;
+}
 
 export type Tool =
   | "select"
@@ -145,12 +158,17 @@ export function createDefaultSpawnPresets(): SpawnPresetsBundle {
     },
     magnetPlus: {
       radius: 0.32,
-      dipoleMagnitude: 12,
+      // Bumped from 12 to 120 — at the previous magnitude a player magnet
+      // placed within 1 unit of a stationary metal marble couldn't overcome
+      // static floor friction, which made every magnet-only puzzle (L2,
+      // L6, L11) effectively unsolvable. 120 lifts a 0.18-radius metal
+      // marble out of a 1-unit pit and pulls it across short gaps.
+      dipoleMagnitude: 120,
       fixed: false,
     },
     magnetMinus: {
       radius: 0.32,
-      dipoleMagnitude: 12,
+      dipoleMagnitude: 120,
       fixed: false,
     },
     enginePlus: {
@@ -379,7 +397,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   mode: "puzzle",
   phase: "design",
-  currentLevelId: defaultLevelId,
+  currentLevelId: initialLevelIdFromUrl(),
   inventory: {},
   placedByPlayer: {},
   levelHandles: null,

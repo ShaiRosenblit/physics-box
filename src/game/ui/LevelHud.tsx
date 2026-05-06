@@ -136,9 +136,9 @@ const goalStyle: React.CSSProperties = {
   border: "1px solid #d8cfbe",
 };
 
-// Phone goal pill — narrower padding, smaller font, capped at two lines.
-// `-webkit-line-clamp` gives us a graceful overflow story for any future
-// level whose goal text doesn't fit a single line on iPhone-SE width.
+// Phone goal pill — narrower padding, smaller font. Wraps freely so the
+// player always sees the full instruction; we cap the longest goal in the
+// repo at ~80 chars which is ~3 lines at this width.
 const goalPhoneStyle: React.CSSProperties = {
   fontFamily: "var(--display-font)",
   fontSize: 11,
@@ -150,11 +150,6 @@ const goalPhoneStyle: React.CSSProperties = {
   border: "1px solid #d8cfbe",
   lineHeight: 1.3,
   maxWidth: "100%",
-  display: "-webkit-box",
-  WebkitLineClamp: 2,
-  WebkitBoxOrient: "vertical",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
   wordBreak: "break-word",
 };
 

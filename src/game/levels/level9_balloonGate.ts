@@ -79,7 +79,10 @@ const setupScene = (world: import("../../simulation").World): LevelHandles => {
   );
 
   // Bucket at the end of the right track (marble falls off and lands here).
-  const bucketCx = 5.5;
+  // Was 5.5; the marble's natural drop trajectory off the right track lands
+  // at x ≈ 4.6, so the bucket needs to be centered there for any legal
+  // balloon placement to succeed.
+  const bucketCx = 4.5;
   const bucketBaseY = 0;
   const wallH = 1.0;
   const bucketHalfW = 0.65;

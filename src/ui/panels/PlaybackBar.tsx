@@ -426,7 +426,7 @@ const compactButtonStyle: React.CSSProperties = {
 const buttonPrimaryStyle: React.CSSProperties = {
   background: "#2a2520",
   color: "#f5efe6",
-  borderColor: "#2a2520",
+  border: "1px solid #2a2520",
 };
 
 const buttonDisabledStyle: React.CSSProperties = {

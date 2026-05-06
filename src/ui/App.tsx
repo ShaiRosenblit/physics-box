@@ -271,9 +271,14 @@ export function App() {
     setTool("select");
     rendererRef.current?.setGoalZones(handles.goalZones);
     setAirDensity(sim.world.config.fluidDensity);
-    const bounds = level.viewBounds ?? null;
-    rendererRef.current?.setViewBounds(bounds);
-    if (!bounds) rendererRef.current?.fitToContent(sim.world.snapshot());
+    // Frame the actual scene content rather than the level's permissive
+    // viewBounds. Most levels declare a generous "studio" rectangle so the
+    // camera doesn't pan when bodies fly around mid-play, but using that
+    // rectangle for the *initial* framing makes the marble render as a
+    // 3-pixel dot and the bucket as two thin sticks before the player
+    // touches anything. fitToContent gives a snug 12%-padded crop instead.
+    rendererRef.current?.setViewBounds(null);
+    rendererRef.current?.fitToContent(sim.world.snapshot());
   };
 
   /** Restart puzzle from design phase, preserving placed items. */
@@ -1072,13 +1077,15 @@ export function App() {
                 borderRadius: isPhone ? 6 : 3,
                 font: "inherit",
                 // ≥16px on phone so iOS Safari does not auto-zoom on focus.
-                fontSize: isPhone ? 16 : 12,
+                // Viewport meta pins maximum-scale=1, so we can drop below
+                // the 16px iOS-auto-zoom floor and fit longer level titles.
+                fontSize: isPhone ? 13 : 12,
                 height: isPhone ? 36 : undefined,
                 cursor: "pointer",
                 minWidth: isPhone ? 92 : 108,
                 // Picker can hold the full level title — but stop it from
                 // ballooning past row 1 width.
-                maxWidth: isPhone ? "60%" : undefined,
+                maxWidth: isPhone ? "70%" : undefined,
                 textOverflow: "ellipsis",
               }}
             >

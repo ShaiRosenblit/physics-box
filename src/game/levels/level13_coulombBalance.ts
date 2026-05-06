@@ -20,7 +20,12 @@ const setupScene = (world: import("../../simulation").World): LevelHandles => {
       position: { x: -3.5, y: 0.4 },
       radius: 0.2,
       material: "metal",
-      charge: 4,
+      // Weakened from 4 to 2: at +4 each, the equal-and-opposite repulsion
+      // produced a deep enough potential well that a single player ball−
+      // could barely budge the marble (best result was a 0.8-unit nudge).
+      // At +2 the balance is more delicate, so the player's −4 charge can
+      // actually break it.
+      charge: 2,
       fixed: true,
     }),
   );
@@ -29,7 +34,12 @@ const setupScene = (world: import("../../simulation").World): LevelHandles => {
       position: { x: 3.5, y: 0.4 },
       radius: 0.2,
       material: "metal",
-      charge: 4,
+      // Weakened from 4 to 2: at +4 each, the equal-and-opposite repulsion
+      // produced a deep enough potential well that a single player ball−
+      // could barely budge the marble (best result was a 0.8-unit nudge).
+      // At +2 the balance is more delicate, so the player's −4 charge can
+      // actually break it.
+      charge: 2,
       fixed: true,
     }),
   );
