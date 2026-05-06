@@ -25,7 +25,8 @@ import {
   ropeRebuildNeeded,
   springAnchorsMatch,
 } from "../core/constraintPatch";
-import { lookupMaterial } from "../mechanics/materials";
+import { isFerromagnetic, lookupMaterial } from "../mechanics/materials";
+import type { FerromagneticBodyState } from "../electromagnetism/magnetForces";
 import type { BuoyantBodyState } from "../mechanics/buoyancy";
 import {
   beltDisplayPath,
@@ -801,6 +802,33 @@ export class PlanckAdapter {
         charge: q,
         mass: record.body.getMass(),
       });
+    }
+    return out;
+  }
+
+  /**
+   * Dynamic, non-magnet bodies whose material is ferromagnetic. These get
+   * pulled toward magnets regardless of pole. Magnets themselves are
+   * excluded — they already interact via the dipole–dipole solver.
+   */
+  collectFerromagneticBodies(): FerromagneticBodyState[] {
+    const out: FerromagneticBodyState[] = [];
+    for (const [id, record] of this.bodies) {
+      if (!record.body.isDynamic()) continue;
+      const spec = record.spec;
+      if (spec.kind === "magnet") continue;
+      if (!isFerromagnetic(spec.material)) continue;
+      let area = 0;
+      if (spec.kind === "ball" || spec.kind === "balloon") {
+        area = Math.PI * spec.radius * spec.radius;
+      } else if (spec.kind === "engine_rotor" || spec.kind === "crank") {
+        area = Math.PI * spec.radius * spec.radius;
+      } else if (spec.kind === "box" || spec.kind === "engine") {
+        area = spec.width * spec.height;
+      }
+      if (area <= 0) continue;
+      const p = record.body.getPosition();
+      out.push({ id, position: { x: p.x, y: p.y }, area });
     }
     return out;
   }

@@ -88,10 +88,11 @@ export {
   type MagneticBodyState,
 } from "./electromagnetism/magnetism";
 export {
-  computeLorentzForces,
+  computeFerromagneticForces,
   computeMagnetPairForces,
   computeMagnetPairTorques,
-} from "./electromagnetism/lorentz";
+  type FerromagneticBodyState,
+} from "./electromagnetism/magnetForces";
 export { emConstants, type EmConstants } from "./electromagnetism/constants";
 export type {
   BallInput,

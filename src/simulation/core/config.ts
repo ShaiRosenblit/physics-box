@@ -21,6 +21,12 @@ export interface SimulationConfig {
   readonly epsilon: number;
   readonly kE: number;
   readonly mu0Eff: number;
+  /**
+   * Pre-factor for the always-attractive force on a ferromagnetic body
+   * (iron/steel-like) toward each magnet. Force scales with magnet
+   * |dipole| × ferromag area / r⁴ — game-friendly “magnet snap” feel.
+   */
+  readonly kFerro: number;
 
   readonly maxCharge: number;
   readonly maxDipole: number;
@@ -56,6 +62,7 @@ export const defaultConfig: SimulationConfig = {
   epsilon: 0.05,
   kE: 50,
   mu0Eff: 4,
+  kFerro: 6,
 
   maxCharge: 50,
   maxDipole: 50,

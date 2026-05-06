@@ -1,43 +1,6 @@
 import type { Id, Vec2 } from "../core/types";
 import type { EmConstants } from "./constants";
-import type { ChargedBodyState } from "./coulomb";
-import { bFieldFromOffset, dipoleMomentXY, sampleB, type MagneticBodyState } from "./magnetism";
-
-/**
- * Per-body Lorentz force on charged bodies, given a scalar B field
- * sampled at each body's position. Sign convention:
- *
- *   F = q * B * ( v_y, -v_x )
- *
- * which is the standard `q (v × B_z ẑ)` reduction for in-plane v.
- *
- * The result is clamped to maxEmForce per body. Solver runs once per
- * substep; B is sampled from current magnet positions, so determinism
- * is preserved if the inputs are passed in stable id order.
- */
-export function computeLorentzForces(
-  charges: readonly (ChargedBodyState & { velocity: Vec2 })[],
-  magnets: readonly MagneticBodyState[],
-  ec: EmConstants,
-): Map<Id, Vec2> {
-  const out = new Map<Id, Vec2>();
-  if (magnets.length === 0) return out;
-  for (const c of charges) {
-    if (c.charge === 0) continue;
-    const b = sampleB(c.position, magnets, ec);
-    if (b === 0) continue;
-    let fx = c.charge * b * c.velocity.y;
-    let fy = -c.charge * b * c.velocity.x;
-    const mag = Math.hypot(fx, fy);
-    if (mag > ec.maxEmForce) {
-      const s = ec.maxEmForce / mag;
-      fx *= s;
-      fy *= s;
-    }
-    out.set(c.id, { x: fx, y: fy });
-  }
-  return out;
-}
+import { bFieldFromOffset, dipoleMomentXY, type MagneticBodyState } from "./magnetism";
 
 /** Force on dipole B at the tip of r (r = pos_B − pos_A) from dipole A. */
 function dipoleDipoleForceOnB(
@@ -63,7 +26,7 @@ function dipoleDipoleForceOnB(
 
 /**
  * Pairwise interaction of planar magnetic dipoles (same ε softening on
- * separation as elsewhere). Newton’s third law holds for the translational
+ * separation as elsewhere). Newton's third law holds for the translational
  * part. Magnitudes are clamped to maxEmForce per magnet after summing pairs.
  */
 export function computeMagnetPairForces(
@@ -124,6 +87,60 @@ export function computeMagnetPairTorques(
     const lim = ec.maxEmTorque;
     if (Math.abs(t) > lim) t = Math.sign(t) * lim;
     out.set(tgt.id, t);
+  }
+  return out;
+}
+
+export interface FerromagneticBodyState {
+  readonly id: Id;
+  readonly position: Vec2;
+  /** Cross-section / coupling area (m²) — bigger pieces feel a stronger pull. */
+  readonly area: number;
+}
+
+/**
+ * Always-attractive force on each ferromagnetic body, summed over magnets.
+ *
+ * For each (ferromag, magnet) pair the force points from the ferromag toward
+ * the magnet, with magnitude `kFerro · |dipole| · area / (r² + ε²)²`. The
+ * pole sign is intentionally ignored: ferromagnetic objects are pulled
+ * toward both N and S poles, never repelled. Forces from multiple magnets
+ * combine as ordinary vector sums. Per-body magnitude is clamped to
+ * `maxEmForce`.
+ *
+ * No reaction force is added back onto the magnet (the induced-dipole
+ * approximation is one-way for game stability — magnets stay deterministic
+ * sources rather than getting yanked around by every nearby nail).
+ */
+export function computeFerromagneticForces(
+  ferros: readonly FerromagneticBodyState[],
+  magnets: readonly MagneticBodyState[],
+  ec: EmConstants,
+): Map<Id, Vec2> {
+  const out = new Map<Id, Vec2>();
+  if (ferros.length === 0 || magnets.length === 0) return out;
+  const eps2 = ec.epsilon * ec.epsilon;
+  for (const f of ferros) {
+    let fx = 0;
+    let fy = 0;
+    for (const m of magnets) {
+      if (m.dipole === 0) continue;
+      const dx = m.position.x - f.position.x;
+      const dy = m.position.y - f.position.y;
+      const r2 = dx * dx + dy * dy + eps2;
+      const r = Math.sqrt(r2);
+      const k = (ec.kFerro * Math.abs(m.dipole) * f.area) / (r2 * r2 * r);
+      fx += k * dx;
+      fy += k * dy;
+    }
+    if (fx === 0 && fy === 0) continue;
+    const mag = Math.hypot(fx, fy);
+    if (mag > ec.maxEmForce) {
+      const s = ec.maxEmForce / mag;
+      fx *= s;
+      fy *= s;
+    }
+    out.set(f.id, { x: fx, y: fy });
   }
   return out;
 }

@@ -31,10 +31,10 @@ import { computeCoulombForces } from "../electromagnetism/coulomb";
 import { emConstants } from "../electromagnetism/constants";
 import { sampleE } from "../electromagnetism/field";
 import {
-  computeLorentzForces,
+  computeFerromagneticForces,
   computeMagnetPairForces,
   computeMagnetPairTorques,
-} from "../electromagnetism/lorentz";
+} from "../electromagnetism/magnetForces";
 import { sampleB } from "../electromagnetism/magnetism";
 import { computeBuoyancyForces } from "../mechanics/buoyancy";
 
@@ -86,9 +86,14 @@ export class World {
         const f = computeCoulombForces(charges, ec);
         this._adapter.applyForces(f);
       }
-      if (charges.length > 0 && magnets.length > 0) {
-        const f = computeLorentzForces(charges, magnets, ec);
-        if (f.size > 0) this._adapter.applyForces(f);
+      if (magnets.length > 0) {
+        const ferros = this._adapter
+          .collectFerromagneticBodies()
+          .sort((a, b) => a.id - b.id);
+        if (ferros.length > 0) {
+          const f = computeFerromagneticForces(ferros, magnets, ec);
+          if (f.size > 0) this._adapter.applyForces(f);
+        }
       }
       if (magnets.length >= 2) {
         const f = computeMagnetPairForces(magnets, ec);
