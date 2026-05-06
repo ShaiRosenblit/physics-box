@@ -23,6 +23,10 @@ When you change UI:
   `viewBounds` rectangle to lock the camera; otherwise the renderer
   fits to content.
 
+## Playwright MCP
+
+The Playwright MCP is available and should be used whenever browser interaction is needed — for example, visually testing UI changes, verifying responsive layouts, checking game behavior in a real browser, or debugging rendering issues. Prefer it over assuming correctness from code alone when the change touches anything visible.
+
 ## After completing any task
 
 Always commit and push changes to `origin/main` when a task is done:
