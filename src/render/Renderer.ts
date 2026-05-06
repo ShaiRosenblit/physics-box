@@ -16,8 +16,8 @@ import { ConstraintLayer } from "./scene/ConstraintView";
 import { FieldView } from "./scene/FieldView";
 import { GoalZoneView } from "./scene/GoalZoneView";
 import { Grid } from "./scene/Grid";
-import { palette } from "./style/palette";
-import type { GoalZone } from "../game/types";
+import { cartoonPalette, palette, type RenderTheme } from "./style/palette";
+import type { GameMode, GoalZone } from "../game/types";
 
 const GEOM_REFRESH_LOG_THRESHOLD = 0.4;
 
@@ -87,13 +87,39 @@ export class Renderer {
   private _lastFieldCenterX = Number.NaN;
   private _lastFieldCenterY = Number.NaN;
   private _lastFieldTimestamp = 0;
+  private _theme: RenderTheme = "workshop";
 
   constructor(config: SimulationConfig = defaultConfig) {
-    this.bodyLayer = new BodyLayer(() => this._camera.zoom);
+    this.bodyLayer = new BodyLayer(
+      () => this._camera.zoom,
+      () => this._theme,
+    );
     this.constraintLayer = new ConstraintLayer(() => this._camera.zoom);
     this.fieldView = new FieldView(config);
     this.selectionView = new SelectionView(() => this._camera.zoom);
     this.connectorPreview = new ConnectorPreviewView(() => this._camera.zoom);
+  }
+
+  /**
+   * Switch the renderer between the muted workshop palette (sandbox) and
+   * the saturated cartoon palette (puzzle). Forces all bodies to rebuild
+   * with the new style and updates the canvas background.
+   *
+   * Safe to call before `attach()` resolves — the new theme is picked up
+   * once init completes; the body layer reads the theme on each reconcile
+   * via the getter passed in the constructor.
+   */
+  setMode(mode: GameMode): void {
+    const next: RenderTheme = mode === "puzzle" ? "cartoon" : "workshop";
+    if (next === this._theme) return;
+    this._theme = next;
+    const bg = next === "cartoon" ? cartoonPalette.paper : palette.paper;
+    if (this._ready && this.app) {
+      this.app.renderer.background.color = bg;
+    }
+    if (this._lastSnapshot) {
+      this.bodyLayer.refreshGeometry(this._lastSnapshot);
+    }
   }
 
   setConnectorPreview(state: ConnectorPreviewState | null): void {
@@ -215,9 +241,12 @@ export class Renderer {
     const app = new Application();
     this.app = app;
 
+    const initialBg =
+      options.background ??
+      (this._theme === "cartoon" ? cartoonPalette.paper : palette.paper);
     this._initPromise = app
       .init({
-        background: options.background ?? palette.paper,
+        background: initialBg,
         antialias: options.antialias ?? true,
         resolution: options.resolution ?? window.devicePixelRatio,
         resizeTo: host,
@@ -229,6 +258,11 @@ export class Renderer {
           this.destroyApp(app);
           return;
         }
+        // Apply the current theme background in case setMode was called
+        // before init completed.
+        const themedBg =
+          this._theme === "cartoon" ? cartoonPalette.paper : palette.paper;
+        app.renderer.background.color = options.background ?? themedBg;
         host.appendChild(app.canvas);
         app.stage.addChild(this.worldRoot);
 

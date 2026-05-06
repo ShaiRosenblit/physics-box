@@ -199,6 +199,13 @@ export function App() {
     rendererRef.current?.setSelectedId(selectedId);
   }, [selectedId]);
 
+  // Puzzle mode flips the renderer to the cartoon theme (saturated
+  // candy palette, thicker outlines, soft drop shadow). Sandbox stays in
+  // the muted workshop palette.
+  useEffect(() => {
+    rendererRef.current?.setMode(gameMode);
+  }, [gameMode]);
+
   // Dev-only probe: exposes a tiny imperative surface to Playwright and
   // ad-hoc debugging. Disabled in production builds so it never leaks
   // simulation internals into the public bundle.
@@ -911,16 +918,22 @@ export function App() {
   // panel — at iPad-landscape widths the panel was just stealing
   // canvas width to render "No body selected".
   const inspectorAsDrawer = !isDesktop;
+  // Puzzle mode wears the cartoon cream background; sandbox keeps the
+  // muted workshop beige.
+  const shellBackground = gameMode === "puzzle" ? "#fffaea" : "#f5efe6";
 
   return (
     <SimulationProvider value={sim}>
-      <div data-testid={testIds.app} style={appShell}>
+      <div
+        data-testid={testIds.app}
+        style={{ ...appShell, background: shellBackground }}
+      >
         <div style={mainRow}>
           {/* Toolbar: rail on tablet, full panel on desktop, drawer on phone. Hidden in puzzle mode. */}
           {gameMode !== "puzzle" && isTablet && <Toolbar variant="rail" />}
           {gameMode !== "puzzle" && isDesktop && <Toolbar variant="panel" />}
 
-          <main style={canvasColumn}>
+          <main style={{ ...canvasColumn, background: shellBackground }}>
             {/* Tool option panels dock under the toolbar on tablet/desktop
                 so they sit out of the way; on phone we move them BELOW the
                 canvas (above the playback bar) so they don't fight the
@@ -988,7 +1001,7 @@ export function App() {
               </button>
             )}
 
-            {isPhone && (
+            {gameMode !== "puzzle" && isPhone && (
               <Drawer
                 open={toolsOpen}
                 side="left"
@@ -1001,7 +1014,7 @@ export function App() {
                 <Toolbar variant="sheet" />
               </Drawer>
             )}
-            {inspectorAsDrawer && (
+            {gameMode !== "puzzle" && inspectorAsDrawer && (
               <Drawer
                 open={inspectorOpen}
                 side="bottom"
