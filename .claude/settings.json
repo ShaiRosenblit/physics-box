@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx playwright test *)",
+      "Bash(curl -s http://localhost:*)"
+    ]
+  }
+}
